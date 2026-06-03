@@ -15,7 +15,7 @@
 }
 
 html {
-  scroll-padding-top: 86px;
+  scroll-padding-top: 124px;
 }
 
 body {
@@ -1073,5 +1073,21 @@ html[data-theme='dark'] .topbar nav::-webkit-scrollbar-thumb {
   .flagImage {
     max-width: 36px;
     max-height: 24px;
+  }
+}
+
+
+/* v8: Better auto-scroll offset after sticky navigation grew taller. */
+.matchCard[data-current-match='true'] {
+  scroll-margin-top: 124px;
+}
+
+@media (max-width: 560px) {
+  html {
+    scroll-padding-top: 132px;
+  }
+
+  .matchCard[data-current-match='true'] {
+    scroll-margin-top: 132px;
   }
 }

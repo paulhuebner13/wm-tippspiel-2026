@@ -4,6 +4,16 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'WM Tippspiel 2026',
   description: 'Privates WM Tippspiel für Freunde',
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: '/app-icon.png',
+    apple: '/app-icon.png',
+  },
+  appleWebApp: {
+    capable: true,
+    title: 'WM Tippspiel',
+    statusBarStyle: 'default',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
