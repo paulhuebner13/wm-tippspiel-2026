@@ -167,3 +167,56 @@ export async function updateKnockoutTeamsAction(formData: FormData) {
   revalidatePath('/matches');
   redirect('/admin?saved=1');
 }
+
+
+export async function createProfileAction(formData: FormData) {
+  await requireAdmin();
+
+  const username = String(formData.get('username') ?? '').trim();
+  const password = String(formData.get('password') ?? '');
+  const isAdmin = formData.get('isAdmin') === 'on';
+
+  if (!username || !password) {
+    redirect('/admin?error=missing_user_data');
+  }
+
+  if (username.length < 2 || password.length < 2) {
+    redirect('/admin?error=user_data_too_short');
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+
+  await supabaseAdmin.from('profiles').upsert(
+    {
+      username,
+      password_hash: passwordHash,
+      is_admin: isAdmin,
+    },
+    { onConflict: 'username' }
+  );
+
+  revalidatePath('/admin');
+  revalidatePath('/results');
+  revalidatePath('/ranking');
+  redirect('/admin?user_saved=1');
+}
+
+export async function deleteProfileAction(formData: FormData) {
+  const admin = await requireAdmin();
+  const profileId = String(formData.get('profileId') ?? '');
+
+  if (!profileId) {
+    redirect('/admin?error=missing_profile');
+  }
+
+  if (profileId === admin.id) {
+    redirect('/admin?error=cannot_delete_self');
+  }
+
+  await supabaseAdmin.from('profiles').delete().eq('id', profileId);
+
+  revalidatePath('/admin');
+  revalidatePath('/results');
+  revalidatePath('/ranking');
+  redirect('/admin?user_deleted=1');
+}

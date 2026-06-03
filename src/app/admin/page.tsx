@@ -1,11 +1,11 @@
-import { saveResultAction, updateKnockoutTeamsAction } from '@/app/actions';
+import { createProfileAction, deleteProfileAction, saveResultAction, updateKnockoutTeamsAction } from '@/app/actions';
 import { Nav } from '@/components/Nav';
 import { Flag } from '@/components/Flag';
 import { requireAdmin } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { formatKickoff } from '@/lib/time';
 import { getStageLabel, isKnockoutStage } from '@/lib/scoring';
-import type { Match, Team } from '@/lib/types';
+import type { Match, Profile, Team } from '@/lib/types';
 
 export default async function AdminPage() {
   const user = await requireAdmin();
@@ -24,15 +24,61 @@ export default async function AdminPage() {
     .select('*')
     .order('name', { ascending: true });
 
+  const { data: profilesData } = await supabaseAdmin
+    .from('profiles')
+    .select('id, username, is_admin')
+    .order('username', { ascending: true });
+
   const matches = (matchesData ?? []) as Match[];
   const teams = (teamsData ?? []) as Team[];
+  const profiles = (profilesData ?? []) as Profile[];
 
   return (
     <>
       <Nav user={user} />
       <main className="page">
         <h1>Admin</h1>
-        <p className="subtle">Hier trägst du Ergebnisse ein und öffnest K.-o.-Spiele, sobald die Teams feststehen.</p>
+        <p className="subtle">Hier trägst du Ergebnisse ein, öffnest K.-o.-Spiele und verwaltest die Spieler.</p>
+
+        <section className="card userAdminCard">
+          <h2>Spieler verwalten</h2>
+          <p className="subtle smallSubtle">Neuen Spieler erstellen oder ein bestehendes Passwort überschreiben. Normale Spieler bekommen keinen Admin-Zugang.</p>
+
+          <form action={createProfileAction} className="userCreateForm">
+            <label>
+              Name
+              <input name="username" placeholder="z. B. Lukas" autoComplete="off" required />
+            </label>
+            <label>
+              Passwort
+              <input name="password" type="text" placeholder="z. B. CR7" autoComplete="off" required />
+            </label>
+            <label className="checkboxLabel">
+              <input name="isAdmin" type="checkbox" />
+              Admin-Rechte geben
+            </label>
+            <button type="submit">Spieler speichern</button>
+          </form>
+
+          <div className="userList">
+            {profiles.map((profile) => (
+              <div className="userRow" key={profile.id}>
+                <div>
+                  <strong>{profile.username}</strong>
+                  <span>{profile.is_admin ? 'Admin' : 'Spieler'}</span>
+                </div>
+                {profile.id !== user.id ? (
+                  <form action={deleteProfileAction}>
+                    <input type="hidden" name="profileId" value={profile.id} />
+                    <button className="dangerButton" type="submit">Löschen</button>
+                  </form>
+                ) : (
+                  <span className="selfBadge">Du</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
 
         <div className="list">
           {matches.map((match) => {
