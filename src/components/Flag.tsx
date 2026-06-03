@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import type { Team } from '@/lib/types';
 
 export function Flag({ team }: { team: Team | null | undefined }) {
@@ -8,7 +7,7 @@ export function Flag({ team }: { team: Team | null | undefined }) {
 
   return (
     <span className="flagFrame" title={team.name}>
-      <Image src={team.flag_path} alt={`${team.name} Flagge`} width={48} height={32} className="flagImage" />
+      <img src={team.flag_path} alt={`${team.name} Flagge`} className="flagImage" loading="lazy" />
     </span>
   );
 }

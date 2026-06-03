@@ -898,3 +898,180 @@ h1 {
     grid-column: auto;
   }
 }
+
+/* v7: Dark mode, better flag framing and lower nav scrollbar. */
+:root {
+  --bg-soft: #f3f4f6;
+  --pill: #f3f4f6;
+  --panel: #f8fafc;
+  --button-soft: #475569;
+  --button-soft-hover: #334155;
+  --input-bg: #ffffff;
+  --flag-border: rgba(0, 0, 0, 0.16);
+  --points-bg: #eef2f7;
+  --points-border: #dbe3ee;
+}
+
+html[data-theme='dark'] {
+  --bg: #0f172a;
+  --card: #172033;
+  --text: #e5e7eb;
+  --muted: #a5b4c7;
+  --line: #2d3a50;
+  --accent: #e2e8f0;
+  --danger: #f87171;
+  --ok: #4ade80;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --bg-soft: #1f2937;
+  --pill: #223049;
+  --panel: #111827;
+  --button-soft: #64748b;
+  --button-soft-hover: #7890ad;
+  --input-bg: #0f172a;
+  --flag-border: rgba(255, 255, 255, 0.22);
+  --points-bg: #111827;
+  --points-border: #334155;
+}
+
+input,
+select {
+  background: var(--input-bg);
+  color: var(--text);
+}
+
+.topbar {
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+  padding-bottom: 16px;
+}
+
+.topbar nav {
+  padding-bottom: 10px;
+  margin-bottom: -8px;
+  scrollbar-gutter: stable;
+}
+
+.topbar nav::-webkit-scrollbar {
+  height: 6px;
+}
+
+.topbar nav::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+html[data-theme='dark'] .topbar nav::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+.topbar a,
+.linkButton {
+  background: var(--pill);
+}
+
+.themeToggle {
+  margin-left: 8px;
+  background: var(--pill);
+  color: var(--text);
+  padding: 7px 10px;
+  min-height: 34px;
+  font-size: 13px;
+  border-radius: 999px;
+}
+
+.matchTitleLine span,
+.matchMeta span,
+.allPredictions li,
+.rankingList li,
+.userRow {
+  background: var(--panel);
+}
+
+.predictionLockedBox,
+.advanceChoiceBox,
+.resultUserPicker {
+  background: var(--panel);
+}
+
+.advanceChoice {
+  background: var(--card);
+  color: var(--text);
+  border-color: var(--line);
+}
+
+.advanceChoice.selected {
+  border-color: #60a5fa;
+  background: color-mix(in srgb, #2563eb 18%, var(--card));
+}
+
+.saveTipButton,
+.resultUserPicker button,
+.userCreateForm button {
+  background: var(--button-soft);
+}
+
+.saveTipButton:hover,
+.resultUserPicker button:hover,
+.userCreateForm button:hover {
+  background: var(--button-soft-hover);
+}
+
+.pointsPanel {
+  background: var(--points-bg);
+  border-left-color: var(--points-border);
+}
+
+.pointsValue {
+  color: var(--text);
+}
+
+.tipScoreNumbers {
+  color: var(--text);
+}
+
+.selfBadge {
+  background: color-mix(in srgb, #0ea5e9 20%, var(--card));
+}
+
+.dangerButton {
+  background: color-mix(in srgb, #ef4444 18%, var(--card));
+  color: var(--danger);
+}
+
+.flagFrame,
+.flagPlaceholder {
+  width: 42px;
+  height: 28px;
+  flex: 0 0 42px;
+  overflow: visible;
+}
+
+.flagImage {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 42px;
+  max-height: 28px;
+  object-fit: contain;
+  border: 1px solid var(--flag-border);
+  border-radius: 2px;
+  box-shadow: none;
+  background: transparent;
+}
+
+.flagPlaceholder {
+  border: 1px dashed var(--line);
+}
+
+@media (max-width: 560px) {
+  .flagFrame,
+  .flagPlaceholder {
+    width: 36px;
+    height: 24px;
+    flex-basis: 36px;
+  }
+
+  .flagImage {
+    max-width: 36px;
+    max-height: 24px;
+  }
+}

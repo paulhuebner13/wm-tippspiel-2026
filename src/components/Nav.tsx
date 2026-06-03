@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { logoutAction } from '@/app/actions';
 import type { Profile } from '@/lib/types';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export function Nav({ user }: { user: Profile }) {
   return (
@@ -8,6 +9,7 @@ export function Nav({ user }: { user: Profile }) {
       <div>
         <strong>WM Tippspiel 2026</strong>
         <span className="userName">{user.username}</span>
+        <ThemeToggle />
       </div>
       <nav>
         <Link href="/matches">Tipps</Link>
