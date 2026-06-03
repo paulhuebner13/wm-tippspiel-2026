@@ -720,3 +720,92 @@ h1 {
     font-size: 28px;
   }
 }
+
+/* v5: On mobile, teams must stay left and right of the score/tip/result.
+   Flag and country name stack vertically to save width. */
+@media (max-width: 560px) {
+  .predictionMainRow,
+  .lockedTeamsRow,
+  .resultScoreGrid {
+    grid-template-columns: minmax(72px, 1fr) auto minmax(72px, 1fr);
+    gap: 6px;
+    align-items: center;
+    justify-items: stretch;
+  }
+
+  .predictionTeam,
+  .team,
+  .resultScoreGrid .sideHome,
+  .resultScoreGrid .sideAway {
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  .predictionTeamHome,
+  .predictionTeamAway,
+  .sideHome,
+  .sideAway {
+    justify-content: center;
+    text-align: center;
+  }
+
+  .predictionTeam .flagFrame,
+  .predictionTeam .flagPlaceholder,
+  .team .flagFrame,
+  .team .flagPlaceholder {
+    order: 1;
+  }
+
+  .predictionTeam .teamName,
+  .team .teamName {
+    order: 2;
+  }
+
+  .teamName {
+    font-size: 12px;
+    line-height: 1.15;
+    max-width: 82px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .flagFrame,
+  .flagPlaceholder {
+    height: 22px;
+    width: 34px;
+    flex-basis: 34px;
+  }
+
+  .flagImage {
+    height: 22px;
+    max-width: 34px;
+  }
+
+  .scoreInputs {
+    grid-template-columns: 42px auto 42px;
+    gap: 5px;
+  }
+
+  .scoreInputs input {
+    font-size: 16px;
+    padding: 9px 4px;
+    min-width: 0;
+  }
+
+  .lockedScoreBox {
+    min-width: 58px;
+    font-size: 20px;
+  }
+
+  .resultScoreNumbers {
+    font-size: 24px;
+  }
+
+  .tipScoreNumbers {
+    font-size: 18px;
+  }
+}
