@@ -1,1 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 2"><rect width="3" height="2" fill="#eee"/><path d="M0 0h3v.67H0z" fill="#d00"/><path d="M0 1.33h3V2H0z" fill="#111"/></svg>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 22 16">
+	<title>Flag of Norway</title>
+	<rect width="22" height="16" fill="#ba0c2f"/>
+	<path d="M0,8h22M8,0v16" stroke="#fff" stroke-width="4"/>
+	<path d="M0,8h22M8,0v16" stroke="#00205b" stroke-width="2"/>
+</svg>
