@@ -43,6 +43,49 @@ export async function loginAction(formData: FormData) {
   redirect('/matches');
 }
 
+
+export async function registerAction(formData: FormData) {
+  const username = String(formData.get('username') ?? '').trim();
+  const password = String(formData.get('password') ?? '');
+
+  if (!username || !password) {
+    redirect('/login?mode=register&error=missing');
+  }
+
+  if (username.length < 2 || password.length < 2) {
+    redirect('/login?mode=register&error=user_data_too_short');
+  }
+
+  const { data: existingProfiles } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .ilike('username', username)
+    .limit(1);
+
+  if (existingProfiles && existingProfiles.length > 0) {
+    redirect('/login?mode=register&error=user_exists');
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+
+  const { data: profile, error } = await supabaseAdmin
+    .from('profiles')
+    .insert({
+      username,
+      password_hash: passwordHash,
+      is_admin: false,
+    })
+    .select('id, username, is_admin')
+    .single();
+
+  if (error || !profile) {
+    redirect('/login?mode=register&error=register_failed');
+  }
+
+  await createSession({ id: profile.id, username: profile.username, is_admin: profile.is_admin });
+  redirect('/matches');
+}
+
 export async function logoutAction() {
   await destroySession();
   redirect('/login');
