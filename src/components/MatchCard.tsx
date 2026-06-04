@@ -101,7 +101,6 @@ export function MatchCard({
         </div>
       </div>
 
-      <p className="venue">{match.venue}</p>
 
       {canPredict ? (
         <form action={savePredictionAction} className="predictionForm predictionFormCentered">

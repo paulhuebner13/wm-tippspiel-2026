@@ -12,11 +12,11 @@ export function Nav({ user }: { user: Profile }) {
         <ThemeToggle />
       </div>
       <nav>
-        <Link href="/countdown">Countdown</Link>
         <Link href="/matches">Tipps</Link>
         <Link href="/results">Ergebnisse</Link>
         <Link href="/ranking">Ranking</Link>
         <Link href="/rules">Regeln</Link>
+        <Link href="/countdown">Countdown</Link>
         {user.is_admin && <Link href="/admin">Admin</Link>}
         <form action={logoutAction}>
           <button className="linkButton">Logout</button>
