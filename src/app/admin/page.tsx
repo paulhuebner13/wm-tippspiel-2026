@@ -1,6 +1,7 @@
-import { createProfileAction, deleteProfileAction, saveResultAction, updateKnockoutTeamsAction } from '@/app/actions';
+import { createProfileAction, saveResultAction, updateKnockoutTeamsAction } from '@/app/actions';
 import { Nav } from '@/components/Nav';
 import { Flag } from '@/components/Flag';
+import { DeleteProfileForm } from '@/components/DeleteProfileForm';
 import { requireAdmin } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { formatKickoff } from '@/lib/time';
@@ -68,10 +69,7 @@ export default async function AdminPage() {
                   <span>{profile.is_admin ? 'Admin' : 'Spieler'}</span>
                 </div>
                 {profile.id !== user.id ? (
-                  <form action={deleteProfileAction}>
-                    <input type="hidden" name="profileId" value={profile.id} />
-                    <button className="dangerButton" type="submit">Löschen</button>
-                  </form>
+                  <DeleteProfileForm profileId={profile.id} username={profile.username} />
                 ) : (
                   <span className="selfBadge">Du</span>
                 )}

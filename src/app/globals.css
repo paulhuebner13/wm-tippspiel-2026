@@ -1091,3 +1091,105 @@ html[data-theme='dark'] .topbar nav::-webkit-scrollbar-thumb {
     scroll-margin-top: 132px;
   }
 }
+
+/* v9: rule page, instant result picker and clearer unsaved save state. */
+.resultUserPicker {
+  max-width: 360px;
+}
+
+.resultUserPicker select {
+  width: 100%;
+}
+
+.saveTipButtonUnsaved:not(:disabled) {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.saveTipButtonUnsaved:not(:disabled):hover {
+  background: #bfdbfe;
+}
+
+html[data-theme='dark'] .saveTipButtonUnsaved:not(:disabled) {
+  background: rgba(96, 165, 250, 0.2);
+  color: #bfdbfe;
+  border-color: rgba(96, 165, 250, 0.6);
+}
+
+html[data-theme='dark'] .saveTipButtonUnsaved:not(:disabled):hover {
+  background: rgba(96, 165, 250, 0.28);
+}
+
+.rulesPage {
+  max-width: 920px;
+}
+
+.rulesCard {
+  display: grid;
+  gap: 12px;
+}
+
+.rulesCard h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.rulesCard p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.rulesGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.rulesGrid > div {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px;
+  display: grid;
+  gap: 6px;
+}
+
+.rulesGrid strong {
+  font-size: 15px;
+}
+
+.rulesGrid span {
+  color: #2563eb;
+  font-weight: 900;
+}
+
+html[data-theme='dark'] .rulesGrid span {
+  color: #93c5fd;
+}
+
+.multiplierList {
+  display: grid;
+  gap: 8px;
+}
+
+.multiplierList div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+
+.multiplierList strong {
+  font-size: 18px;
+}
+
+@media (max-width: 620px) {
+  .rulesGrid {
+    grid-template-columns: 1fr;
+  }
+}

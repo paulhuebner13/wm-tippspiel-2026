@@ -1,5 +1,6 @@
 import { Nav } from '@/components/Nav';
 import { Flag } from '@/components/Flag';
+import { ResultUserPicker } from '@/components/ResultUserPicker';
 import { requireUser } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { calculateTotalPoints, getStageLabel } from '@/lib/scoring';
@@ -56,17 +57,7 @@ export default async function ResultsPage({ searchParams }: ResultsPageProps) {
             <p className="subtle">Angezeigt werden die Tipps von {selectedProfile.username}.</p>
           </div>
 
-          <form className="resultUserPicker" action="/results" method="get">
-            <label htmlFor="userId">Spieler auswählen</label>
-            <select id="userId" name="userId" defaultValue={selectedUserId}>
-              {profiles.map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {profile.id === user.id ? `${profile.username} (du)` : profile.username}
-                </option>
-              ))}
-            </select>
-            <button type="submit">Anzeigen</button>
-          </form>
+          <ResultUserPicker profiles={profiles} selectedUserId={selectedUserId} ownUserId={user.id} />
         </div>
 
         <div className="list">

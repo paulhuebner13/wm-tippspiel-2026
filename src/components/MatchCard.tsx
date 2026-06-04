@@ -74,7 +74,16 @@ export function MatchCard({
     return home !== null && away !== null && home === away;
   }, [awayScore, homeScore, knockoutStage]);
 
+  const hasCompleteScoreInput = scoreInputToNumber(homeScore) !== null && scoreInputToNumber(awayScore) !== null;
+  const scoreChanged =
+    homeScore !== (ownPrediction?.predicted_home_score?.toString() ?? '') ||
+    awayScore !== (ownPrediction?.predicted_away_score?.toString() ?? '');
+  const advanceChanged = showAdvanceChoice
+    ? advanceTeamId !== (ownPrediction?.advance_team_id ?? '')
+    : Boolean(ownPrediction?.advance_team_id);
+  const hasUnsavedChanges = hasCompleteScoreInput && (scoreChanged || advanceChanged);
   const saveDisabled = Boolean(showAdvanceChoice && advanceTeamId.length === 0);
+  const saveButtonClass = `saveTipButton${hasUnsavedChanges ? ' saveTipButtonUnsaved' : ''}${saveDisabled ? ' saveTipButtonDisabled' : ''}`;
 
   return (
     <article className={`card matchCard ${statusClass}`} data-current-match={current ? 'true' : undefined}>
@@ -177,7 +186,7 @@ export function MatchCard({
             </div>
           )}
 
-          <button type="submit" className="saveTipButton" disabled={saveDisabled}>
+          <button type="submit" className={saveButtonClass} disabled={saveDisabled}>
             Tipp speichern
           </button>
         </form>
