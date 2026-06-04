@@ -10,8 +10,6 @@ export default async function RulesPage() {
       <Nav user={user} />
       <main className="page rulesPage">
         <h1>Regeln</h1>
-        <p className="subtle">Hier stehen die wichtigsten Regeln für das WM Tippspiel.</p>
-
         <section className="card rulesCard">
           <h2>Punkte pro Tipp</h2>
           <div className="rulesGrid">

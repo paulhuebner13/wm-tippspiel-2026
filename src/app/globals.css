@@ -1193,3 +1193,111 @@ html[data-theme='dark'] .rulesGrid span {
     grid-template-columns: 1fr;
   }
 }
+
+/* v10: cleaner rules spacing and expandable ranking rows. */
+.rulesPage > .card {
+  margin-top: 22px;
+}
+
+.rulesPage > .card + .card {
+  margin-top: 28px;
+}
+
+.rulesCard {
+  gap: 18px;
+}
+
+.rulesGrid {
+  gap: 18px;
+}
+
+.rulesGrid > div {
+  padding: 18px;
+}
+
+.multiplierList {
+  gap: 12px;
+}
+
+.rankingListExpandable li {
+  display: block;
+  padding: 0;
+  overflow: hidden;
+}
+
+.rankingDetails {
+  width: 100%;
+}
+
+.rankingDetails summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+}
+
+.rankingDetails summary::-webkit-details-marker {
+  display: none;
+}
+
+.rankingDetails summary::after {
+  content: '›';
+  font-size: 22px;
+  line-height: 1;
+  color: var(--muted);
+  transition: transform 0.18s ease;
+}
+
+.rankingDetails[open] summary::after {
+  transform: rotate(90deg);
+}
+
+.rankingDetails summary strong {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.rankingBreakdown {
+  border-top: 1px solid var(--line);
+  padding: 10px 12px 12px;
+  display: grid;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.rankingBreakdown div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.rankingBreakdown span {
+  color: var(--muted);
+}
+
+.rankingBreakdown strong {
+  white-space: nowrap;
+}
+
+html[data-theme='dark'] .rankingBreakdown {
+  background: rgba(15, 23, 42, 0.35);
+}
+
+@media (max-width: 520px) {
+  .rankingDetails summary {
+    align-items: flex-start;
+  }
+
+  .rankingDetails summary strong {
+    font-size: 14px;
+  }
+
+  .rankingBreakdown div {
+    font-size: 13px;
+  }
+}

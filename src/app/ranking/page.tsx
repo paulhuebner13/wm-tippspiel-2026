@@ -1,13 +1,28 @@
 import { Nav } from '@/components/Nav';
 import { requireUser } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { calculateTotalPoints } from '@/lib/scoring';
-import type { Match, Prediction, Profile } from '@/lib/types';
+import { calculateTotalPoints, getStageLabel, STAGE_MULTIPLIERS } from '@/lib/scoring';
+import type { Match, Prediction, Profile, Stage } from '@/lib/types';
 
 type RankingRow = {
   user: Profile;
   total: number;
+  stageTotals: Record<Stage, number>;
 };
+
+const STAGE_ORDER = Object.keys(STAGE_MULTIPLIERS) as Stage[];
+
+function emptyStageTotals(): Record<Stage, number> {
+  return {
+    group: 0,
+    round_of_32: 0,
+    round_of_16: 0,
+    quarter_final: 0,
+    semi_final: 0,
+    third_place: 0,
+    final: 0,
+  };
+}
 
 export default async function RankingPage() {
   const user = await requireUser();
@@ -32,14 +47,24 @@ export default async function RankingPage() {
 
   const ranking: RankingRow[] = profiles
     .map((profile) => {
+      const stageTotals = emptyStageTotals();
+
       const total = predictions
         .filter((prediction) => prediction.user_id === profile.id)
         .reduce((sum, prediction) => {
           const match = matches.find((item) => item.id === prediction.match_id);
-          return match ? sum + calculateTotalPoints(match, prediction) : sum;
+
+          if (!match) {
+            return sum;
+          }
+
+          const points = calculateTotalPoints(match, prediction);
+          stageTotals[match.stage] += points;
+
+          return sum + points;
         }, 0);
 
-      return { user: profile, total };
+      return { user: profile, total, stageTotals };
     })
     .sort((a, b) => b.total - a.total || a.user.username.localeCompare(b.user.username));
 
@@ -49,11 +74,24 @@ export default async function RankingPage() {
       <main className="page">
         <h1>Ranking</h1>
         <section className="card">
-          <ol className="rankingList">
+          <ol className="rankingList rankingListExpandable">
             {ranking.map((row, index) => (
               <li key={row.user.id} className={row.user.id === user.id ? 'ownRanking' : ''}>
-                <span>{index + 1}. {row.user.username}</span>
-                <strong>{row.total} Punkte</strong>
+                <details className="rankingDetails">
+                  <summary>
+                    <span>{index + 1}. {row.user.username}</span>
+                    <strong>{row.total} Punkte</strong>
+                  </summary>
+
+                  <div className="rankingBreakdown">
+                    {STAGE_ORDER.map((stage) => (
+                      <div key={stage}>
+                        <span>{getStageLabel(stage)}</span>
+                        <strong>{row.stageTotals[stage]} Punkte</strong>
+                      </div>
+                    ))}
+                  </div>
+                </details>
               </li>
             ))}
           </ol>
