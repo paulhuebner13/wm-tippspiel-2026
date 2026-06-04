@@ -12,6 +12,7 @@ export function Nav({ user }: { user: Profile }) {
         <ThemeToggle />
       </div>
       <nav>
+        <Link href="/countdown">Countdown</Link>
         <Link href="/matches">Tipps</Link>
         <Link href="/results">Ergebnisse</Link>
         <Link href="/ranking">Ranking</Link>

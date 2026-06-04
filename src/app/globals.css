@@ -1374,3 +1374,112 @@ html[data-theme='dark'] .rankingBreakdown {
 [data-theme='dark'] .authSwitch button.active {
   color: #0f172a;
 }
+
+/* v12: Countdown tab. */
+.countdownPage {
+  min-height: calc(100vh - 110px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.countdownHero {
+  width: min(760px, 100%);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+  padding: 28px 18px;
+}
+
+.countdownMatchLine {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.countdownTeam {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+  font-size: clamp(17px, 4vw, 26px);
+  line-height: 1.1;
+}
+
+.countdownTeam span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.countdownHomeTeam {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.countdownAwayTeam {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.countdownVersus {
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 14px;
+  text-transform: uppercase;
+}
+
+.countdownClock {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.countdownClock div {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 16px 8px;
+  text-align: center;
+}
+
+.countdownClock strong {
+  display: block;
+  font-size: clamp(28px, 8vw, 58px);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.countdownClock span {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+@media (max-width: 520px) {
+  .countdownHero {
+    padding: 22px 12px;
+    border-radius: 22px;
+  }
+
+  .countdownMatchLine {
+    gap: 8px;
+  }
+
+  .countdownTeam {
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .countdownHomeTeam,
+  .countdownAwayTeam {
+    text-align: center;
+    justify-content: center;
+  }
+}
