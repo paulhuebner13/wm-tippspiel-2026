@@ -1597,3 +1597,25 @@ html[data-theme='dark'] .rankingBreakdown {
 .adminSectionCard {
   border: 1px solid color-mix(in srgb, var(--danger) 25%, var(--line));
 }
+
+/* v17: result status borders in Resultate admin tab. */
+.adminResultCard {
+  border-width: 3px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.adminResultEntered {
+  border-color: #16a34a;
+}
+
+.adminResultMissing {
+  border-color: #f59e0b;
+}
+
+.adminResultUpcoming {
+  border-color: #d1d5db;
+}
+
+.adminResultCard[data-current-match='true'] {
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.16), var(--shadow);
+}

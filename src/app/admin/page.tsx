@@ -1,6 +1,7 @@
 import { saveResultAction, updateKnockoutTeamsAction } from '@/app/actions';
 import { Nav } from '@/components/Nav';
 import { Flag } from '@/components/Flag';
+import { AutoScrollToCurrent } from '@/components/AutoScrollToCurrent';
 import { requireAdmin } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { formatKickoff } from '@/lib/time';
@@ -26,6 +27,8 @@ export default async function AdminPage() {
 
   const matches = (matchesData ?? []) as Match[];
   const teams = (teamsData ?? []) as Team[];
+  const now = new Date();
+  const firstUnenteredMatchId = matches.find((match) => match.home_score === null || match.away_score === null)?.id ?? null;
 
   return (
     <>
@@ -33,14 +36,23 @@ export default async function AdminPage() {
       <main className="page">
         <h1>Resultate</h1>
         <p className="subtle">Hier trägst du Spielergebnisse ein und öffnest K.-o.-Spiele für Tipps.</p>
+        <AutoScrollToCurrent />
 
         <div className="list">
           {matches.map((match) => {
             const homeName = match.home_team?.name ?? match.home_placeholder ?? 'Offen';
             const awayName = match.away_team?.name ?? match.away_placeholder ?? 'Offen';
+            const hasResult = match.home_score !== null && match.away_score !== null;
+            const hasStarted = new Date(match.kickoff_time) <= now;
+            const resultStatusClass = hasResult ? 'adminResultEntered' : hasStarted ? 'adminResultMissing' : 'adminResultUpcoming';
+            const shouldAutoScrollHere = match.id === firstUnenteredMatchId;
 
             return (
-              <article className="card adminCard" key={match.id}>
+              <article
+                className={`card adminCard adminResultCard ${resultStatusClass}`}
+                data-current-match={shouldAutoScrollHere ? 'true' : undefined}
+                key={match.id}
+              >
                 <div className="matchMeta">
                   <span>Spiel {match.match_number}</span>
                   <span>{getStageLabel(match.stage)}</span>
