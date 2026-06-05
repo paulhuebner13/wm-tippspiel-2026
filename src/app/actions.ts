@@ -220,11 +220,11 @@ export async function createProfileAction(formData: FormData) {
   const isAdmin = formData.get('isAdmin') === 'on';
 
   if (!username || !password) {
-    redirect('/admin?error=missing_user_data');
+    redirect('/players?error=missing_user_data');
   }
 
   if (username.length < 2 || password.length < 2) {
-    redirect('/admin?error=user_data_too_short');
+    redirect('/players?error=user_data_too_short');
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
@@ -238,10 +238,10 @@ export async function createProfileAction(formData: FormData) {
     { onConflict: 'username' }
   );
 
-  revalidatePath('/admin');
+  revalidatePath('/players');
   revalidatePath('/results');
   revalidatePath('/ranking');
-  redirect('/admin?user_saved=1');
+  redirect('/players?user_saved=1');
 }
 
 export async function deleteProfileAction(formData: FormData) {
@@ -249,19 +249,19 @@ export async function deleteProfileAction(formData: FormData) {
   const profileId = String(formData.get('profileId') ?? '');
 
   if (!profileId) {
-    redirect('/admin?error=missing_profile');
+    redirect('/players?error=missing_profile');
   }
 
   if (profileId === admin.id) {
-    redirect('/admin?error=cannot_delete_self');
+    redirect('/players?error=cannot_delete_self');
   }
 
   await supabaseAdmin.from('profiles').delete().eq('id', profileId);
 
-  revalidatePath('/admin');
+  revalidatePath('/players');
   revalidatePath('/results');
   revalidatePath('/ranking');
-  redirect('/admin?user_deleted=1');
+  redirect('/players?user_deleted=1');
 }
 
 export async function createGroupAction(formData: FormData) {

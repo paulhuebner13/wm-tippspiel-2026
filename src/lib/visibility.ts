@@ -9,10 +9,6 @@ export async function getVisibleProfilesForUser(user: Profile): Promise<Profile[
 
   const profiles = (profilesData ?? []) as Profile[];
 
-  if (user.is_admin) {
-    return profiles;
-  }
-
   const { data: membershipsData } = await supabaseAdmin
     .from('group_members')
     .select('group_id')

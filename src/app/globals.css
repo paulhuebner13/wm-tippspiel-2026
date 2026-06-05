@@ -1581,3 +1581,19 @@ html[data-theme='dark'] .rankingBreakdown {
     display: grid;
   }
 }
+
+
+/* v16: separated admin player management and highlighted admin tabs. */
+.topbar a.adminNavLink {
+  border: 1px solid color-mix(in srgb, var(--danger) 55%, transparent);
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--pill, #f3f4f6));
+}
+
+.topbar a.adminNavLink:hover {
+  background: color-mix(in srgb, var(--danger) 14%, var(--pill, #f3f4f6));
+}
+
+.adminSectionCard {
+  border: 1px solid color-mix(in srgb, var(--danger) 25%, var(--line));
+}

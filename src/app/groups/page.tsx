@@ -77,11 +77,11 @@ export default async function GroupsPage({ searchParams }: GroupsPageProps) {
                   <DeleteGroupForm groupId={selectedGroup.id} groupName={selectedGroup.name} />
                 </div>
 
-                <form action={updateGroupMembersAction} className="groupMembersForm">
+                <form key={selectedGroup.id} action={updateGroupMembersAction} className="groupMembersForm">
                   <input type="hidden" name="groupId" value={selectedGroup.id} />
-                  <div className="memberCheckboxGrid">
+                  <div key={`members-${selectedGroup.id}`} className="memberCheckboxGrid">
                     {profiles.map((profile) => (
-                      <label key={profile.id} className="memberCheckbox">
+                      <label key={`${selectedGroup.id}-${profile.id}`} className="memberCheckbox">
                         <input name="memberIds" type="checkbox" value={profile.id} defaultChecked={memberIds.has(profile.id)} />
                         <span>{profile.username}</span>
                         {profile.is_admin && <small>Admin</small>}

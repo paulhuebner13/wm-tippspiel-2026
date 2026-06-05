@@ -17,9 +17,10 @@ export function Nav({ user }: { user: Profile }) {
         <Link href="/ranking">Ranking</Link>
         <Link href="/rules">Regeln</Link>
         <Link href="/countdown">Countdown</Link>
-        {user.is_admin && <Link href="/groups">Gruppen</Link>}
-        {user.is_admin && <Link href="/changes">Änderungen</Link>}
-        {user.is_admin && <Link href="/admin">Admin</Link>}
+        {user.is_admin && <Link className="adminNavLink" href="/admin">Resultate</Link>}
+        {user.is_admin && <Link className="adminNavLink" href="/players">Spieler</Link>}
+        {user.is_admin && <Link className="adminNavLink" href="/groups">Gruppen</Link>}
+        {user.is_admin && <Link className="adminNavLink" href="/changes">Änderungen</Link>}
         <form action={logoutAction}>
           <button className="linkButton">Logout</button>
         </form>
