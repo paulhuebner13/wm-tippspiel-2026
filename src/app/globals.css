@@ -1483,3 +1483,101 @@ html[data-theme='dark'] .rankingBreakdown {
     justify-content: center;
   }
 }
+
+.groupsLayout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.35fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.groupsCreateCard,
+.groupListCard,
+.groupMembersCard,
+.changeSearchCard,
+.changeEditCard {
+  margin-bottom: 1rem;
+}
+
+.groupsCreateForm,
+.changeSearchForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.groupLinkList {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.groupLink {
+  display: block;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.85rem;
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+  text-decoration: none;
+  color: var(--text);
+  font-weight: 650;
+}
+
+.groupLink.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.groupMembersHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: start;
+  margin-bottom: 1rem;
+}
+
+.groupMembersForm {
+  display: grid;
+  gap: 1rem;
+}
+
+.memberCheckboxGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.6rem;
+}
+
+.memberCheckbox {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.72rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: var(--bg-soft);
+}
+
+.memberCheckbox small {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.changeSearchForm {
+  grid-template-columns: minmax(160px, 1fr) minmax(120px, 0.6fr) auto;
+}
+
+.changeOverrideForm {
+  margin-top: 1rem;
+}
+
+@media (max-width: 720px) {
+  .groupsLayout,
+  .groupsCreateForm,
+  .changeSearchForm {
+    grid-template-columns: 1fr;
+  }
+
+  .groupMembersHeader {
+    display: grid;
+  }
+}

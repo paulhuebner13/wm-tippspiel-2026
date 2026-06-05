@@ -1,6 +1,7 @@
 import { Nav } from '@/components/Nav';
 import { requireUser } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getVisibleProfilesForUser, getVisibleProfileIdSet } from '@/lib/visibility';
 import { calculateTotalPoints, getStageLabel, STAGE_MULTIPLIERS } from '@/lib/scoring';
 import type { Match, Prediction, Profile, Stage } from '@/lib/types';
 
@@ -27,10 +28,8 @@ function emptyStageTotals(): Record<Stage, number> {
 export default async function RankingPage() {
   const user = await requireUser();
 
-  const { data: profilesData } = await supabaseAdmin
-    .from('profiles')
-    .select('id, username, is_admin')
-    .order('username', { ascending: true });
+  const profiles = await getVisibleProfilesForUser(user);
+  const visibleProfileIds = getVisibleProfileIdSet(profiles);
 
   const { data: matchesData } = await supabaseAdmin
     .from('matches')
@@ -41,9 +40,8 @@ export default async function RankingPage() {
     .from('predictions')
     .select('*');
 
-  const profiles = (profilesData ?? []) as Profile[];
   const matches = (matchesData ?? []) as Match[];
-  const predictions = (predictionsData ?? []) as Prediction[];
+  const predictions = ((predictionsData ?? []) as Prediction[]).filter((prediction) => visibleProfileIds.has(prediction.user_id));
 
   const ranking: RankingRow[] = profiles
     .map((profile) => {

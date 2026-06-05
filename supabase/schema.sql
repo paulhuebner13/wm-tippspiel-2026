@@ -1,5 +1,7 @@
 create extension if not exists pgcrypto;
 
+drop table if exists group_members cascade;
+drop table if exists player_groups cascade;
 drop table if exists predictions cascade;
 drop table if exists matches cascade;
 drop table if exists teams cascade;
@@ -44,6 +46,19 @@ create table matches (
   constraint match_has_away check (away_team_id is not null or away_placeholder is not null)
 );
 
+create table player_groups (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  created_at timestamptz not null default now()
+);
+
+create table group_members (
+  group_id uuid not null references player_groups(id) on delete cascade,
+  profile_id uuid not null references profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (group_id, profile_id)
+);
+
 create table predictions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references profiles(id) on delete cascade,
@@ -56,6 +71,8 @@ create table predictions (
   unique(user_id, match_id)
 );
 
+create index idx_group_members_group on group_members(group_id);
+create index idx_group_members_profile on group_members(profile_id);
 create index idx_matches_kickoff on matches(kickoff_time);
 create index idx_predictions_user on predictions(user_id);
 create index idx_predictions_match on predictions(match_id);

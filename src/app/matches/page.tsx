@@ -3,6 +3,7 @@ import { MatchCard } from '@/components/MatchCard';
 import { AutoScrollToCurrent } from '@/components/AutoScrollToCurrent';
 import { requireUser } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getVisibleProfilesForUser, getVisibleProfileIdSet } from '@/lib/visibility';
 import { isMatchStillRelevant, isPredictionLocked } from '@/lib/time';
 import type { Match, Prediction } from '@/lib/types';
 
@@ -20,6 +21,9 @@ export default async function MatchesPage() {
 
   if (matchesError) throw new Error(matchesError.message);
 
+  const visibleProfiles = await getVisibleProfilesForUser(user);
+  const visibleProfileIds = getVisibleProfileIdSet(visibleProfiles);
+
   const { data: predictionsData } = await supabaseAdmin
     .from('predictions')
     .select(`
@@ -28,7 +32,7 @@ export default async function MatchesPage() {
     `);
 
   const matches = (matchesData ?? []) as Match[];
-  const predictions = (predictionsData ?? []) as Prediction[];
+  const predictions = ((predictionsData ?? []) as Prediction[]).filter((prediction) => prediction.user_id === user.id || visibleProfileIds.has(prediction.user_id));
   const now = new Date();
   const currentMatchId = matches.find((match) => isMatchStillRelevant(match.kickoff_time, now))?.id;
 

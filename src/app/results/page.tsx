@@ -3,6 +3,7 @@ import { Flag } from '@/components/Flag';
 import { ResultUserPicker } from '@/components/ResultUserPicker';
 import { requireUser } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getVisibleProfilesForUser } from '@/lib/visibility';
 import { calculateTotalPoints, getStageLabel } from '@/lib/scoring';
 import { formatKickoff } from '@/lib/time';
 import type { Match, Prediction, Profile } from '@/lib/types';
@@ -20,12 +21,7 @@ export default async function ResultsPage({ searchParams }: ResultsPageProps) {
   const user = await requireUser();
   const params = await searchParams;
 
-  const { data: profilesData } = await supabaseAdmin
-    .from('profiles')
-    .select('id, username, is_admin')
-    .order('username', { ascending: true });
-
-  const profiles = (profilesData ?? []) as Profile[];
+  const profiles = await getVisibleProfilesForUser(user);
   const selectedUserId = params?.userId && profiles.some((profile) => profile.id === params.userId) ? params.userId : user.id;
   const selectedProfile = profiles.find((profile) => profile.id === selectedUserId) ?? user;
 

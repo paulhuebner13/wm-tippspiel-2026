@@ -50,3 +50,15 @@ export type Prediction = {
   advance_team_id: string | null;
   profile?: Profile | null;
 };
+
+
+export type PlayerGroup = {
+  id: string;
+  name: string;
+  created_at: string;
+};
+
+export type GroupMember = {
+  group_id: string;
+  profile_id: string;
+};

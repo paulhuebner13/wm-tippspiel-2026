@@ -263,3 +263,121 @@ export async function deleteProfileAction(formData: FormData) {
   revalidatePath('/ranking');
   redirect('/admin?user_deleted=1');
 }
+
+export async function createGroupAction(formData: FormData) {
+  await requireAdmin();
+  const name = String(formData.get('name') ?? '').trim();
+
+  if (!name) {
+    redirect('/groups?error=missing_group_name');
+  }
+
+  const { data: group, error } = await supabaseAdmin
+    .from('player_groups')
+    .insert({ name })
+    .select('id')
+    .single();
+
+  if (error || !group) {
+    redirect('/groups?error=group_create_failed');
+  }
+
+  revalidatePath('/groups');
+  redirect(`/groups?groupId=${group.id}`);
+}
+
+export async function updateGroupMembersAction(formData: FormData) {
+  await requireAdmin();
+
+  const groupId = String(formData.get('groupId') ?? '');
+  const memberIds = formData.getAll('memberIds').map((value) => String(value));
+
+  if (!groupId) {
+    redirect('/groups?error=missing_group');
+  }
+
+  await supabaseAdmin.from('group_members').delete().eq('group_id', groupId);
+
+  if (memberIds.length > 0) {
+    await supabaseAdmin.from('group_members').insert(
+      memberIds.map((profileId) => ({
+        group_id: groupId,
+        profile_id: profileId,
+      }))
+    );
+  }
+
+  revalidatePath('/groups');
+  revalidatePath('/ranking');
+  revalidatePath('/results');
+  revalidatePath('/matches');
+  redirect(`/groups?groupId=${groupId}&saved=1`);
+}
+
+export async function deleteGroupAction(formData: FormData) {
+  await requireAdmin();
+  const groupId = String(formData.get('groupId') ?? '');
+
+  if (!groupId) {
+    redirect('/groups?error=missing_group');
+  }
+
+  await supabaseAdmin.from('player_groups').delete().eq('id', groupId);
+
+  revalidatePath('/groups');
+  revalidatePath('/ranking');
+  revalidatePath('/results');
+  revalidatePath('/matches');
+  redirect('/groups?deleted=1');
+}
+
+export async function overridePredictionAction(formData: FormData) {
+  await requireAdmin();
+
+  const userId = String(formData.get('userId') ?? '');
+  const matchId = String(formData.get('matchId') ?? '');
+  const matchNumber = String(formData.get('matchNumber') ?? '');
+  const predictedHomeScore = readNumber(formData.get('predictedHomeScore'));
+  const predictedAwayScore = readNumber(formData.get('predictedAwayScore'));
+  const advanceTeamIdRaw = String(formData.get('advanceTeamId') ?? '');
+  const advanceTeamId = advanceTeamIdRaw.length > 0 ? advanceTeamIdRaw : null;
+
+  if (!userId || !matchId || predictedHomeScore === null || predictedAwayScore === null) {
+    redirect('/changes?error=invalid_prediction');
+  }
+
+  const { data: match } = await supabaseAdmin
+    .from('matches')
+    .select('id, stage, home_team_id, away_team_id')
+    .eq('id', matchId)
+    .single();
+
+  if (!match) {
+    redirect('/changes?error=match_not_found');
+  }
+
+  if (isKnockoutStage(match.stage) && predictedHomeScore === predictedAwayScore) {
+    const validAdvanceTeam = advanceTeamId === match.home_team_id || advanceTeamId === match.away_team_id;
+    if (!validAdvanceTeam) {
+      redirect(`/changes?profileId=${userId}&matchNumber=${matchNumber}&error=missing_advance_team`);
+    }
+  }
+
+  await supabaseAdmin.from('predictions').upsert(
+    {
+      user_id: userId,
+      match_id: matchId,
+      predicted_home_score: predictedHomeScore,
+      predicted_away_score: predictedAwayScore,
+      advance_team_id: advanceTeamId,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,match_id' }
+  );
+
+  revalidatePath('/changes');
+  revalidatePath('/matches');
+  revalidatePath('/results');
+  revalidatePath('/ranking');
+  redirect(`/changes?profileId=${userId}&matchNumber=${matchNumber}&saved=1`);
+}
