@@ -30,11 +30,17 @@ function hasCompletePrediction(prediction: Prediction | undefined, match: Match)
   return true;
 }
 
-function predictionText(prediction: Prediction | undefined, match: Match) {
+function predictionStatusText(prediction: Prediction | undefined, match: Match) {
   if (!prediction) return 'Kein Tipp abgegeben';
   if (!hasCompletePrediction(prediction, match)) return 'Tipp unvollständig';
+  return 'Tipp abgegeben';
+}
 
-  return `${prediction.predicted_home_score}:${prediction.predicted_away_score}`;
+function advanceWinnerName(prediction: Prediction | undefined, match: Match) {
+  if (!prediction?.advance_team_id) return null;
+  if (match.home_team?.id === prediction.advance_team_id) return resultTeamName(match, 'home');
+  if (match.away_team?.id === prediction.advance_team_id) return resultTeamName(match, 'away');
+  return null;
 }
 
 function pointsText(match: Match, prediction: Prediction | undefined) {
@@ -51,14 +57,38 @@ function resultScoreText(match: Match) {
 function ResultPlayerPanel({ profile, match, prediction, self }: { profile: Profile; match: Match; prediction?: Prediction; self: boolean }) {
   const complete = hasCompletePrediction(prediction, match);
   const finished = hasResult(match) && match.is_finished;
+  const advanceName = finished ? advanceWinnerName(prediction, match) : null;
 
   return (
     <div className={`resultPlayerPanel ${self ? 'resultPlayerPanelSelf' : ''}`}>
-      <div className="resultPlayerName">{self ? 'Du' : profile.username}</div>
-      <div className={`resultPredictionText ${complete ? 'resultPredictionComplete' : 'resultPredictionMissing'}`}>
-        {finished ? predictionText(prediction, match) : complete ? 'Tipp abgegeben' : prediction ? 'Tipp unvollständig' : 'Kein Tipp abgegeben'}
+      <div className="resultPlayerMain">
+        <div className="resultPlayerName">{self ? 'Du' : profile.username}</div>
+
+        {finished && complete ? (
+          <div className="resultTipVisual">
+            <div className="resultTipTeam resultTipTeamHome">
+              <Flag team={match.home_team} />
+              <span>{resultTeamName(match, 'home')}</span>
+            </div>
+            <div className="resultTipScore">
+              {prediction?.predicted_home_score}:{prediction?.predicted_away_score}
+            </div>
+            <div className="resultTipTeam resultTipTeamAway">
+              <Flag team={match.away_team} />
+              <span>{resultTeamName(match, 'away')}</span>
+            </div>
+            {advanceName && <div className="resultAdvanceLine">Weiter: {advanceName}</div>}
+          </div>
+        ) : (
+          <div className={`resultPredictionText ${complete ? 'resultPredictionComplete' : 'resultPredictionMissing'}`}>
+            {predictionStatusText(prediction, match)}
+          </div>
+        )}
       </div>
-      <div className="resultPlayerPoints">{pointsText(match, prediction)}</div>
+
+      <div className="resultPlayerPointsBox">
+        <span>{pointsText(match, prediction)}</span>
+      </div>
     </div>
   );
 }

@@ -2039,3 +2039,183 @@ html[data-theme='dark'] .resultCompareChipActive {
   background: rgba(96, 165, 250, 0.22);
   color: #bfdbfe;
 }
+
+/* v26: tighter result compare bar and restored points-heavy result panels. */
+.resultsHeaderBlock {
+  margin-bottom: 4px;
+}
+
+.resultCompareSticky {
+  top: 104px;
+  margin-top: -4px;
+  margin-bottom: 10px;
+  padding-top: 6px;
+  padding-bottom: 8px;
+}
+
+.resultCompareScroller {
+  gap: 6px;
+  padding-bottom: 5px;
+}
+
+.resultCompareChip {
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.1;
+  font-weight: 850;
+  min-height: 32px;
+}
+
+.resultPlayersGrid {
+  gap: 10px;
+}
+
+.resultPlayerPanel {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(58px, 1fr);
+  gap: 8px;
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
+}
+
+.resultPlayerMain {
+  min-width: 0;
+  padding: 10px 0 10px 10px;
+  display: grid;
+  gap: 7px;
+  align-content: start;
+}
+
+.resultPlayerName {
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.resultTipVisual {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.resultTipTeam {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.08;
+  font-weight: 850;
+  text-align: center;
+}
+
+.resultTipTeam span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.resultTipScore {
+  min-width: 46px;
+  text-align: center;
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 950;
+  color: var(--text);
+}
+
+.resultAdvanceLine {
+  grid-column: 1 / -1;
+  justify-self: center;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.1;
+  font-weight: 850;
+  text-align: center;
+}
+
+.resultPredictionText {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.resultPlayerPointsBox {
+  border-left: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  background: color-mix(in srgb, var(--points-bg) 80%, var(--card));
+}
+
+.resultPlayerPointsBox span {
+  display: block;
+  color: var(--text);
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+html[data-theme='dark'] .resultPlayerPointsBox {
+  background: color-mix(in srgb, var(--points-bg) 72%, #020617);
+}
+
+@media (min-width: 640px) {
+  .resultCompareSticky {
+    top: 76px;
+    margin-top: -8px;
+  }
+
+  .resultCompareChip {
+    font-size: 13px;
+    padding: 7px 12px;
+  }
+
+  .resultPlayerPanel {
+    grid-template-columns: minmax(0, 2fr) minmax(74px, 1fr);
+  }
+
+  .resultPlayerMain {
+    padding: 12px 0 12px 12px;
+  }
+
+  .resultTipScore {
+    min-width: 58px;
+    font-size: 26px;
+  }
+
+  .resultPlayerPointsBox span {
+    font-size: 36px;
+  }
+}
+
+@media (max-width: 560px) {
+  .resultsPageNew {
+    padding-top: 10px;
+  }
+
+  .resultCompareSticky {
+    top: 116px;
+    margin-left: -14px;
+    margin-right: -14px;
+  }
+
+  .resultMatchCard {
+    scroll-margin-top: 184px;
+  }
+
+  .resultPlayersGridCompare {
+    grid-template-columns: 1fr;
+  }
+
+  .resultTipScore {
+    font-size: 20px;
+    min-width: 42px;
+  }
+
+  .resultPlayerPointsBox span {
+    font-size: 28px;
+  }
+}
