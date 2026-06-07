@@ -1,6 +1,7 @@
 import { Nav } from '@/components/Nav';
 import { Flag } from '@/components/Flag';
-import { ResultUserPicker } from '@/components/ResultUserPicker';
+import { ResultsAutoScroll } from '@/components/ResultsAutoScroll';
+import { ResultsComparePicker } from '@/components/ResultsComparePicker';
 import { requireUser } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getVisibleProfilesForUser } from '@/lib/visibility';
@@ -9,7 +10,7 @@ import { formatKickoff } from '@/lib/time';
 import type { Match, Prediction, Profile } from '@/lib/types';
 
 type ResultsPageProps = {
-  searchParams?: Promise<{ userId?: string }>;
+  searchParams?: Promise<{ compareUserId?: string }>;
 };
 
 function resultTeamName(match: Match, side: 'home' | 'away') {
@@ -17,13 +18,62 @@ function resultTeamName(match: Match, side: 'home' | 'away') {
   return match.away_team?.name ?? match.away_placeholder ?? 'Offen';
 }
 
+function hasResult(match: Match) {
+  return match.home_score !== null && match.away_score !== null;
+}
+
+function hasCompletePrediction(prediction: Prediction | undefined, match: Match) {
+  if (!prediction || prediction.predicted_home_score === null || prediction.predicted_away_score === null) return false;
+  if (match.stage !== 'group' && prediction.predicted_home_score === prediction.predicted_away_score && !prediction.advance_team_id) {
+    return false;
+  }
+  return true;
+}
+
+function predictionText(prediction: Prediction | undefined, match: Match) {
+  if (!prediction) return 'Kein Tipp abgegeben';
+  if (!hasCompletePrediction(prediction, match)) return 'Tipp unvollständig';
+
+  return `${prediction.predicted_home_score}:${prediction.predicted_away_score}`;
+}
+
+function pointsText(match: Match, prediction: Prediction | undefined) {
+  if (!hasResult(match) || !match.is_finished) return '–';
+  if (!hasCompletePrediction(prediction, match)) return '0';
+  return String(calculateTotalPoints(match, prediction as Prediction));
+}
+
+function resultScoreText(match: Match) {
+  if (!hasResult(match)) return '–:–';
+  return `${match.home_score}:${match.away_score}`;
+}
+
+function ResultPlayerPanel({ profile, match, prediction, self }: { profile: Profile; match: Match; prediction?: Prediction; self: boolean }) {
+  const complete = hasCompletePrediction(prediction, match);
+  const finished = hasResult(match) && match.is_finished;
+
+  return (
+    <div className={`resultPlayerPanel ${self ? 'resultPlayerPanelSelf' : ''}`}>
+      <div className="resultPlayerName">{self ? 'Du' : profile.username}</div>
+      <div className={`resultPredictionText ${complete ? 'resultPredictionComplete' : 'resultPredictionMissing'}`}>
+        {finished ? predictionText(prediction, match) : complete ? 'Tipp abgegeben' : prediction ? 'Tipp unvollständig' : 'Kein Tipp abgegeben'}
+      </div>
+      <div className="resultPlayerPoints">{pointsText(match, prediction)}</div>
+    </div>
+  );
+}
+
 export default async function ResultsPage({ searchParams }: ResultsPageProps) {
   const user = await requireUser();
   const params = await searchParams;
 
-  const profiles = await getVisibleProfilesForUser(user);
-  const selectedUserId = params?.userId && profiles.some((profile) => profile.id === params.userId) ? params.userId : user.id;
-  const selectedProfile = profiles.find((profile) => profile.id === selectedUserId) ?? user;
+  const visibleProfiles = await getVisibleProfilesForUser(user);
+  const otherProfiles = visibleProfiles.filter((profile) => profile.id !== user.id);
+  const selectedCompareUserId =
+    params?.compareUserId && otherProfiles.some((profile) => profile.id === params.compareUserId) ? params.compareUserId : null;
+  const compareProfile = otherProfiles.find((profile) => profile.id === selectedCompareUserId) ?? null;
+  const shownProfiles = compareProfile ? [user, compareProfile] : [user];
+  const shownProfileIds = shownProfiles.map((profile) => profile.id);
 
   const { data: matchesData } = await supabaseAdmin
     .from('matches')
@@ -32,87 +82,67 @@ export default async function ResultsPage({ searchParams }: ResultsPageProps) {
       home_team:teams!matches_home_team_id_fkey(*),
       away_team:teams!matches_away_team_id_fkey(*)
     `)
-    .eq('is_finished', true)
     .order('kickoff_time', { ascending: true });
 
-  const { data: predictionsData } = await supabaseAdmin
-    .from('predictions')
-    .select('*')
-    .eq('user_id', selectedUserId);
+  const { data: predictionsData } = await supabaseAdmin.from('predictions').select('*').in('user_id', shownProfileIds);
 
   const matches = (matchesData ?? []) as Match[];
   const predictions = (predictionsData ?? []) as Prediction[];
+  const predictionsByKey = new Map(predictions.map((prediction) => [`${prediction.user_id}:${prediction.match_id}`, prediction]));
+
+  const finishedMatches = matches.filter((match) => match.is_finished && hasResult(match));
+  const lastFinishedMatchNumber = finishedMatches.length > 0 ? finishedMatches[finishedMatches.length - 1].match_number : null;
 
   return (
     <>
       <Nav user={user} />
-      <main className="page">
-        <div className="pageHeaderBlock">
+      <ResultsAutoScroll targetMatchNumber={lastFinishedMatchNumber} />
+      <main className="page resultsPageNew">
+        <div className="pageHeaderBlock resultsHeaderBlock">
           <div>
             <h1>Ergebnisse</h1>
-            <p className="subtle">Angezeigt werden die Tipps von {selectedProfile.username}.</p>
           </div>
-
-          <ResultUserPicker profiles={profiles} selectedUserId={selectedUserId} ownUserId={user.id} />
         </div>
 
-        <div className="list">
-          {matches.length === 0 && <p className="subtle">Noch keine fertigen Spiele.</p>}
+        <ResultsComparePicker profiles={otherProfiles} selectedCompareUserId={selectedCompareUserId} />
+
+        <div className="list resultsListNew">
           {matches.map((match) => {
-            const prediction = predictions.find((item) => item.match_id === match.id);
-            const points = prediction ? calculateTotalPoints(match, prediction) : 0;
-
             return (
-              <article className="card resultCard" key={match.id}>
-                <div className="resultMainArea">
-                  <div className="resultContentArea">
-                    <div className="matchMeta resultMeta">
-                      <span>Spiel {match.match_number}</span>
-                      <span>{getStageLabel(match.stage)}</span>
-                      <span>{formatKickoff(match.kickoff_time)}</span>
-                    </div>
+              <article className="card resultMatchCard" key={match.id} data-result-scroll-target={match.match_number}>
+                <div className="matchTitleLine">
+                  <span>Spiel {match.match_number}</span>
+                  <span>{match.stage === 'group' && match.group_name ? `Gruppe ${match.group_name}` : getStageLabel(match.stage)}</span>
+                  <span>{formatKickoff(match.kickoff_time)}</span>
+                </div>
 
-                    <div className="resultScoreGrid">
-                      <div className="team sideHome">
-                        <span className="teamName">{resultTeamName(match, 'home')}</span>
-                        <Flag team={match.home_team} />
-                      </div>
-
-                      <div className="resultCenterStack">
-                        <div className="resultScoreLabel">Ergebnis</div>
-                        <div className="resultScoreNumbers">
-                          <span>{match.home_score}</span>
-                          <span>:</span>
-                          <span>{match.away_score}</span>
-                        </div>
-                      </div>
-
-                      <div className="team sideAway">
-                        <Flag team={match.away_team} />
-                        <span className="teamName">{resultTeamName(match, 'away')}</span>
-                      </div>
-                    </div>
-
-                    <div className="tipUnderResult">
-                      {prediction ? (
-                        <>
-                          <div className="resultScoreLabel">Tipp</div>
-                          <div className="tipScoreNumbers">
-                            <span>{prediction.predicted_home_score ?? '-'}</span>
-                            <span>:</span>
-                            <span>{prediction.predicted_away_score ?? '-'}</span>
-                          </div>
-                        </>
-                      ) : (
-                        <span className="subtle">Kein Tipp abgegeben.</span>
-                      )}
-                    </div>
+                <div className="resultMatchGrid">
+                  <div className="team resultTeamSide sideHome">
+                    <span className="teamName">{resultTeamName(match, 'home')}</span>
+                    <Flag team={match.home_team} />
                   </div>
 
-                  <aside className="pointsPanel">
-                    <div className="pointsValue">{points}</div>
-                    <div className="pointsLabel">Punkte</div>
-                  </aside>
+                  <div className="resultFinalScoreBox">
+                    <span>Ergebnis</span>
+                    <strong>{resultScoreText(match)}</strong>
+                  </div>
+
+                  <div className="team resultTeamSide sideAway">
+                    <Flag team={match.away_team} />
+                    <span className="teamName">{resultTeamName(match, 'away')}</span>
+                  </div>
+                </div>
+
+                <div className={`resultPlayersGrid ${compareProfile ? 'resultPlayersGridCompare' : ''}`}>
+                  {shownProfiles.map((profile) => (
+                    <ResultPlayerPanel
+                      key={profile.id}
+                      profile={profile}
+                      match={match}
+                      prediction={predictionsByKey.get(`${profile.id}:${match.id}`)}
+                      self={profile.id === user.id}
+                    />
+                  ))}
                 </div>
               </article>
             );

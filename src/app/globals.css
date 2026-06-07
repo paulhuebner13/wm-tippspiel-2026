@@ -1803,3 +1803,239 @@ html[data-theme='dark'] .predictionStatusPartial {
   background: rgba(113, 63, 18, 0.38);
   border-color: rgba(251, 191, 36, 0.42);
 }
+
+/* v25: mobile-friendly results comparison without dropdown. */
+.resultsPageNew {
+  padding-top: 18px;
+}
+
+.resultsHeaderBlock {
+  margin-bottom: 10px;
+}
+
+.resultCompareSticky {
+  position: sticky;
+  top: 112px;
+  z-index: 12;
+  margin: 0 -14px 14px;
+  padding: 8px 14px 10px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+
+.resultCompareScroller {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 7px;
+  scrollbar-gutter: stable;
+}
+
+.resultCompareScroller::-webkit-scrollbar {
+  height: 6px;
+}
+
+.resultCompareScroller::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+.resultCompareChip {
+  border: 1px solid var(--line);
+  background: var(--pill);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 9px 13px;
+  font-weight: 900;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.resultCompareChipActive {
+  border-color: #2563eb;
+  background: #dbeafe;
+  color: #1d4ed8;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.resultMatchCard {
+  scroll-margin-top: 180px;
+}
+
+.resultMatchGrid {
+  display: grid;
+  grid-template-columns: minmax(74px, 1fr) auto minmax(74px, 1fr);
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.resultTeamSide {
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  gap: 5px;
+}
+
+.resultTeamSide.sideHome,
+.resultTeamSide.sideAway {
+  justify-content: center;
+  text-align: center;
+}
+
+.resultFinalScoreBox {
+  min-width: 86px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 8px 10px;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  background: var(--panel);
+}
+
+.resultFinalScoreBox span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.resultFinalScoreBox strong {
+  font-size: 26px;
+  line-height: 1;
+  color: var(--text);
+}
+
+.resultPlayersGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 9px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.resultPlayersGridCompare {
+  grid-template-columns: 1fr 1fr;
+}
+
+.resultPlayerPanel {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 10px;
+  background: var(--panel);
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.resultPlayerPanelSelf {
+  border-color: color-mix(in srgb, #0ea5e9 45%, var(--line));
+}
+
+.resultPlayerName {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 900;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resultPredictionText {
+  font-size: 14px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.resultPredictionComplete {
+  color: var(--ok);
+}
+
+.resultPredictionMissing {
+  color: var(--danger);
+}
+
+.resultPlayerPoints {
+  justify-self: end;
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 950;
+  color: var(--text);
+}
+
+@media (min-width: 640px) {
+  .resultCompareSticky {
+    top: 78px;
+    margin-left: 0;
+    margin-right: 0;
+    border-radius: 18px;
+    border: 1px solid var(--line);
+  }
+
+  .resultMatchGrid {
+    grid-template-columns: minmax(150px, 1fr) auto minmax(150px, 1fr);
+    gap: 16px;
+  }
+
+  .resultFinalScoreBox {
+    min-width: 112px;
+  }
+
+  .resultFinalScoreBox strong {
+    font-size: 32px;
+  }
+}
+
+@media (max-width: 560px) {
+  .resultCompareSticky {
+    top: 124px;
+  }
+
+  .resultMatchCard {
+    scroll-margin-top: 194px;
+  }
+
+  .resultMatchGrid .teamName {
+    font-size: 13px;
+    line-height: 1.15;
+  }
+
+  .resultFinalScoreBox {
+    min-width: 76px;
+    padding: 7px 8px;
+  }
+
+  .resultFinalScoreBox strong {
+    font-size: 23px;
+  }
+
+  .resultPlayersGridCompare {
+    gap: 7px;
+  }
+
+  .resultPlayerPanel {
+    padding: 9px 7px;
+  }
+
+  .resultPredictionText {
+    font-size: 12px;
+  }
+
+  .resultPlayerPoints {
+    font-size: 24px;
+  }
+}
+
+html[data-theme='dark'] .resultCompareScroller::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+html[data-theme='dark'] .resultCompareChipActive {
+  border-color: #60a5fa;
+  background: rgba(96, 165, 250, 0.22);
+  color: #bfdbfe;
+}
