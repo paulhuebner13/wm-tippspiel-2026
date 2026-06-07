@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { savePredictionAction } from '@/app/actions';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { savePredictionInlineAction } from '@/app/actions';
 import { Flag } from './Flag';
 import { Countdown } from './Countdown';
 import { calculateTotalPoints, getStageLabel, isKnockoutStage } from '@/lib/scoring';
@@ -11,6 +11,10 @@ import type { Match, Prediction } from '@/lib/types';
 type MatchWithPredictions = Match & {
   predictions?: Prediction[];
 };
+
+type LocalPrediction = Pick<Prediction, 'id' | 'predicted_home_score' | 'predicted_away_score' | 'advance_team_id'>;
+
+type DraftStatus = 'empty' | 'dirty' | 'saving' | 'saved' | 'closed';
 
 function teamName(match: Match, side: 'home' | 'away'): string {
   if (side === 'home') return match.home_team?.name ?? match.home_placeholder ?? 'Offen';
@@ -22,20 +26,10 @@ function groupOrStage(match: Match): string {
   return getStageLabel(match.stage);
 }
 
-function cardStateClass({
-  ownPrediction,
-  canPredict,
-  locked,
-  isFinished,
-}: {
-  ownPrediction?: Prediction;
-  canPredict: boolean;
-  locked: boolean;
-  isFinished: boolean;
-}) {
-  if (isFinished) return 'matchCardFinished';
-  if (ownPrediction) return 'matchCardSaved';
-  if (canPredict && !locked) return 'matchCardMissing';
+function cardStateClass(status: DraftStatus) {
+  if (status === 'saved') return 'matchCardSaved';
+  if (status === 'dirty' || status === 'saving') return 'matchCardUnsaved';
+  if (status === 'empty') return 'matchCardMissing';
   return 'matchCardClosed';
 }
 
@@ -44,6 +38,14 @@ function scoreInputToNumber(value: string): number | null {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 0) return null;
   return parsed;
+}
+
+function predictionMatchesDraft(prediction: LocalPrediction | undefined, home: number, away: number, advanceTeamId: string | null) {
+  return (
+    prediction?.predicted_home_score === home &&
+    prediction?.predicted_away_score === away &&
+    (prediction.advance_team_id ?? null) === advanceTeamId
+  );
 }
 
 export function MatchCard({
@@ -58,32 +60,97 @@ export function MatchCard({
   current: boolean;
 }) {
   const locked = isPredictionLocked(match.kickoff_time);
-  const canPredict = match.is_open_for_predictions && !match.is_finished && !locked && match.home_team && match.away_team;
+  const canPredict = Boolean(match.is_open_for_predictions && !match.is_finished && !locked && match.home_team && match.away_team);
   const knockoutStage = isKnockoutStage(match.stage);
-  const knockoutDrawTip = ownPrediction?.predicted_home_score === ownPrediction?.predicted_away_score && knockoutStage;
-  const statusClass = cardStateClass({ ownPrediction, canPredict: Boolean(canPredict), locked, isFinished: match.is_finished });
 
+  const [savedPrediction, setSavedPrediction] = useState<LocalPrediction | undefined>(ownPrediction);
   const [homeScore, setHomeScore] = useState(ownPrediction?.predicted_home_score?.toString() ?? '');
   const [awayScore, setAwayScore] = useState(ownPrediction?.predicted_away_score?.toString() ?? '');
   const [advanceTeamId, setAdvanceTeamId] = useState(ownPrediction?.advance_team_id ?? '');
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'error'>('idle');
+  const lastRequestKey = useRef('');
+
+  const homeNumber = scoreInputToNumber(homeScore);
+  const awayNumber = scoreInputToNumber(awayScore);
 
   const showAdvanceChoice = useMemo(() => {
     if (!knockoutStage) return false;
-    const home = scoreInputToNumber(homeScore);
-    const away = scoreInputToNumber(awayScore);
-    return home !== null && away !== null && home === away;
-  }, [awayScore, homeScore, knockoutStage]);
+    return homeNumber !== null && awayNumber !== null && homeNumber === awayNumber;
+  }, [awayNumber, homeNumber, knockoutStage]);
 
-  const hasCompleteScoreInput = scoreInputToNumber(homeScore) !== null && scoreInputToNumber(awayScore) !== null;
-  const scoreChanged =
-    homeScore !== (ownPrediction?.predicted_home_score?.toString() ?? '') ||
-    awayScore !== (ownPrediction?.predicted_away_score?.toString() ?? '');
-  const advanceChanged = showAdvanceChoice
-    ? advanceTeamId !== (ownPrediction?.advance_team_id ?? '')
-    : Boolean(ownPrediction?.advance_team_id);
-  const hasUnsavedChanges = hasCompleteScoreInput && (scoreChanged || advanceChanged);
-  const saveDisabled = Boolean(showAdvanceChoice && advanceTeamId.length === 0);
-  const saveButtonClass = `saveTipButton${hasUnsavedChanges ? ' saveTipButtonUnsaved' : ''}${saveDisabled ? ' saveTipButtonDisabled' : ''}`;
+  const normalizedAdvanceTeamId = showAdvanceChoice ? advanceTeamId || null : null;
+  const hasAnyInput = homeScore.trim() !== '' || awayScore.trim() !== '' || Boolean(advanceTeamId);
+  const hasCompleteScoreInput = homeNumber !== null && awayNumber !== null;
+  const hasCompletePrediction = hasCompleteScoreInput && (!showAdvanceChoice || Boolean(advanceTeamId));
+  const matchesSaved = hasCompletePrediction
+    ? predictionMatchesDraft(savedPrediction, homeNumber, awayNumber, normalizedAdvanceTeamId)
+    : false;
+
+  const draftStatus: DraftStatus = !canPredict
+    ? savedPrediction
+      ? 'saved'
+      : 'closed'
+    : matchesSaved
+      ? 'saved'
+      : !hasAnyInput && !savedPrediction
+        ? 'empty'
+        : 'dirty';
+
+  const effectiveStatus: DraftStatus = saveState === 'saving' ? 'saving' : draftStatus;
+  const statusClass = cardStateClass(effectiveStatus);
+  const knockoutDrawTip = savedPrediction?.predicted_home_score === savedPrediction?.predicted_away_score && knockoutStage;
+
+  useEffect(() => {
+    setSavedPrediction(ownPrediction);
+    setHomeScore(ownPrediction?.predicted_home_score?.toString() ?? '');
+    setAwayScore(ownPrediction?.predicted_away_score?.toString() ?? '');
+    setAdvanceTeamId(ownPrediction?.advance_team_id ?? '');
+  }, [match.id, ownPrediction]);
+
+  useEffect(() => {
+    if (!canPredict || !hasCompletePrediction || homeNumber === null || awayNumber === null) return;
+    if (matchesSaved) return;
+
+    const requestKey = `${match.id}:${homeNumber}:${awayNumber}:${normalizedAdvanceTeamId ?? ''}`;
+    lastRequestKey.current = requestKey;
+
+    const timeout = window.setTimeout(async () => {
+      setSaveState('saving');
+
+      const result = await savePredictionInlineAction({
+        matchId: match.id,
+        predictedHomeScore: homeNumber,
+        predictedAwayScore: awayNumber,
+        advanceTeamId: normalizedAdvanceTeamId,
+      });
+
+      if (lastRequestKey.current !== requestKey) return;
+
+      if (result.ok) {
+        setSavedPrediction({
+          id: result.predictionId ?? savedPrediction?.id ?? 'local',
+          predicted_home_score: homeNumber,
+          predicted_away_score: awayNumber,
+          advance_team_id: normalizedAdvanceTeamId,
+        });
+        setSaveState('idle');
+      } else {
+        setSaveState('error');
+      }
+    }, 650);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    advanceTeamId,
+    awayNumber,
+    canPredict,
+    hasCompletePrediction,
+    homeNumber,
+    match.id,
+    matchesSaved,
+    normalizedAdvanceTeamId,
+    savedPrediction?.id,
+  ]);
 
   return (
     <article className={`card matchCard ${statusClass}`} data-current-match={current ? 'true' : undefined}>
@@ -101,11 +168,8 @@ export function MatchCard({
         </div>
       </div>
 
-
       {canPredict ? (
-        <form action={savePredictionAction} className="predictionForm predictionFormCentered">
-          <input type="hidden" name="matchId" value={match.id} />
-
+        <div className="predictionForm predictionFormCentered" aria-label="Tipp eingeben">
           <div className="predictionMainRow">
             <div className="predictionTeam predictionTeamHome">
               <span className="teamName">{teamName(match, 'home')}</span>
@@ -114,7 +178,6 @@ export function MatchCard({
 
             <div className="scoreInputs">
               <input
-                name="predictedHomeScore"
                 type="number"
                 min="0"
                 inputMode="numeric"
@@ -122,13 +185,12 @@ export function MatchCard({
                 onChange={(event) => {
                   setHomeScore(event.target.value);
                   setAdvanceTeamId('');
+                  setSaveState('idle');
                 }}
                 aria-label={`${teamName(match, 'home')} Tore`}
-                required
               />
               <span>:</span>
               <input
-                name="predictedAwayScore"
                 type="number"
                 min="0"
                 inputMode="numeric"
@@ -136,9 +198,9 @@ export function MatchCard({
                 onChange={(event) => {
                   setAwayScore(event.target.value);
                   setAdvanceTeamId('');
+                  setSaveState('idle');
                 }}
                 aria-label={`${teamName(match, 'away')} Tore`}
-                required
               />
             </div>
 
@@ -156,11 +218,13 @@ export function MatchCard({
                   <label className={advanceTeamId === match.home_team.id ? 'advanceChoice selected' : 'advanceChoice'}>
                     <input
                       type="radio"
-                      name="advanceTeamId"
+                      name={`advanceTeamId-${match.id}`}
                       value={match.home_team.id}
                       checked={advanceTeamId === match.home_team.id}
-                      onChange={(event) => setAdvanceTeamId(event.target.value)}
-                      required
+                      onChange={(event) => {
+                        setAdvanceTeamId(event.target.value);
+                        setSaveState('idle');
+                      }}
                     />
                     <Flag team={match.home_team} />
                     <span>{match.home_team.name}</span>
@@ -170,11 +234,13 @@ export function MatchCard({
                   <label className={advanceTeamId === match.away_team.id ? 'advanceChoice selected' : 'advanceChoice'}>
                     <input
                       type="radio"
-                      name="advanceTeamId"
+                      name={`advanceTeamId-${match.id}`}
                       value={match.away_team.id}
                       checked={advanceTeamId === match.away_team.id}
-                      onChange={(event) => setAdvanceTeamId(event.target.value)}
-                      required
+                      onChange={(event) => {
+                        setAdvanceTeamId(event.target.value);
+                        setSaveState('idle');
+                      }}
                     />
                     <Flag team={match.away_team} />
                     <span>{match.away_team.name}</span>
@@ -184,11 +250,7 @@ export function MatchCard({
               <p className="advanceHint">Bei K.-o.-Unentschieden musst du auswählen, wer weiterkommt.</p>
             </div>
           )}
-
-          <button type="submit" className={saveButtonClass} disabled={saveDisabled}>
-            Tipp speichern
-          </button>
-        </form>
+        </div>
       ) : (
         <div className="lockedMatchContent">
           <div className="lockedTeamsRow">
@@ -200,8 +262,8 @@ export function MatchCard({
             <div className="lockedScoreBox">
               {match.is_finished ? (
                 <strong>{match.home_score}:{match.away_score}</strong>
-              ) : ownPrediction ? (
-                <strong>{ownPrediction.predicted_home_score}:{ownPrediction.predicted_away_score}</strong>
+              ) : savedPrediction ? (
+                <strong>{savedPrediction.predicted_home_score}:{savedPrediction.predicted_away_score}</strong>
               ) : (
                 <strong>- : -</strong>
               )}
@@ -214,11 +276,11 @@ export function MatchCard({
           </div>
 
           <div className="predictionLockedBox">
-            {ownPrediction ? (
+            {savedPrediction ? (
               <>
-                Dein Tipp: <strong>{ownPrediction.predicted_home_score}:{ownPrediction.predicted_away_score}</strong>
-                {knockoutDrawTip && ownPrediction.advance_team_id && <span> · Weiterkommer ausgewählt</span>}
-                {match.is_finished && <span> · Punkte: {calculateTotalPoints(match, ownPrediction)}</span>}
+                Dein Tipp: <strong>{savedPrediction.predicted_home_score}:{savedPrediction.predicted_away_score}</strong>
+                {knockoutDrawTip && savedPrediction.advance_team_id && <span> · Weiterkommer ausgewählt</span>}
+                {match.is_finished && <span> · Punkte: {calculateTotalPoints(match, savedPrediction as Prediction)}</span>}
               </>
             ) : (
               <span>{match.is_open_for_predictions ? 'Kein Tipp abgegeben' : 'Tipps noch nicht geöffnet'}</span>

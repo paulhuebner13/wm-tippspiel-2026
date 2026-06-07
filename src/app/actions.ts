@@ -136,6 +136,64 @@ export async function savePredictionAction(formData: FormData) {
   redirect('/matches?saved=1');
 }
 
+
+export async function savePredictionInlineAction(input: {
+  matchId: string;
+  predictedHomeScore: number;
+  predictedAwayScore: number;
+  advanceTeamId?: string | null;
+}): Promise<{ ok: true; predictionId?: string } | { ok: false; error: string }> {
+  const user = await requireUser();
+  const { matchId, predictedHomeScore, predictedAwayScore } = input;
+  const advanceTeamId = input.advanceTeamId ?? null;
+
+  if (!matchId || !Number.isInteger(predictedHomeScore) || !Number.isInteger(predictedAwayScore) || predictedHomeScore < 0 || predictedAwayScore < 0) {
+    return { ok: false, error: 'invalid_prediction' };
+  }
+
+  const { data: match } = await supabaseAdmin
+    .from('matches')
+    .select('id, kickoff_time, stage, is_finished, is_open_for_predictions, home_team_id, away_team_id')
+    .eq('id', matchId)
+    .single();
+
+  if (!match || match.is_finished || !match.is_open_for_predictions || isPredictionLocked(match.kickoff_time)) {
+    return { ok: false, error: 'locked' };
+  }
+
+  if (isKnockoutStage(match.stage) && predictedHomeScore === predictedAwayScore) {
+    const validAdvanceTeam = advanceTeamId === match.home_team_id || advanceTeamId === match.away_team_id;
+    if (!validAdvanceTeam) {
+      return { ok: false, error: 'missing_advance_team' };
+    }
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('predictions')
+    .upsert(
+      {
+        user_id: user.id,
+        match_id: matchId,
+        predicted_home_score: predictedHomeScore,
+        predicted_away_score: predictedAwayScore,
+        advance_team_id: predictedHomeScore === predictedAwayScore ? advanceTeamId : null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id,match_id' }
+    )
+    .select('id')
+    .single();
+
+  if (error) {
+    return { ok: false, error: 'save_failed' };
+  }
+
+  revalidatePath('/matches');
+  revalidatePath('/results');
+  revalidatePath('/ranking');
+  return { ok: true, predictionId: data?.id };
+}
+
 export async function saveResultAction(formData: FormData) {
   await requireAdmin();
 
