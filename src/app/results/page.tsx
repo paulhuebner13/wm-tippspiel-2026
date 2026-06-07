@@ -98,9 +98,9 @@ export default async function ResultsPage({ searchParams }: ResultsPageProps) {
                         <>
                           <div className="resultScoreLabel">Tipp</div>
                           <div className="tipScoreNumbers">
-                            <span>{prediction.predicted_home_score}</span>
+                            <span>{prediction.predicted_home_score ?? '-'}</span>
                             <span>:</span>
-                            <span>{prediction.predicted_away_score}</span>
+                            <span>{prediction.predicted_away_score ?? '-'}</span>
                           </div>
                         </>
                       ) : (

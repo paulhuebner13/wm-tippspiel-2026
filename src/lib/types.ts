@@ -45,8 +45,8 @@ export type Prediction = {
   id: string;
   user_id: string;
   match_id: string;
-  predicted_home_score: number;
-  predicted_away_score: number;
+  predicted_home_score: number | null;
+  predicted_away_score: number | null;
   advance_team_id: string | null;
   profile?: Profile | null;
 };

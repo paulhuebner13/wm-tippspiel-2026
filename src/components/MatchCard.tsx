@@ -28,7 +28,8 @@ function groupOrStage(match: Match): string {
 
 function cardStateClass(status: DraftStatus) {
   if (status === 'saved') return 'matchCardSaved';
-  if (status === 'dirty' || status === 'saving') return 'matchCardUnsaved';
+  if (status === 'dirty') return 'matchCardUnsaved';
+  if (status === 'saving') return 'matchCardSaving';
   if (status === 'empty') return 'matchCardMissing';
   return 'matchCardClosed';
 }
@@ -40,12 +41,29 @@ function scoreInputToNumber(value: string): number | null {
   return parsed;
 }
 
-function predictionMatchesDraft(prediction: LocalPrediction | undefined, home: number, away: number, advanceTeamId: string | null) {
+function predictionMatchesDraft(
+  prediction: LocalPrediction | undefined,
+  home: number | null,
+  away: number | null,
+  advanceTeamId: string | null
+) {
   return (
     prediction?.predicted_home_score === home &&
     prediction?.predicted_away_score === away &&
     (prediction.advance_team_id ?? null) === advanceTeamId
   );
+}
+
+function scoreText(prediction: LocalPrediction | Prediction): string {
+  const home = prediction.predicted_home_score ?? '-';
+  const away = prediction.predicted_away_score ?? '-';
+  return `${home}:${away}`;
+}
+
+function isCompletePrediction(prediction: LocalPrediction | Prediction | undefined, knockoutStage: boolean): boolean {
+  if (!prediction || prediction.predicted_home_score === null || prediction.predicted_away_score === null) return false;
+  if (knockoutStage && prediction.predicted_home_score === prediction.predicted_away_score && !prediction.advance_team_id) return false;
+  return true;
 }
 
 export function MatchCard({
@@ -72,29 +90,35 @@ export function MatchCard({
 
   const homeNumber = scoreInputToNumber(homeScore);
   const awayNumber = scoreInputToNumber(awayScore);
+  const homeFieldEmpty = homeScore.trim() === '';
+  const awayFieldEmpty = awayScore.trim() === '';
 
   const showAdvanceChoice = useMemo(() => {
     if (!knockoutStage) return false;
-    return homeNumber !== null && awayNumber !== null && homeNumber === awayNumber;
-  }, [awayNumber, homeNumber, knockoutStage]);
+    return !homeFieldEmpty && !awayFieldEmpty && homeNumber !== null && awayNumber !== null && homeNumber === awayNumber;
+  }, [awayFieldEmpty, awayNumber, homeFieldEmpty, homeNumber, knockoutStage]);
 
   const normalizedAdvanceTeamId = showAdvanceChoice ? advanceTeamId || null : null;
-  const hasAnyInput = homeScore.trim() !== '' || awayScore.trim() !== '' || Boolean(advanceTeamId);
-  const hasCompleteScoreInput = homeNumber !== null && awayNumber !== null;
-  const hasCompletePrediction = hasCompleteScoreInput && (!showAdvanceChoice || Boolean(advanceTeamId));
-  const matchesSaved = hasCompletePrediction
-    ? predictionMatchesDraft(savedPrediction, homeNumber, awayNumber, normalizedAdvanceTeamId)
-    : false;
+  const hasAnyInput = !homeFieldEmpty || !awayFieldEmpty || Boolean(advanceTeamId);
+  const bothFieldsEmpty = homeFieldEmpty && awayFieldEmpty && !advanceTeamId;
+  const hasCompleteScoreInput = !homeFieldEmpty && !awayFieldEmpty && homeNumber !== null && awayNumber !== null;
+  const hasValidCompletePrediction = hasCompleteScoreInput && (!showAdvanceChoice || Boolean(advanceTeamId));
+  const savedPredictionIsComplete = isCompletePrediction(savedPrediction, knockoutStage);
+  const matchesSaved = predictionMatchesDraft(savedPrediction, homeNumber, awayNumber, normalizedAdvanceTeamId);
 
   const draftStatus: DraftStatus = !canPredict
-    ? savedPrediction
+    ? savedPredictionIsComplete
       ? 'saved'
-      : 'closed'
-    : matchesSaved
+      : savedPrediction
+        ? 'dirty'
+        : 'closed'
+    : matchesSaved && hasValidCompletePrediction
       ? 'saved'
-      : !hasAnyInput && !savedPrediction
-        ? 'empty'
-        : 'dirty';
+      : matchesSaved && savedPrediction
+        ? 'dirty'
+        : !hasAnyInput && !savedPrediction
+          ? 'empty'
+          : 'dirty';
 
   const effectiveStatus: DraftStatus = saveState === 'saving' ? 'saving' : draftStatus;
   const statusClass = cardStateClass(effectiveStatus);
@@ -108,10 +132,14 @@ export function MatchCard({
   }, [match.id, ownPrediction]);
 
   useEffect(() => {
-    if (!canPredict || !hasCompletePrediction || homeNumber === null || awayNumber === null) return;
+    if (!canPredict) return;
+    if (bothFieldsEmpty && !savedPrediction) return;
     if (matchesSaved) return;
 
-    const requestKey = `${match.id}:${homeNumber}:${awayNumber}:${normalizedAdvanceTeamId ?? ''}`;
+    const requestHomeScore = homeFieldEmpty ? null : homeNumber;
+    const requestAwayScore = awayFieldEmpty ? null : awayNumber;
+    const requestAdvanceTeamId = normalizedAdvanceTeamId;
+    const requestKey = `${match.id}:${requestHomeScore ?? ''}:${requestAwayScore ?? ''}:${requestAdvanceTeamId ?? ''}`;
     lastRequestKey.current = requestKey;
 
     const timeout = window.setTimeout(async () => {
@@ -119,20 +147,24 @@ export function MatchCard({
 
       const result = await savePredictionInlineAction({
         matchId: match.id,
-        predictedHomeScore: homeNumber,
-        predictedAwayScore: awayNumber,
-        advanceTeamId: normalizedAdvanceTeamId,
+        predictedHomeScore: requestHomeScore,
+        predictedAwayScore: requestAwayScore,
+        advanceTeamId: requestAdvanceTeamId,
       });
 
       if (lastRequestKey.current !== requestKey) return;
 
       if (result.ok) {
-        setSavedPrediction({
-          id: result.predictionId ?? savedPrediction?.id ?? 'local',
-          predicted_home_score: homeNumber,
-          predicted_away_score: awayNumber,
-          advance_team_id: normalizedAdvanceTeamId,
-        });
+        if (result.deleted) {
+          setSavedPrediction(undefined);
+        } else {
+          setSavedPrediction({
+            id: result.predictionId ?? savedPrediction?.id ?? 'local',
+            predicted_home_score: requestHomeScore,
+            predicted_away_score: requestAwayScore,
+            advance_team_id: requestAdvanceTeamId,
+          });
+        }
         setSaveState('idle');
       } else {
         setSaveState('error');
@@ -141,15 +173,16 @@ export function MatchCard({
 
     return () => window.clearTimeout(timeout);
   }, [
-    advanceTeamId,
+    awayFieldEmpty,
     awayNumber,
+    bothFieldsEmpty,
     canPredict,
-    hasCompletePrediction,
+    homeFieldEmpty,
     homeNumber,
     match.id,
     matchesSaved,
     normalizedAdvanceTeamId,
-    savedPrediction?.id,
+    savedPrediction,
   ]);
 
   return (
@@ -263,7 +296,7 @@ export function MatchCard({
               {match.is_finished ? (
                 <strong>{match.home_score}:{match.away_score}</strong>
               ) : savedPrediction ? (
-                <strong>{savedPrediction.predicted_home_score}:{savedPrediction.predicted_away_score}</strong>
+                <strong>{scoreText(savedPrediction)}</strong>
               ) : (
                 <strong>- : -</strong>
               )}
@@ -278,9 +311,9 @@ export function MatchCard({
           <div className="predictionLockedBox">
             {savedPrediction ? (
               <>
-                Dein Tipp: <strong>{savedPrediction.predicted_home_score}:{savedPrediction.predicted_away_score}</strong>
+                Dein Tipp: <strong>{scoreText(savedPrediction)}</strong>
                 {knockoutDrawTip && savedPrediction.advance_team_id && <span> · Weiterkommer ausgewählt</span>}
-                {match.is_finished && <span> · Punkte: {calculateTotalPoints(match, savedPrediction as Prediction)}</span>}
+                {match.is_finished && savedPredictionIsComplete && <span> · Punkte: {calculateTotalPoints(match, savedPrediction as Prediction)}</span>}
               </>
             ) : (
               <span>{match.is_open_for_predictions ? 'Kein Tipp abgegeben' : 'Tipps noch nicht geöffnet'}</span>
@@ -296,8 +329,8 @@ export function MatchCard({
             {match.predictions.map((prediction) => (
               <li key={prediction.id}>
                 <span>{prediction.profile?.username ?? 'User'}</span>
-                <strong>{prediction.predicted_home_score}:{prediction.predicted_away_score}</strong>
-                {match.is_finished && <span>{calculateTotalPoints(match, prediction)} Punkte</span>}
+                <strong>{scoreText(prediction)}</strong>
+                {match.is_finished && isCompletePrediction(prediction, knockoutStage) && <span>{calculateTotalPoints(match, prediction)} Punkte</span>}
               </li>
             ))}
           </ul>

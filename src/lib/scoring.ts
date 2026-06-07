@@ -53,6 +53,10 @@ export function calculateBasePoints(match: Match, prediction: Prediction): numbe
   const tipHome = prediction.predicted_home_score;
   const tipAway = prediction.predicted_away_score;
 
+  if (tipHome === null || tipAway === null) {
+    return 0;
+  }
+
   let points = 0;
 
   if (realHome === tipHome && realAway === tipAway) {

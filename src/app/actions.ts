@@ -139,15 +139,17 @@ export async function savePredictionAction(formData: FormData) {
 
 export async function savePredictionInlineAction(input: {
   matchId: string;
-  predictedHomeScore: number;
-  predictedAwayScore: number;
+  predictedHomeScore: number | null;
+  predictedAwayScore: number | null;
   advanceTeamId?: string | null;
-}): Promise<{ ok: true; predictionId?: string } | { ok: false; error: string }> {
+}): Promise<{ ok: true; predictionId?: string; deleted?: boolean } | { ok: false; error: string }> {
   const user = await requireUser();
   const { matchId, predictedHomeScore, predictedAwayScore } = input;
   const advanceTeamId = input.advanceTeamId ?? null;
 
-  if (!matchId || !Number.isInteger(predictedHomeScore) || !Number.isInteger(predictedAwayScore) || predictedHomeScore < 0 || predictedAwayScore < 0) {
+  const scoreIsValid = (score: number | null) => score === null || (Number.isInteger(score) && score >= 0);
+
+  if (!matchId || !scoreIsValid(predictedHomeScore) || !scoreIsValid(predictedAwayScore)) {
     return { ok: false, error: 'invalid_prediction' };
   }
 
@@ -161,12 +163,32 @@ export async function savePredictionInlineAction(input: {
     return { ok: false, error: 'locked' };
   }
 
-  if (isKnockoutStage(match.stage) && predictedHomeScore === predictedAwayScore) {
-    const validAdvanceTeam = advanceTeamId === match.home_team_id || advanceTeamId === match.away_team_id;
-    if (!validAdvanceTeam) {
-      return { ok: false, error: 'missing_advance_team' };
+  const isCompletelyEmpty = predictedHomeScore === null && predictedAwayScore === null;
+
+  if (isCompletelyEmpty) {
+    const { error } = await supabaseAdmin
+      .from('predictions')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('match_id', matchId);
+
+    if (error) {
+      return { ok: false, error: 'delete_failed' };
     }
+
+    revalidatePath('/matches');
+    revalidatePath('/results');
+    revalidatePath('/ranking');
+    return { ok: true, deleted: true };
   }
+
+  const bothScoresComplete = predictedHomeScore !== null && predictedAwayScore !== null;
+  const isKnockoutDraw = bothScoresComplete && isKnockoutStage(match.stage) && predictedHomeScore === predictedAwayScore;
+  const validAdvanceTeam = advanceTeamId === match.home_team_id || advanceTeamId === match.away_team_id;
+
+  // Incomplete tips and knockout draws without selected advancing team are intentionally saved.
+  // They stay yellow in the UI and do not count for points until they become complete.
+  const storedAdvanceTeamId = isKnockoutDraw && validAdvanceTeam ? advanceTeamId : null;
 
   const { data, error } = await supabaseAdmin
     .from('predictions')
@@ -176,7 +198,7 @@ export async function savePredictionInlineAction(input: {
         match_id: matchId,
         predicted_home_score: predictedHomeScore,
         predicted_away_score: predictedAwayScore,
-        advance_team_id: predictedHomeScore === predictedAwayScore ? advanceTeamId : null,
+        advance_team_id: storedAdvanceTeamId,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'user_id,match_id' }
