@@ -61,9 +61,13 @@ function ResultPlayerPanel({ profile, match, prediction, self }: { profile: Prof
 
   return (
     <div className={`resultPlayerPanel ${self ? 'resultPlayerPanelSelf' : ''}`}>
-      <div className="resultPlayerMain">
-        <div className="resultPlayerName">{self ? 'Du' : profile.username}</div>
+      <div className="resultPlayerNameCell">
+        <span>{self ? 'Du' : profile.username}</span>
+      </div>
 
+      <div className="resultPanelDivider" aria-hidden="true" />
+
+      <div className="resultPlayerTipCell">
         {finished && complete ? (
           <div className="resultTipVisual">
             <div className="resultTipTeam resultTipTeamHome">

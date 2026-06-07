@@ -1,11 +1,21 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { Profile } from '@/lib/types';
 
 export function ResultsComparePicker({ profiles, selectedCompareUserId }: { profiles: Profile[]; selectedCompareUserId: string | null }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (!selectedCompareUserId) return;
+
+    const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+    if (navigation?.type === 'reload') {
+      router.replace('/results', { scroll: false });
+    }
+  }, [router, selectedCompareUserId]);
 
   function toggleProfile(profileId: string) {
     const params = new URLSearchParams(searchParams.toString());

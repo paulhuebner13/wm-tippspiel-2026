@@ -2219,3 +2219,190 @@ html[data-theme='dark'] .resultPlayerPointsBox {
     font-size: 28px;
   }
 }
+
+/* v27: compact reload-safe result comparison layout. */
+.resultCompareSticky {
+  margin-bottom: 8px;
+}
+
+.resultCompareChip {
+  font-size: 11px;
+  padding: 5px 9px;
+  min-height: 28px;
+}
+
+.resultPlayerPanel {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) 1px minmax(0, 3fr) minmax(54px, 2fr);
+  gap: 0;
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
+  min-height: 76px;
+}
+
+.resultPlayerNameCell {
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  padding: 8px 6px;
+  text-align: center;
+}
+
+.resultPlayerNameCell span {
+  display: block;
+  max-width: 100%;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.08;
+  font-weight: 950;
+  overflow-wrap: anywhere;
+}
+
+.resultPanelDivider {
+  align-self: center;
+  height: 66%;
+  background: color-mix(in srgb, var(--line) 75%, transparent);
+  border-radius: 999px;
+}
+
+.resultPlayerTipCell {
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  padding: 8px 7px;
+  text-align: center;
+}
+
+.resultPlayerTipCell .resultTipVisual {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  justify-items: center;
+  gap: 5px;
+}
+
+.resultPlayerTipCell .resultPredictionText {
+  display: grid;
+  place-items: center;
+  min-height: 34px;
+  font-size: 12px;
+  line-height: 1.12;
+  font-weight: 950;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.resultPlayerPointsBox {
+  border-left: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  padding: 8px 6px;
+  background: color-mix(in srgb, var(--points-bg) 72%, var(--card));
+}
+
+.resultPlayerPointsBox span {
+  color: var(--text);
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: -0.05em;
+}
+
+.resultTipTeam {
+  font-size: 10px;
+  line-height: 1.05;
+}
+
+.resultTipScore {
+  min-width: 42px;
+  font-size: 21px;
+}
+
+.resultAdvanceLine {
+  grid-column: 1 / -1;
+  margin-top: 3px;
+  font-size: 10px;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+@media (min-width: 640px) {
+  .resultCompareChip {
+    font-size: 12px;
+    padding: 6px 11px;
+    min-height: 30px;
+  }
+
+  .resultPlayerPanel {
+    grid-template-columns: minmax(0, 2fr) 1px minmax(0, 3fr) minmax(76px, 2fr);
+    min-height: 88px;
+  }
+
+  .resultPlayerNameCell span {
+    font-size: 13px;
+  }
+
+  .resultTipTeam {
+    font-size: 11px;
+  }
+
+  .resultTipScore {
+    min-width: 56px;
+    font-size: 27px;
+  }
+
+  .resultPlayerPointsBox span {
+    font-size: 40px;
+  }
+}
+
+@media (max-width: 560px) {
+  .resultCompareSticky {
+    top: 104px;
+    margin-top: -12px;
+    margin-left: -14px;
+    margin-right: -14px;
+    padding-top: 4px;
+    padding-bottom: 7px;
+  }
+
+  .resultMatchCard {
+    scroll-margin-top: 172px;
+  }
+
+  .resultPlayersGridCompare {
+    grid-template-columns: 1fr;
+  }
+
+  .resultPlayerPanel {
+    grid-template-columns: minmax(0, 2fr) 1px minmax(0, 3fr) minmax(52px, 2fr);
+    min-height: 74px;
+  }
+
+  .resultPlayerNameCell {
+    padding: 7px 5px;
+  }
+
+  .resultPlayerNameCell span {
+    font-size: 11px;
+  }
+
+  .resultPlayerTipCell {
+    padding: 7px 5px;
+  }
+
+  .resultTipTeam {
+    font-size: 9px;
+  }
+
+  .resultTipScore {
+    min-width: 36px;
+    font-size: 19px;
+  }
+
+  .resultPlayerPointsBox span {
+    font-size: 30px;
+  }
+}
