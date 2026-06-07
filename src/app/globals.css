@@ -1637,3 +1637,76 @@ html[data-theme='dark'] .matchCardUnsaved {
 html[data-theme='dark'] .matchCardSaving {
   border-color: #fbbf24;
 }
+
+/* v21/v22: Resultate tab uses the same centered layout as Tipps and saves without reload. */
+.resultAdminMain {
+  display: grid;
+  gap: 12px;
+}
+
+.resultScoreInputs input {
+  border-width: 2px;
+}
+
+.resultAutoSaveHint {
+  text-align: center;
+  font-weight: 950;
+  color: var(--muted);
+  min-height: 20px;
+}
+
+.adminResultSavedGreen {
+  border-color: #16a34a;
+  box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.1), var(--shadow);
+}
+
+.adminResultDirtyYellow {
+  border-color: #f59e0b;
+}
+
+.adminResultExpectedMissingRed {
+  border-color: #ef4444;
+}
+
+.adminResultUpcomingGrey {
+  border-color: #d1d5db;
+}
+
+html[data-theme='dark'] .adminResultSavedGreen {
+  border-color: #4ade80;
+  box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.12), var(--shadow);
+}
+
+html[data-theme='dark'] .adminResultDirtyYellow {
+  border-color: #fbbf24;
+}
+
+html[data-theme='dark'] .adminResultExpectedMissingRed {
+  border-color: #f87171;
+}
+
+html[data-theme='dark'] .adminResultUpcomingGrey {
+  border-color: #4b5563;
+}
+
+.adminResultCard[data-current-match='true'].adminResultSavedGreen {
+  box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.16), var(--shadow);
+}
+
+.adminResultCard[data-current-match='true'].adminResultDirtyYellow {
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.16), var(--shadow);
+}
+
+.adminResultCard[data-current-match='true'].adminResultExpectedMissingRed {
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.13), var(--shadow);
+}
+
+.adminResultCard[data-current-match='true'].adminResultUpcomingGrey {
+  box-shadow: 0 0 0 4px rgba(156, 163, 175, 0.16), var(--shadow);
+}
+
+.knockoutTeamsForm {
+  margin-top: 6px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}

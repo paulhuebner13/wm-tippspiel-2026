@@ -264,6 +264,86 @@ export async function saveResultAction(formData: FormData) {
   redirect('/admin?saved=1');
 }
 
+
+
+export async function saveResultInlineAction(input: {
+  matchId: string;
+  homeScore: number | null;
+  awayScore: number | null;
+  winnerTeamId?: string | null;
+}): Promise<{ ok: true; winnerTeamId?: string | null } | { ok: false; error: string }> {
+  await requireAdmin();
+
+  const { matchId, homeScore, awayScore } = input;
+  const winnerTeamId = input.winnerTeamId ?? null;
+  const scoreIsValid = (score: number | null) => score === null || (Number.isInteger(score) && score >= 0);
+
+  if (!matchId || !scoreIsValid(homeScore) || !scoreIsValid(awayScore)) {
+    return { ok: false, error: 'invalid_result' };
+  }
+
+  const { data: match } = await supabaseAdmin
+    .from('matches')
+    .select('id, stage, home_team_id, away_team_id')
+    .eq('id', matchId)
+    .single();
+
+  if (!match) {
+    return { ok: false, error: 'match_not_found' };
+  }
+
+  const hasBothScores = homeScore !== null && awayScore !== null;
+  const knockout = isKnockoutStage(match.stage);
+  const isDraw = hasBothScores && homeScore === awayScore;
+  let storedWinnerTeamId: string | null = null;
+  let isFinished = false;
+
+  if (hasBothScores) {
+    if (knockout) {
+      if (homeScore > awayScore) {
+        storedWinnerTeamId = match.home_team_id;
+        isFinished = true;
+      } else if (homeScore < awayScore) {
+        storedWinnerTeamId = match.away_team_id;
+        isFinished = true;
+      } else if (isDraw) {
+        const validWinner = winnerTeamId === match.home_team_id || winnerTeamId === match.away_team_id;
+        if (validWinner) {
+          storedWinnerTeamId = winnerTeamId;
+          isFinished = true;
+        } else {
+          storedWinnerTeamId = null;
+          isFinished = false;
+        }
+      }
+    } else {
+      storedWinnerTeamId = null;
+      isFinished = true;
+    }
+  }
+
+  const { error } = await supabaseAdmin
+    .from('matches')
+    .update({
+      home_score: homeScore,
+      away_score: awayScore,
+      winner_team_id: knockout ? storedWinnerTeamId : null,
+      is_finished: isFinished,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', matchId);
+
+  if (error) {
+    return { ok: false, error: 'save_failed' };
+  }
+
+  revalidatePath('/admin');
+  revalidatePath('/matches');
+  revalidatePath('/results');
+  revalidatePath('/ranking');
+  return { ok: true, winnerTeamId: storedWinnerTeamId };
+}
+
 export async function updateKnockoutTeamsAction(formData: FormData) {
   await requireAdmin();
 
