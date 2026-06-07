@@ -29,7 +29,7 @@ function groupOrStage(match: Match): string {
 function cardStateClass(status: DraftStatus) {
   if (status === 'saved') return 'matchCardSaved';
   if (status === 'dirty') return 'matchCardUnsaved';
-  if (status === 'saving') return 'matchCardSaving';
+  if (status === 'saving') return 'matchCardUnsaved';
   if (status === 'empty') return 'matchCardMissing';
   return 'matchCardClosed';
 }
