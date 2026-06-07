@@ -12,12 +12,20 @@ export function ResultsComparePicker({ profiles, selectedCompareUserId }: { prof
     if (!selectedCompareUserId) return;
 
     const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+    const keepSelection = sessionStorage.getItem('results-compare-click');
+
+    if (keepSelection === '1') {
+      sessionStorage.removeItem('results-compare-click');
+      return;
+    }
+
     if (navigation?.type === 'reload') {
       router.replace('/results', { scroll: false });
     }
   }, [router, selectedCompareUserId]);
 
   function toggleProfile(profileId: string) {
+    sessionStorage.setItem('results-compare-click', '1');
     const params = new URLSearchParams(searchParams.toString());
 
     if (selectedCompareUserId === profileId) {

@@ -2406,3 +2406,27 @@ html[data-theme='dark'] .resultPlayerPointsBox {
     font-size: 30px;
   }
 }
+
+
+/* v28: fix result compare selection persistence and mobile sticky spacing. */
+.resultCompareScroller {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.resultCompareScroller::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 560px) {
+  .resultCompareSticky {
+    top: 128px;
+    margin-top: 0;
+    padding-top: 5px;
+    padding-bottom: 7px;
+  }
+
+  .resultMatchCard {
+    scroll-margin-top: 196px;
+  }
+}
