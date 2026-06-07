@@ -6,7 +6,7 @@ import { Flag } from './Flag';
 import { Countdown } from './Countdown';
 import { calculateTotalPoints, getStageLabel, isKnockoutStage } from '@/lib/scoring';
 import { formatKickoff, isPredictionLocked } from '@/lib/time';
-import type { Match, Prediction } from '@/lib/types';
+import type { Match, Prediction, Profile } from '@/lib/types';
 
 type MatchWithPredictions = Match & {
   predictions?: Prediction[];
@@ -70,11 +70,15 @@ export function MatchCard({
   match,
   ownPrediction,
   showAllPredictions,
+  currentUserId,
+  visibleProfiles,
   current,
 }: {
   match: MatchWithPredictions;
   ownPrediction?: Prediction;
   showAllPredictions: boolean;
+  currentUserId: string;
+  visibleProfiles: Profile[];
   current: boolean;
 }) {
   const locked = isPredictionLocked(match.kickoff_time);
@@ -123,6 +127,19 @@ export function MatchCard({
   const effectiveStatus: DraftStatus = saveState === 'saving' ? 'saving' : draftStatus;
   const statusClass = cardStateClass(effectiveStatus);
   const knockoutDrawTip = savedPrediction?.predicted_home_score === savedPrediction?.predicted_away_score && knockoutStage;
+
+  const otherVisibleProfiles = visibleProfiles.filter((profile) => profile.id !== currentUserId);
+  const predictionsByUserId = new Map((match.predictions ?? []).map((prediction) => [prediction.user_id, prediction]));
+
+  function predictionStatusClass(prediction: Prediction | undefined) {
+    if (!prediction) return 'predictionStatusMissing';
+    return isCompletePrediction(prediction, knockoutStage) ? 'predictionStatusSaved' : 'predictionStatusPartial';
+  }
+
+  function predictionStatusText(prediction: Prediction | undefined) {
+    if (!prediction) return 'Kein Tipp abgegeben';
+    return isCompletePrediction(prediction, knockoutStage) ? 'Tipp abgegeben' : 'Tipp unvollständig';
+  }
 
   useEffect(() => {
     setSavedPrediction(ownPrediction);
@@ -322,17 +339,34 @@ export function MatchCard({
         </div>
       )}
 
-      {showAllPredictions && match.predictions && match.predictions.length > 0 && (
+      {otherVisibleProfiles.length > 0 && (
         <details className="allPredictions">
           <summary>Tipps der anderen anzeigen</summary>
           <ul>
-            {match.predictions.map((prediction) => (
-              <li key={prediction.id}>
-                <span>{prediction.profile?.username ?? 'User'}</span>
-                <strong>{scoreText(prediction)}</strong>
-                {match.is_finished && isCompletePrediction(prediction, knockoutStage) && <span>{calculateTotalPoints(match, prediction)} Punkte</span>}
-              </li>
-            ))}
+            {otherVisibleProfiles.map((profile) => {
+              const prediction = predictionsByUserId.get(profile.id);
+              const complete = isCompletePrediction(prediction, knockoutStage);
+
+              return (
+                <li key={profile.id} className="predictionOverviewRow">
+                  <span>{profile.username}</span>
+                  {showAllPredictions ? (
+                    complete ? (
+                      <>
+                        {prediction && <strong>{scoreText(prediction)}</strong>}
+                        {match.is_finished && prediction && <span>{calculateTotalPoints(match, prediction)} Punkte</span>}
+                      </>
+                    ) : (
+                      <span className="predictionStatus predictionStatusMissing">Kein gültiger Tipp</span>
+                    )
+                  ) : (
+                    <span className={`predictionStatus ${predictionStatusClass(prediction)}`}>
+                      {predictionStatusText(prediction)}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </details>
       )}

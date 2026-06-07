@@ -5,7 +5,7 @@ import { requireUser } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getVisibleProfilesForUser, getVisibleProfileIdSet } from '@/lib/visibility';
 import { isMatchStillRelevant, isPredictionLocked } from '@/lib/time';
-import type { Match, Prediction } from '@/lib/types';
+import type { Match, Prediction, Profile } from '@/lib/types';
 
 export default async function MatchesPage() {
   const user = await requireUser();
@@ -55,6 +55,8 @@ export default async function MatchesPage() {
                 match={{ ...match, predictions: matchPredictions }}
                 ownPrediction={ownPrediction}
                 showAllPredictions={showAllPredictions}
+                currentUserId={user.id}
+                visibleProfiles={visibleProfiles as Profile[]}
                 current={match.id === currentMatchId}
               />
             );
