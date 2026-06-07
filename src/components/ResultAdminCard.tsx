@@ -86,8 +86,6 @@ export function ResultAdminCard({
       ? expectedFinished ? 'expectedMissing' : 'upcoming'
       : 'dirty';
 
-  const resultText = completeAndValid ? `${homeNumber}:${awayNumber}` : homeEmpty && awayEmpty ? '- : -' : `${homeEmpty ? '-' : homeScore}:${awayEmpty ? '-' : awayScore}`;
-
   useEffect(() => {
     setSavedHomeScore(match.home_score);
     setSavedAwayScore(match.away_score);
@@ -232,9 +230,11 @@ export function ResultAdminCard({
           </div>
         )}
 
-        <div className="resultAutoSaveHint" aria-live="polite">
-          {saveState === 'error' ? 'Konnte nicht gespeichert werden.' : resultText}
-        </div>
+        {saveState === 'error' && (
+          <div className="resultAutoSaveHint" aria-live="polite">
+            Konnte nicht gespeichert werden.
+          </div>
+        )}
       </div>
 
       {knockoutStage && (

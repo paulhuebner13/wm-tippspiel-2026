@@ -337,10 +337,10 @@ export async function saveResultInlineAction(input: {
     return { ok: false, error: 'save_failed' };
   }
 
-  revalidatePath('/admin');
-  revalidatePath('/matches');
-  revalidatePath('/results');
-  revalidatePath('/ranking');
+  // Do not revalidate paths here. This action is used by the inline admin result editor.
+  // Revalidating the current admin page while the user is still typing can cause the
+  // server-rendered values to overwrite the local input fields. The UI updates
+  // optimistically instead, and other pages will see the saved result on their next load.
   return { ok: true, winnerTeamId: storedWinnerTeamId };
 }
 

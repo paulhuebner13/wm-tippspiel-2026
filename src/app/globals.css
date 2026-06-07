@@ -1710,3 +1710,43 @@ html[data-theme='dark'] .adminResultUpcomingGrey {
   border-top: 1px solid var(--line);
   padding-top: 12px;
 }
+
+
+/* v23: smoother inline result editing, red-tinted admin areas and improved dark countdown badges. */
+.adminCard,
+.adminSectionCard {
+  background: color-mix(in srgb, var(--danger) 4%, var(--card));
+}
+
+html[data-theme='dark'] .adminCard,
+html[data-theme='dark'] .adminSectionCard {
+  background: color-mix(in srgb, var(--danger) 8%, var(--card));
+}
+
+.resultAutoSaveHint {
+  color: var(--danger);
+}
+
+html[data-theme='dark'] .badge {
+  background: color-mix(in srgb, var(--ok) 14%, var(--card));
+  color: #bbf7d0;
+  border: 1px solid color-mix(in srgb, var(--ok) 28%, transparent);
+}
+
+html[data-theme='dark'] .badge.locked {
+  background: color-mix(in srgb, var(--danger) 14%, var(--card));
+  color: #fecaca;
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+html[data-theme='dark'] .badge.finished {
+  background: color-mix(in srgb, #94a3b8 16%, var(--card));
+  color: #cbd5e1;
+  border-color: color-mix(in srgb, #94a3b8 30%, transparent);
+}
+
+html[data-theme='dark'] .matchTitleLine span,
+html[data-theme='dark'] .matchMeta span {
+  background: var(--pill);
+  color: var(--muted);
+}
