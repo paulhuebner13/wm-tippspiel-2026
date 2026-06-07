@@ -2430,3 +2430,35 @@ html[data-theme='dark'] .resultPlayerPointsBox {
     scroll-margin-top: 196px;
   }
 }
+
+/* v29: move results compare bar slightly up and cover the gap under the main tabs. */
+.resultCompareSticky::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -14px;
+  height: 14px;
+  background: color-mix(in srgb, var(--bg) 96%, transparent);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+
+@media (max-width: 560px) {
+  .resultCompareSticky {
+    top: 116px;
+    margin-top: 0;
+    padding-top: 6px;
+    padding-bottom: 8px;
+    background: color-mix(in srgb, var(--bg) 96%, transparent);
+  }
+
+  .resultCompareSticky::before {
+    top: -18px;
+    height: 18px;
+  }
+
+  .resultMatchCard {
+    scroll-margin-top: 188px;
+  }
+}
