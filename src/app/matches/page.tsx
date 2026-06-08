@@ -42,7 +42,7 @@ export default async function MatchesPage() {
       <main className="page">
         <AutoScrollToCurrent />
         <h1>Tipps</h1>
-        <p className="subtle">Tipps können bis 15 Minuten vor Anpfiff geändert werden.</p>
+        <p className="subtle">Tipps können bis zum Anpfiff geändert werden. Änderungen werden automatisch gespeichert.</p>
         <div className="list">
           {matches.map((match) => {
             const matchPredictions = predictions.filter((prediction) => prediction.match_id === match.id);

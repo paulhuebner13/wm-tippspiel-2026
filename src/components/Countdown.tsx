@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { getLockTime } from '@/lib/time';
 
 function formatRemaining(milliseconds: number): string {
-  if (milliseconds <= 0) return 'Tipp gesperrt';
+  if (milliseconds <= 0) return 'Anpfiff erreicht';
 
   const seconds = Math.floor(milliseconds / 1000);
   const days = Math.floor(seconds / 86400);

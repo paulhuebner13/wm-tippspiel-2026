@@ -72,7 +72,7 @@ export default async function GroupsPage({ searchParams }: GroupsPageProps) {
                 <div className="groupMembersHeader">
                   <div>
                     <h2>{selectedGroup.name}</h2>
-                    <p className="subtle smallSubtle">Alle ausgewählten Spieler sehen sich gegenseitig in Ranking, Ergebnissen und gesperrten Tipps.</p>
+                    <p className="subtle smallSubtle">Alle ausgewählten Spieler sehen sich gegenseitig in Ranking, Ergebnissen und Tipps, sobald diese sichtbar sind.</p>
                   </div>
                   <DeleteGroupForm groupId={selectedGroup.id} groupName={selectedGroup.name} />
                 </div>

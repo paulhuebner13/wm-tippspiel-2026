@@ -186,7 +186,7 @@ export function MatchCard({
       } else {
         setSaveState('error');
       }
-    }, 650);
+    }, 325);
 
     return () => window.clearTimeout(timeout);
   }, [

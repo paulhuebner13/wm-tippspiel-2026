@@ -52,20 +52,20 @@ export default async function RulesPage() {
         <section className="card rulesCard">
           <h2>Tipps ändern</h2>
           <p>
-            Du kannst deinen Tipp bis <strong>15 Minuten vor Spielbeginn</strong> ändern. Danach ist das Spiel gesperrt und der Tipp kann nicht mehr bearbeitet werden.
+            Du kannst deinen Tipp bis zum <strong>Anpfiff</strong> ändern. Ab Spielbeginn ist das Spiel gesperrt und der Tipp kann nicht mehr bearbeitet werden.
           </p>
           <p>
-            Bei K.-o.-Spielen erscheint die Auswahl <strong>„Wer kommt weiter?“</strong> erst dann, wenn du ein Unentschieden eintippst. Dann musst du eines der beiden Teams auswählen, bevor du speichern kannst.
+            Bei K.-o.-Spielen erscheint die Auswahl <strong>„Wer kommt weiter?“</strong> erst dann, wenn du ein Unentschieden eintippst. Ein Tipp ist erst vollständig, wenn dann auch ein Weiterkommer ausgewählt ist.
           </p>
         </section>
 
         <section className="card rulesCard">
           <h2>Tipps der anderen ansehen</h2>
           <p>
-            Vor der Tipp-Sperre siehst du nur deinen eigenen Tipp. Sobald ein Spiel gesperrt ist, also ab 15 Minuten vor Spielbeginn, können die Tipps der anderen angezeigt werden.
+            Vor dem Anpfiff siehst du bei anderen Spielern nur, ob ein Tipp abgegeben wurde. Die konkreten Tipps werden erst ab Spielbeginn sichtbar.
           </p>
           <p>
-            Auf der Ergebnisseite kannst du auswählen, von welchem Spieler du die Tipps und Punkte sehen möchtest.
+            Deine Eingaben werden automatisch gespeichert. Du musst keinen Speichern-Button drücken.
           </p>
         </section>
       </main>

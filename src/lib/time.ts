@@ -1,4 +1,4 @@
-export const LOCK_MINUTES_BEFORE_KICKOFF = 15;
+export const LOCK_MINUTES_BEFORE_KICKOFF = 0;
 export const MATCH_RELEVANT_HOURS_AFTER_KICKOFF = 3;
 
 export function getLockTime(kickoffTime: string): Date {
