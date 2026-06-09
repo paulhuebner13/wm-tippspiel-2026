@@ -1,31 +1,36 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { saveResultInlineAction, updateKnockoutTeamsAction } from '@/app/actions';
-import { Flag } from '@/components/Flag';
-import { formatKickoff } from '@/lib/time';
-import { getStageLabel, isKnockoutStage } from '@/lib/scoring';
-import type { Match, Team } from '@/lib/types';
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  saveKnockoutTeamsInlineAction,
+  saveResultInlineAction,
+} from "@/app/actions";
+import { Flag } from "@/components/Flag";
+import { formatKickoff } from "@/lib/time";
+import { getStageLabel, isKnockoutStage } from "@/lib/scoring";
+import type { Match, Team } from "@/lib/types";
 
-type ResultSaveStatus = 'upcoming' | 'expectedMissing' | 'dirty' | 'saved';
+type ResultSaveStatus = "upcoming" | "expectedMissing" | "dirty" | "saved";
+type TeamSaveStatus = "idle" | "dirty" | "error";
 
-function teamName(match: Match, side: 'home' | 'away'): string {
-  if (side === 'home') return match.home_team?.name ?? match.home_placeholder ?? 'Offen';
-  return match.away_team?.name ?? match.away_placeholder ?? 'Offen';
+function teamName(match: Match, side: "home" | "away"): string {
+  if (side === "home")
+    return match.home_team?.name ?? match.home_placeholder ?? "Offen";
+  return match.away_team?.name ?? match.away_placeholder ?? "Offen";
 }
 
 function scoreInputToNumber(value: string): number | null {
-  if (value.trim() === '') return null;
+  if (value.trim() === "") return null;
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 0) return null;
   return parsed;
 }
 
 function statusClass(status: ResultSaveStatus) {
-  if (status === 'saved') return 'adminResultSavedGreen';
-  if (status === 'dirty') return 'adminResultDirtyYellow';
-  if (status === 'expectedMissing') return 'adminResultExpectedMissingRed';
-  return 'adminResultUpcomingGrey';
+  if (status === "saved") return "adminResultSavedGreen";
+  if (status === "dirty") return "adminResultDirtyYellow";
+  if (status === "expectedMissing") return "adminResultExpectedMissingRed";
+  return "adminResultUpcomingGrey";
 }
 
 function isExpectedFinished(kickoffTime: string) {
@@ -34,11 +39,18 @@ function isExpectedFinished(kickoffTime: string) {
   return Date.now() >= kickoff + 110 * 60 * 1000;
 }
 
-function hasValidFinalResult(match: Match, home: number | null, away: number | null, winnerTeamId: string | null) {
+function hasValidFinalResult(
+  match: Match,
+  home: number | null,
+  away: number | null,
+  winnerTeamId: string | null,
+) {
   if (home === null || away === null) return false;
   if (!isKnockoutStage(match.stage)) return true;
   if (home !== away) return true;
-  return winnerTeamId === match.home_team_id || winnerTeamId === match.away_team_id;
+  return (
+    winnerTeamId === match.home_team_id || winnerTeamId === match.away_team_id
+  );
 }
 
 export function ResultAdminCard({
@@ -51,22 +63,37 @@ export function ResultAdminCard({
   current: boolean;
 }) {
   const knockoutStage = isKnockoutStage(match.stage);
-  const [savedHomeScore, setSavedHomeScore] = useState<number | null>(match.home_score);
-  const [savedAwayScore, setSavedAwayScore] = useState<number | null>(match.away_score);
-  const [savedWinnerTeamId, setSavedWinnerTeamId] = useState<string | null>(match.winner_team_id ?? null);
+  const [savedHomeScore, setSavedHomeScore] = useState<number | null>(
+    match.home_score,
+  );
+  const [savedAwayScore, setSavedAwayScore] = useState<number | null>(
+    match.away_score,
+  );
+  const [savedWinnerTeamId, setSavedWinnerTeamId] = useState<string | null>(
+    match.winner_team_id ?? null,
+  );
 
-  const [homeScore, setHomeScore] = useState(match.home_score?.toString() ?? '');
-  const [awayScore, setAwayScore] = useState(match.away_score?.toString() ?? '');
-  const [winnerTeamId, setWinnerTeamId] = useState(match.winner_team_id ?? '');
-  const [saveState, setSaveState] = useState<'idle' | 'error'>('idle');
-  const lastRequestKey = useRef('');
+  const [homeScore, setHomeScore] = useState(
+    match.home_score?.toString() ?? "",
+  );
+  const [awayScore, setAwayScore] = useState(
+    match.away_score?.toString() ?? "",
+  );
+  const [winnerTeamId, setWinnerTeamId] = useState(match.winner_team_id ?? "");
+  const [saveState, setSaveState] = useState<"idle" | "error">("idle");
+  const [teamHomeId, setTeamHomeId] = useState(match.home_team_id ?? "");
+  const [teamAwayId, setTeamAwayId] = useState(match.away_team_id ?? "");
+  const [teamSaveState, setTeamSaveState] = useState<TeamSaveStatus>("idle");
+  const lastRequestKey = useRef("");
+  const lastTeamRequestKey = useRef("");
 
   const homeNumber = scoreInputToNumber(homeScore);
   const awayNumber = scoreInputToNumber(awayScore);
-  const homeEmpty = homeScore.trim() === '';
-  const awayEmpty = awayScore.trim() === '';
+  const homeEmpty = homeScore.trim() === "";
+  const awayEmpty = awayScore.trim() === "";
   const bothEmpty = homeEmpty && awayEmpty && !winnerTeamId;
-  const bothScoresFilled = !homeEmpty && !awayEmpty && homeNumber !== null && awayNumber !== null;
+  const bothScoresFilled =
+    !homeEmpty && !awayEmpty && homeNumber !== null && awayNumber !== null;
   const isDraw = bothScoresFilled && homeNumber === awayNumber;
   const showWinnerChoice = knockoutStage && isDraw;
   const normalizedWinnerTeamId = showWinnerChoice ? winnerTeamId || null : null;
@@ -76,24 +103,42 @@ export function ResultAdminCard({
     savedAwayScore === (awayEmpty ? null : awayNumber) &&
     (savedWinnerTeamId ?? null) === normalizedWinnerTeamId;
 
-  const completeAndValid = hasValidFinalResult(match, homeEmpty ? null : homeNumber, awayEmpty ? null : awayNumber, normalizedWinnerTeamId);
+  const completeAndValid = hasValidFinalResult(
+    match,
+    homeEmpty ? null : homeNumber,
+    awayEmpty ? null : awayNumber,
+    normalizedWinnerTeamId,
+  );
 
   const expectedFinished = isExpectedFinished(match.kickoff_time);
 
-  const visualStatus: ResultSaveStatus = completeAndValid && matchesSaved
-    ? 'saved'
-    : matchesSaved && bothEmpty
-      ? expectedFinished ? 'expectedMissing' : 'upcoming'
-      : 'dirty';
+  const visualStatus: ResultSaveStatus =
+    completeAndValid && matchesSaved
+      ? "saved"
+      : matchesSaved && bothEmpty
+        ? expectedFinished
+          ? "expectedMissing"
+          : "upcoming"
+        : "dirty";
 
   useEffect(() => {
     setSavedHomeScore(match.home_score);
     setSavedAwayScore(match.away_score);
     setSavedWinnerTeamId(match.winner_team_id ?? null);
-    setHomeScore(match.home_score?.toString() ?? '');
-    setAwayScore(match.away_score?.toString() ?? '');
-    setWinnerTeamId(match.winner_team_id ?? '');
-  }, [match.id, match.home_score, match.away_score, match.winner_team_id]);
+    setHomeScore(match.home_score?.toString() ?? "");
+    setAwayScore(match.away_score?.toString() ?? "");
+    setWinnerTeamId(match.winner_team_id ?? "");
+    setTeamHomeId(match.home_team_id ?? "");
+    setTeamAwayId(match.away_team_id ?? "");
+    setTeamSaveState("idle");
+  }, [
+    match.id,
+    match.home_score,
+    match.away_score,
+    match.winner_team_id,
+    match.home_team_id,
+    match.away_team_id,
+  ]);
 
   useEffect(() => {
     if (matchesSaved) return;
@@ -101,7 +146,7 @@ export function ResultAdminCard({
     const requestHomeScore = homeEmpty ? null : homeNumber;
     const requestAwayScore = awayEmpty ? null : awayNumber;
     const requestWinnerTeamId = normalizedWinnerTeamId;
-    const requestKey = `${match.id}:${requestHomeScore ?? ''}:${requestAwayScore ?? ''}:${requestWinnerTeamId ?? ''}`;
+    const requestKey = `${match.id}:${requestHomeScore ?? ""}:${requestAwayScore ?? ""}:${requestWinnerTeamId ?? ""}`;
     lastRequestKey.current = requestKey;
 
     const timeout = window.setTimeout(async () => {
@@ -121,9 +166,9 @@ export function ResultAdminCard({
         if (!showWinnerChoice && result.winnerTeamId) {
           setWinnerTeamId(result.winnerTeamId);
         }
-        setSaveState('idle');
+        setSaveState("idle");
       } else {
-        setSaveState('error');
+        setSaveState("error");
       }
     }, 650);
 
@@ -139,23 +184,75 @@ export function ResultAdminCard({
     showWinnerChoice,
   ]);
 
+  const canEditTeamsManually = match.stage === "round_of_32";
+  const teamsMatchSaved =
+    teamHomeId === (match.home_team_id ?? "") &&
+    teamAwayId === (match.away_team_id ?? "");
+  const displayHomeTeam = canEditTeamsManually
+    ? (teams.find((team) => team.id === teamHomeId) ?? match.home_team)
+    : match.home_team;
+  const displayAwayTeam = canEditTeamsManually
+    ? (teams.find((team) => team.id === teamAwayId) ?? match.away_team)
+    : match.away_team;
+  const displayHomeName =
+    displayHomeTeam?.name ?? match.home_placeholder ?? "Offen";
+  const displayAwayName =
+    displayAwayTeam?.name ?? match.away_placeholder ?? "Offen";
+
+  useEffect(() => {
+    if (!canEditTeamsManually || teamsMatchSaved) return;
+
+    const requestHomeTeamId = teamHomeId || null;
+    const requestAwayTeamId = teamAwayId || null;
+    const requestKey = `${match.id}:${requestHomeTeamId ?? ""}:${requestAwayTeamId ?? ""}`;
+    lastTeamRequestKey.current = requestKey;
+    setTeamSaveState("dirty");
+
+    const timeout = window.setTimeout(async () => {
+      const result = await saveKnockoutTeamsInlineAction({
+        matchId: match.id,
+        homeTeamId: requestHomeTeamId,
+        awayTeamId: requestAwayTeamId,
+      });
+
+      if (lastTeamRequestKey.current !== requestKey) return;
+
+      if (result.ok) {
+        setTeamSaveState("idle");
+      } else {
+        setTeamSaveState("error");
+      }
+    }, 325);
+
+    return () => window.clearTimeout(timeout);
+  }, [canEditTeamsManually, match.id, teamAwayId, teamHomeId, teamsMatchSaved]);
+
   return (
-    <article className={`card adminCard adminResultCard ${statusClass(visualStatus)}`} data-current-match={current ? 'true' : undefined}>
+    <article
+      className={`card adminCard adminResultCard ${statusClass(visualStatus)}`}
+      data-current-match={current ? "true" : undefined}
+    >
       <div className="matchHeader">
         <div>
           <div className="matchTitleLine">
             <span>Spiel {match.match_number}</span>
-            <span>{match.stage === 'group' && match.group_name ? `Gruppe ${match.group_name}` : getStageLabel(match.stage)}</span>
+            <span>
+              {match.stage === "group" && match.group_name
+                ? `Gruppe ${match.group_name}`
+                : getStageLabel(match.stage)}
+            </span>
           </div>
-          <div className="kickoffLine">Spielbeginn: {formatKickoff(match.kickoff_time)}</div>
+          <div className="kickoffLine">
+            Spielbeginn: {formatKickoff(match.kickoff_time)}
+          </div>
         </div>
       </div>
 
       <div className="resultAdminMain" aria-label="Resultat eintragen">
         <div className="predictionMainRow">
           <div className="predictionTeam predictionTeamHome">
-            <span className="teamName">{teamName(match, 'home')}</span>
-            <Flag team={match.home_team} />
+            <span className="teamName">{displayHomeName}</span>
+            <Flag team={displayHomeTeam} />
           </div>
 
           <div className="scoreInputs resultScoreInputs">
@@ -166,9 +263,9 @@ export function ResultAdminCard({
               value={homeScore}
               onChange={(event) => {
                 setHomeScore(event.target.value);
-                setSaveState('idle');
+                setSaveState("idle");
               }}
-              aria-label={`${teamName(match, 'home')} Tore`}
+              aria-label={`${displayHomeName} Tore`}
             />
             <span>:</span>
             <input
@@ -178,15 +275,15 @@ export function ResultAdminCard({
               value={awayScore}
               onChange={(event) => {
                 setAwayScore(event.target.value);
-                setSaveState('idle');
+                setSaveState("idle");
               }}
-              aria-label={`${teamName(match, 'away')} Tore`}
+              aria-label={`${displayAwayName} Tore`}
             />
           </div>
 
           <div className="predictionTeam predictionTeamAway">
-            <Flag team={match.away_team} />
-            <span className="teamName">{teamName(match, 'away')}</span>
+            <Flag team={displayAwayTeam} />
+            <span className="teamName">{displayAwayName}</span>
           </div>
         </div>
 
@@ -194,43 +291,55 @@ export function ResultAdminCard({
           <div className="advanceChoiceBox">
             <div className="advanceChoiceTitle">Wer kommt weiter?</div>
             <div className="advanceChoices">
-              {match.home_team && (
-                <label className={winnerTeamId === match.home_team.id ? 'advanceChoice selected' : 'advanceChoice'}>
+              {displayHomeTeam && (
+                <label
+                  className={
+                    winnerTeamId === displayHomeTeam.id
+                      ? "advanceChoice selected"
+                      : "advanceChoice"
+                  }
+                >
                   <input
                     type="radio"
                     name={`winnerTeamId-${match.id}`}
-                    value={match.home_team.id}
-                    checked={winnerTeamId === match.home_team.id}
+                    value={displayHomeTeam.id}
+                    checked={winnerTeamId === displayHomeTeam.id}
                     onChange={(event) => {
                       setWinnerTeamId(event.target.value);
-                      setSaveState('idle');
+                      setSaveState("idle");
                     }}
                   />
-                  <Flag team={match.home_team} />
-                  <span>{match.home_team.name}</span>
+                  <Flag team={displayHomeTeam} />
+                  <span>{displayHomeTeam.name}</span>
                 </label>
               )}
-              {match.away_team && (
-                <label className={winnerTeamId === match.away_team.id ? 'advanceChoice selected' : 'advanceChoice'}>
+              {displayAwayTeam && (
+                <label
+                  className={
+                    winnerTeamId === displayAwayTeam.id
+                      ? "advanceChoice selected"
+                      : "advanceChoice"
+                  }
+                >
                   <input
                     type="radio"
                     name={`winnerTeamId-${match.id}`}
-                    value={match.away_team.id}
-                    checked={winnerTeamId === match.away_team.id}
+                    value={displayAwayTeam.id}
+                    checked={winnerTeamId === displayAwayTeam.id}
                     onChange={(event) => {
                       setWinnerTeamId(event.target.value);
-                      setSaveState('idle');
+                      setSaveState("idle");
                     }}
                   />
-                  <Flag team={match.away_team} />
-                  <span>{match.away_team.name}</span>
+                  <Flag team={displayAwayTeam} />
+                  <span>{displayAwayTeam.name}</span>
                 </label>
               )}
             </div>
           </div>
         )}
 
-        {saveState === 'error' && (
+        {saveState === "error" && (
           <div className="resultAutoSaveHint" aria-live="polite">
             Konnte nicht gespeichert werden.
           </div>
@@ -238,28 +347,55 @@ export function ResultAdminCard({
       </div>
 
       {knockoutStage && (
-        <form action={updateKnockoutTeamsAction} className="adminForm knockoutTeamsForm">
-          <input type="hidden" name="matchId" value={match.id} />
-          <label>
-            Heimteam
-            <select name="homeTeamId" defaultValue={match.home_team_id ?? ''}>
-              <option value="">Offen lassen</option>
-              {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
-            </select>
-          </label>
-          <label>
-            Auswärtsteam
-            <select name="awayTeamId" defaultValue={match.away_team_id ?? ''}>
-              <option value="">Offen lassen</option>
-              {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
-            </select>
-          </label>
-          <label className="checkboxLabel">
-            <input name="openForPredictions" type="checkbox" defaultChecked={match.is_open_for_predictions} />
-            Tipps öffnen
-          </label>
-          <button type="submit">Teams speichern</button>
-        </form>
+        <div className="adminForm knockoutTeamsForm">
+          {canEditTeamsManually ? (
+            <>
+              <label>
+                Heimteam
+                <select
+                  value={teamHomeId}
+                  onChange={(event) => setTeamHomeId(event.target.value)}
+                >
+                  <option value="">Offen lassen</option>
+                  {teams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Auswärtsteam
+                <select
+                  value={teamAwayId}
+                  onChange={(event) => setTeamAwayId(event.target.value)}
+                >
+                  <option value="">Offen lassen</option>
+                  {teams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {teamSaveState === "dirty" && (
+                <div className="resultAutoSaveHint">
+                  Teams werden automatisch gespeichert.
+                </div>
+              )}
+              {teamSaveState === "error" && (
+                <div className="resultAutoSaveHint">
+                  Teams konnten nicht gespeichert werden.
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="autoBracketHint">
+              Teams werden automatisch aus den vorherigen Ergebnissen
+              übernommen.
+            </div>
+          )}
+        </div>
       )}
     </article>
   );

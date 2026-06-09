@@ -2462,3 +2462,13 @@ html[data-theme='dark'] .resultPlayerPointsBox {
     scroll-margin-top: 188px;
   }
 }
+
+/* v31: automatic knockout bracket team handling. */
+.autoBracketHint {
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  background: color-mix(in srgb, var(--card) 86%, var(--bg));
+  font-size: 0.9rem;
+}
