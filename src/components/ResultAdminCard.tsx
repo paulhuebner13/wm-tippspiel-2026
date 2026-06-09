@@ -19,6 +19,30 @@ function teamName(match: Match, side: "home" | "away"): string {
   return match.away_team?.name ?? match.away_placeholder ?? "Offen";
 }
 
+
+const ROUND_OF_32_PLACEHOLDERS: Record<number, { home: string; away: string }> = {
+  73: { home: "Zweiter Gruppe A", away: "Zweiter Gruppe B" },
+  74: { home: "Erster Gruppe E", away: "Dritter Gruppe A/B/C/D/F" },
+  75: { home: "Erster Gruppe F", away: "Zweiter Gruppe C" },
+  76: { home: "Erster Gruppe C", away: "Zweiter Gruppe F" },
+  77: { home: "Erster Gruppe I", away: "Dritter Gruppe C/D/F/G/H" },
+  78: { home: "Zweiter Gruppe E", away: "Zweiter Gruppe I" },
+  79: { home: "Erster Gruppe A", away: "Dritter Gruppe C/E/F/H/I" },
+  80: { home: "Erster Gruppe L", away: "Dritter Gruppe E/H/I/J/K" },
+  81: { home: "Erster Gruppe D", away: "Dritter Gruppe B/E/F/I/J" },
+  82: { home: "Erster Gruppe G", away: "Dritter Gruppe A/E/H/I/J" },
+  83: { home: "Zweiter Gruppe K", away: "Zweiter Gruppe L" },
+  84: { home: "Erster Gruppe H", away: "Zweiter Gruppe J" },
+  85: { home: "Erster Gruppe B", away: "Dritter Gruppe E/F/G/I/J" },
+  86: { home: "Erster Gruppe J", away: "Zweiter Gruppe H" },
+  87: { home: "Erster Gruppe K", away: "Dritter Gruppe D/E/I/J/L" },
+  88: { home: "Zweiter Gruppe D", away: "Zweiter Gruppe G" },
+};
+
+function defaultRoundOf32Placeholder(matchNumber: number, side: "home" | "away") {
+  return ROUND_OF_32_PLACEHOLDERS[matchNumber]?.[side] ?? "Offen";
+}
+
 function scoreInputToNumber(value: string): number | null {
   if (value.trim() === "") return null;
   const parsed = Number(value);
@@ -86,6 +110,12 @@ export function ResultAdminCard({
   const [teamAwayId, setTeamAwayId] = useState(match.away_team_id ?? "");
   const [savedTeamHomeId, setSavedTeamHomeId] = useState(match.home_team_id ?? "");
   const [savedTeamAwayId, setSavedTeamAwayId] = useState(match.away_team_id ?? "");
+  const [savedHomePlaceholder, setSavedHomePlaceholder] = useState(
+    match.home_placeholder ?? defaultRoundOf32Placeholder(match.match_number, "home"),
+  );
+  const [savedAwayPlaceholder, setSavedAwayPlaceholder] = useState(
+    match.away_placeholder ?? defaultRoundOf32Placeholder(match.match_number, "away"),
+  );
   const [teamSaveState, setTeamSaveState] = useState<TeamSaveStatus>("idle");
   const lastRequestKey = useRef("");
   const lastTeamRequestKey = useRef("");
@@ -149,6 +179,12 @@ export function ResultAdminCard({
     setTeamAwayId(match.away_team_id ?? "");
     setSavedTeamHomeId(match.home_team_id ?? "");
     setSavedTeamAwayId(match.away_team_id ?? "");
+    setSavedHomePlaceholder(
+      match.home_placeholder ?? defaultRoundOf32Placeholder(match.match_number, "home"),
+    );
+    setSavedAwayPlaceholder(
+      match.away_placeholder ?? defaultRoundOf32Placeholder(match.match_number, "away"),
+    );
     setTeamSaveState("idle");
   }, [
     match.id,
@@ -157,6 +193,9 @@ export function ResultAdminCard({
     match.winner_team_id,
     match.home_team_id,
     match.away_team_id,
+    match.home_placeholder,
+    match.away_placeholder,
+    match.match_number,
   ]);
 
   useEffect(() => {
@@ -204,15 +243,17 @@ export function ResultAdminCard({
   ]);
 
   const displayHomeTeam = canEditTeamsManually
-    ? (teams.find((team) => team.id === teamHomeId) ?? match.home_team)
+    ? teamHomeId
+      ? teams.find((team) => team.id === teamHomeId) ?? null
+      : null
     : match.home_team;
   const displayAwayTeam = canEditTeamsManually
-    ? (teams.find((team) => team.id === teamAwayId) ?? match.away_team)
+    ? teamAwayId
+      ? teams.find((team) => team.id === teamAwayId) ?? null
+      : null
     : match.away_team;
-  const displayHomeName =
-    displayHomeTeam?.name ?? match.home_placeholder ?? "Offen";
-  const displayAwayName =
-    displayAwayTeam?.name ?? match.away_placeholder ?? "Offen";
+  const displayHomeName = displayHomeTeam?.name ?? savedHomePlaceholder;
+  const displayAwayName = displayAwayTeam?.name ?? savedAwayPlaceholder;
 
   useEffect(() => {
     if (!canEditTeamsManually || teamsMatchSaved) return;
@@ -235,6 +276,12 @@ export function ResultAdminCard({
       if (result.ok) {
         setSavedTeamHomeId(result.homeTeamId ?? "");
         setSavedTeamAwayId(result.awayTeamId ?? "");
+        setSavedHomePlaceholder(
+          result.homePlaceholder ?? defaultRoundOf32Placeholder(match.match_number, "home"),
+        );
+        setSavedAwayPlaceholder(
+          result.awayPlaceholder ?? defaultRoundOf32Placeholder(match.match_number, "away"),
+        );
         setTeamSaveState("idle");
       } else {
         setTeamSaveState("error");
@@ -242,7 +289,14 @@ export function ResultAdminCard({
     }, 325);
 
     return () => window.clearTimeout(timeout);
-  }, [canEditTeamsManually, match.id, teamAwayId, teamHomeId, teamsMatchSaved]);
+  }, [
+    canEditTeamsManually,
+    match.id,
+    match.match_number,
+    teamAwayId,
+    teamHomeId,
+    teamsMatchSaved,
+  ]);
 
   return (
     <article

@@ -511,6 +511,30 @@ export async function updateKnockoutTeamsAction(formData: FormData) {
   redirect("/admin?saved=1");
 }
 
+const ROUND_OF_32_PLACEHOLDERS: Record<number, { home: string; away: string }> = {
+  73: { home: "Zweiter Gruppe A", away: "Zweiter Gruppe B" },
+  74: { home: "Erster Gruppe E", away: "Dritter Gruppe A/B/C/D/F" },
+  75: { home: "Erster Gruppe F", away: "Zweiter Gruppe C" },
+  76: { home: "Erster Gruppe C", away: "Zweiter Gruppe F" },
+  77: { home: "Erster Gruppe I", away: "Dritter Gruppe C/D/F/G/H" },
+  78: { home: "Zweiter Gruppe E", away: "Zweiter Gruppe I" },
+  79: { home: "Erster Gruppe A", away: "Dritter Gruppe C/E/F/H/I" },
+  80: { home: "Erster Gruppe L", away: "Dritter Gruppe E/H/I/J/K" },
+  81: { home: "Erster Gruppe D", away: "Dritter Gruppe B/E/F/I/J" },
+  82: { home: "Erster Gruppe G", away: "Dritter Gruppe A/E/H/I/J" },
+  83: { home: "Zweiter Gruppe K", away: "Zweiter Gruppe L" },
+  84: { home: "Erster Gruppe H", away: "Zweiter Gruppe J" },
+  85: { home: "Erster Gruppe B", away: "Dritter Gruppe E/F/G/I/J" },
+  86: { home: "Erster Gruppe J", away: "Zweiter Gruppe H" },
+  87: { home: "Erster Gruppe K", away: "Dritter Gruppe D/E/I/J/L" },
+  88: { home: "Zweiter Gruppe D", away: "Zweiter Gruppe G" },
+};
+
+function getRoundOf32Placeholder(matchNumber: number, side: "home" | "away") {
+  const placeholders = ROUND_OF_32_PLACEHOLDERS[matchNumber];
+  return placeholders ? placeholders[side] : "Offen";
+}
+
 export async function saveKnockoutTeamsInlineAction(input: {
   matchId: string;
   homeTeamId: string | null;
@@ -521,6 +545,8 @@ export async function saveKnockoutTeamsInlineAction(input: {
       openForPredictions: boolean;
       homeTeamId: string | null;
       awayTeamId: string | null;
+      homePlaceholder: string | null;
+      awayPlaceholder: string | null;
     }
   | { ok: false; error: string }
 > {
@@ -547,14 +573,20 @@ export async function saveKnockoutTeamsInlineAction(input: {
   }
 
   const openForPredictions = Boolean(homeTeamId && awayTeamId);
+  const homePlaceholder = homeTeamId
+    ? null
+    : getRoundOf32Placeholder(match.match_number, "home");
+  const awayPlaceholder = awayTeamId
+    ? null
+    : getRoundOf32Placeholder(match.match_number, "away");
 
   const { error } = await supabaseAdmin
     .from("matches")
     .update({
       home_team_id: homeTeamId,
       away_team_id: awayTeamId,
-      home_placeholder: homeTeamId ? null : (match.home_placeholder ?? "Offen"),
-      away_placeholder: awayTeamId ? null : (match.away_placeholder ?? "Offen"),
+      home_placeholder: homePlaceholder,
+      away_placeholder: awayPlaceholder,
       is_open_for_predictions: openForPredictions,
       updated_at: new Date().toISOString(),
     })
@@ -564,7 +596,14 @@ export async function saveKnockoutTeamsInlineAction(input: {
     return { ok: false, error: "team_save_failed" };
   }
 
-  return { ok: true, openForPredictions, homeTeamId, awayTeamId };
+  return {
+    ok: true,
+    openForPredictions,
+    homeTeamId,
+    awayTeamId,
+    homePlaceholder,
+    awayPlaceholder,
+  };
 }
 
 export async function createProfileAction(formData: FormData) {
