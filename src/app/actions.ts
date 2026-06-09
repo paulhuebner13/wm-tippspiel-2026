@@ -516,7 +516,13 @@ export async function saveKnockoutTeamsInlineAction(input: {
   homeTeamId: string | null;
   awayTeamId: string | null;
 }): Promise<
-  { ok: true; openForPredictions: boolean } | { ok: false; error: string }
+  | {
+      ok: true;
+      openForPredictions: boolean;
+      homeTeamId: string | null;
+      awayTeamId: string | null;
+    }
+  | { ok: false; error: string }
 > {
   await requireAdmin();
 
@@ -528,7 +534,7 @@ export async function saveKnockoutTeamsInlineAction(input: {
 
   const { data: match } = await supabaseAdmin
     .from("matches")
-    .select("id, stage, match_number")
+    .select("id, stage, match_number, home_placeholder, away_placeholder")
     .eq("id", matchId)
     .single();
 
@@ -547,8 +553,8 @@ export async function saveKnockoutTeamsInlineAction(input: {
     .update({
       home_team_id: homeTeamId,
       away_team_id: awayTeamId,
-      home_placeholder: homeTeamId ? null : undefined,
-      away_placeholder: awayTeamId ? null : undefined,
+      home_placeholder: homeTeamId ? null : (match.home_placeholder ?? "Offen"),
+      away_placeholder: awayTeamId ? null : (match.away_placeholder ?? "Offen"),
       is_open_for_predictions: openForPredictions,
       updated_at: new Date().toISOString(),
     })
@@ -558,7 +564,7 @@ export async function saveKnockoutTeamsInlineAction(input: {
     return { ok: false, error: "team_save_failed" };
   }
 
-  return { ok: true, openForPredictions };
+  return { ok: true, openForPredictions, homeTeamId, awayTeamId };
 }
 
 export async function createProfileAction(formData: FormData) {

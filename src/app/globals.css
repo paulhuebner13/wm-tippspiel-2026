@@ -2472,3 +2472,18 @@ html[data-theme='dark'] .resultPlayerPointsBox {
   background: color-mix(in srgb, var(--card) 86%, var(--bg));
   font-size: 0.9rem;
 }
+
+/* v32: one saved knockout team in Resultate is marked blue. */
+.adminResultPartialTeamBlue {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1), var(--shadow);
+}
+
+html[data-theme='dark'] .adminResultPartialTeamBlue {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.12), var(--shadow);
+}
+
+.adminResultCard[data-current-match='true'].adminResultPartialTeamBlue {
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.16), var(--shadow);
+}

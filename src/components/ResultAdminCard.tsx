@@ -10,7 +10,7 @@ import { formatKickoff } from "@/lib/time";
 import { getStageLabel, isKnockoutStage } from "@/lib/scoring";
 import type { Match, Team } from "@/lib/types";
 
-type ResultSaveStatus = "upcoming" | "expectedMissing" | "dirty" | "saved";
+type ResultSaveStatus = "upcoming" | "expectedMissing" | "dirty" | "saved" | "partialTeamSaved";
 type TeamSaveStatus = "idle" | "dirty" | "error";
 
 function teamName(match: Match, side: "home" | "away"): string {
@@ -29,6 +29,7 @@ function scoreInputToNumber(value: string): number | null {
 function statusClass(status: ResultSaveStatus) {
   if (status === "saved") return "adminResultSavedGreen";
   if (status === "dirty") return "adminResultDirtyYellow";
+  if (status === "partialTeamSaved") return "adminResultPartialTeamBlue";
   if (status === "expectedMissing") return "adminResultExpectedMissingRed";
   return "adminResultUpcomingGrey";
 }
@@ -83,6 +84,8 @@ export function ResultAdminCard({
   const [saveState, setSaveState] = useState<"idle" | "error">("idle");
   const [teamHomeId, setTeamHomeId] = useState(match.home_team_id ?? "");
   const [teamAwayId, setTeamAwayId] = useState(match.away_team_id ?? "");
+  const [savedTeamHomeId, setSavedTeamHomeId] = useState(match.home_team_id ?? "");
+  const [savedTeamAwayId, setSavedTeamAwayId] = useState(match.away_team_id ?? "");
   const [teamSaveState, setTeamSaveState] = useState<TeamSaveStatus>("idle");
   const lastRequestKey = useRef("");
   const lastTeamRequestKey = useRef("");
@@ -111,15 +114,29 @@ export function ResultAdminCard({
   );
 
   const expectedFinished = isExpectedFinished(match.kickoff_time);
+  const canEditTeamsManually = match.stage === "round_of_32";
+  const teamsMatchSaved =
+    teamHomeId === savedTeamHomeId && teamAwayId === savedTeamAwayId;
+  const exactlyOneSavedTeam =
+    canEditTeamsManually &&
+    teamsMatchSaved &&
+    Boolean(savedTeamHomeId || savedTeamAwayId) &&
+    !(savedTeamHomeId && savedTeamAwayId) &&
+    matchesSaved &&
+    bothEmpty;
 
   const visualStatus: ResultSaveStatus =
     completeAndValid && matchesSaved
       ? "saved"
-      : matchesSaved && bothEmpty
-        ? expectedFinished
-          ? "expectedMissing"
-          : "upcoming"
-        : "dirty";
+      : !teamsMatchSaved
+        ? "dirty"
+        : exactlyOneSavedTeam
+          ? "partialTeamSaved"
+          : matchesSaved && bothEmpty
+            ? expectedFinished
+              ? "expectedMissing"
+              : "upcoming"
+            : "dirty";
 
   useEffect(() => {
     setSavedHomeScore(match.home_score);
@@ -130,6 +147,8 @@ export function ResultAdminCard({
     setWinnerTeamId(match.winner_team_id ?? "");
     setTeamHomeId(match.home_team_id ?? "");
     setTeamAwayId(match.away_team_id ?? "");
+    setSavedTeamHomeId(match.home_team_id ?? "");
+    setSavedTeamAwayId(match.away_team_id ?? "");
     setTeamSaveState("idle");
   }, [
     match.id,
@@ -184,10 +203,6 @@ export function ResultAdminCard({
     showWinnerChoice,
   ]);
 
-  const canEditTeamsManually = match.stage === "round_of_32";
-  const teamsMatchSaved =
-    teamHomeId === (match.home_team_id ?? "") &&
-    teamAwayId === (match.away_team_id ?? "");
   const displayHomeTeam = canEditTeamsManually
     ? (teams.find((team) => team.id === teamHomeId) ?? match.home_team)
     : match.home_team;
@@ -218,6 +233,8 @@ export function ResultAdminCard({
       if (lastTeamRequestKey.current !== requestKey) return;
 
       if (result.ok) {
+        setSavedTeamHomeId(result.homeTeamId ?? "");
+        setSavedTeamAwayId(result.awayTeamId ?? "");
         setTeamSaveState("idle");
       } else {
         setTeamSaveState("error");
@@ -378,23 +395,13 @@ export function ResultAdminCard({
                   ))}
                 </select>
               </label>
-              {teamSaveState === "dirty" && (
-                <div className="resultAutoSaveHint">
-                  Teams werden automatisch gespeichert.
-                </div>
-              )}
               {teamSaveState === "error" && (
                 <div className="resultAutoSaveHint">
                   Teams konnten nicht gespeichert werden.
                 </div>
               )}
             </>
-          ) : (
-            <div className="autoBracketHint">
-              Teams werden automatisch aus den vorherigen Ergebnissen
-              übernommen.
-            </div>
-          )}
+          ) : null}
         </div>
       )}
     </article>

@@ -64,9 +64,6 @@ export default async function RulesPage() {
           <p>
             Vor dem Anpfiff siehst du bei anderen Spielern nur, ob ein Tipp abgegeben wurde. Die konkreten Tipps werden erst ab Spielbeginn sichtbar.
           </p>
-          <p>
-            Deine Eingaben werden automatisch gespeichert. Du musst keinen Speichern-Button drücken.
-          </p>
         </section>
       </main>
     </>
