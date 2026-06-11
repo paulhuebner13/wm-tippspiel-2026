@@ -2487,3 +2487,46 @@ html[data-theme='dark'] .adminResultPartialTeamBlue {
 .adminResultCard[data-current-match='true'].adminResultPartialTeamBlue {
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.16), var(--shadow);
 }
+
+
+/* v34: cleaner change override and centred prediction overview. */
+.predictionOverviewRow {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 150px) minmax(64px, 84px);
+  align-items: center;
+  gap: 10px;
+}
+
+.predictionOverviewRow > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.predictionOverviewRow > strong,
+.predictionOverviewRow > .predictionStatus {
+  justify-self: center;
+  text-align: center;
+}
+
+.predictionOverviewRow > span:last-child:not(:first-child) {
+  justify-self: end;
+  text-align: right;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+@media (max-width: 520px) {
+  .predictionOverviewRow {
+    grid-template-columns: minmax(0, 1fr) minmax(112px, 132px) minmax(42px, 58px);
+    gap: 7px;
+    padding: 9px 8px;
+  }
+
+  .predictionStatus {
+    padding: 6px 8px;
+    font-size: 11px;
+    white-space: normal;
+    line-height: 1.15;
+  }
+}

@@ -5,7 +5,7 @@ import { requireAdmin } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { formatKickoff } from '@/lib/time';
 import { getStageLabel, isKnockoutStage } from '@/lib/scoring';
-import type { Match, Prediction, Profile } from '@/lib/types';
+import type { Match, Profile } from '@/lib/types';
 
 type ChangesPageProps = {
   searchParams?: Promise<{ profileId?: string; matchNumber?: string }>;
@@ -31,8 +31,6 @@ export default async function ChangesPage({ searchParams }: ChangesPageProps) {
   const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId);
 
   let match: Match | null = null;
-  let prediction: Prediction | null = null;
-
   if (matchNumber.trim() !== '') {
     const parsedMatchNumber = Number(matchNumber);
     if (Number.isInteger(parsedMatchNumber)) {
@@ -48,16 +46,6 @@ export default async function ChangesPage({ searchParams }: ChangesPageProps) {
 
       match = (matchData ?? null) as Match | null;
 
-      if (match && selectedProfileId) {
-        const { data: predictionData } = await supabaseAdmin
-          .from('predictions')
-          .select('*')
-          .eq('match_id', match.id)
-          .eq('user_id', selectedProfileId)
-          .maybeSingle();
-
-        prediction = (predictionData ?? null) as Prediction | null;
-      }
     }
   }
 
@@ -113,17 +101,17 @@ export default async function ChangesPage({ searchParams }: ChangesPageProps) {
 
               <label>
                 Tipp {teamName(match, 'home')}
-                <input name="predictedHomeScore" type="number" min="0" inputMode="numeric" defaultValue={prediction?.predicted_home_score ?? ''} required />
+                <input name="predictedHomeScore" type="number" min="0" inputMode="numeric" defaultValue="" required />
               </label>
               <label>
                 Tipp {teamName(match, 'away')}
-                <input name="predictedAwayScore" type="number" min="0" inputMode="numeric" defaultValue={prediction?.predicted_away_score ?? ''} required />
+                <input name="predictedAwayScore" type="number" min="0" inputMode="numeric" defaultValue="" required />
               </label>
 
               {isKnockoutStage(match.stage) && (
                 <label>
                   Weiterkommer bei Remis
-                  <select name="advanceTeamId" defaultValue={prediction?.advance_team_id ?? ''}>
+                  <select name="advanceTeamId" defaultValue="">
                     <option value="">Nur bei Remis wählen</option>
                     {match.home_team && <option value={match.home_team.id}>{match.home_team.name}</option>}
                     {match.away_team && <option value={match.away_team.id}>{match.away_team.name}</option>}

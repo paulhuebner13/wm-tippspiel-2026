@@ -126,7 +126,6 @@ export function MatchCard({
 
   const effectiveStatus: DraftStatus = saveState === 'saving' ? 'saving' : draftStatus;
   const statusClass = cardStateClass(effectiveStatus);
-  const knockoutDrawTip = savedPrediction?.predicted_home_score === savedPrediction?.predicted_away_score && knockoutStage;
 
   const otherVisibleProfiles = visibleProfiles.filter((profile) => profile.id !== currentUserId);
   const predictionsByUserId = new Map((match.predictions ?? []).map((prediction) => [prediction.user_id, prediction]));
@@ -323,20 +322,7 @@ export function MatchCard({
               <Flag team={match.away_team} />
               <span className="teamName">{teamName(match, 'away')}</span>
             </div>
-          </div>
-
-          <div className="predictionLockedBox">
-            {savedPrediction ? (
-              <>
-                Dein Tipp: <strong>{scoreText(savedPrediction)}</strong>
-                {knockoutDrawTip && savedPrediction.advance_team_id && <span> · Weiterkommer ausgewählt</span>}
-                {match.is_finished && savedPredictionIsComplete && <span> · Punkte: {calculateTotalPoints(match, savedPrediction as Prediction)}</span>}
-              </>
-            ) : (
-              <span>{match.is_open_for_predictions ? 'Kein Tipp abgegeben' : 'Tipps noch nicht geöffnet'}</span>
-            )}
-          </div>
-        </div>
+          </div>        </div>
       )}
 
       {otherVisibleProfiles.length > 0 && (
