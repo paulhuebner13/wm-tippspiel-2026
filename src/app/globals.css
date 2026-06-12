@@ -2716,3 +2716,24 @@ html[data-theme='dark'] .resultMatchCard.resultMatchEvaluated {
   grid-row: auto;
   white-space: nowrap;
 }
+
+
+/* v40: results page shows kickoff time next to match/group without extra Spielbeginn line. */
+.resultPageMatchHeader .resultTitleLine {
+  margin-bottom: 14px;
+}
+
+.resultPageMatchHeader .resultTitleLine span {
+  white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  .resultPageMatchHeader .resultTitleLine {
+    gap: 6px;
+  }
+
+  .resultPageMatchHeader .resultTitleLine span {
+    padding: 5px 7px;
+    font-size: 12px;
+  }
+}

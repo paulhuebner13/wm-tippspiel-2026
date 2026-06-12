@@ -150,11 +150,11 @@ export default async function ResultsPage({ searchParams }: ResultsPageProps) {
               >
                 <div className="matchHeader resultPageMatchHeader">
                   <div>
-                    <div className="matchTitleLine">
+                    <div className="matchTitleLine resultTitleLine">
                       <span>Spiel {match.match_number}</span>
                       <span>{match.stage === 'group' && match.group_name ? `Gruppe ${match.group_name}` : getStageLabel(match.stage)}</span>
+                      <span>{formatKickoff(match.kickoff_time)}</span>
                     </div>
-                    <div className="kickoffLine">Spielbeginn: {formatKickoff(match.kickoff_time)}</div>
                   </div>
                 </div>
 
