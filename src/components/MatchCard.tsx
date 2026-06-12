@@ -125,7 +125,8 @@ export function MatchCard({
           : 'dirty';
 
   const effectiveStatus: DraftStatus = saveState === 'saving' ? 'saving' : draftStatus;
-  const statusClass = cardStateClass(effectiveStatus);
+  const startedOrFinished = locked || Boolean(match.is_finished);
+  const statusClass = !canPredict && startedOrFinished ? 'matchCardLockedBlue' : cardStateClass(effectiveStatus);
 
   const otherVisibleProfiles = visibleProfiles.filter((profile) => profile.id !== currentUserId);
   const predictionsByUserId = new Map((match.predictions ?? []).map((prediction) => [prediction.user_id, prediction]));
@@ -334,7 +335,7 @@ export function MatchCard({
               const complete = isCompletePrediction(prediction, knockoutStage);
 
               return (
-                <li key={profile.id} className="predictionOverviewRow">
+                <li key={profile.id} className={`predictionOverviewRow ${showAllPredictions ? 'predictionOverviewRowUnlocked' : 'predictionOverviewRowLocked'}`}>
                   <span>{profile.username}</span>
                   {showAllPredictions ? (
                     complete ? (

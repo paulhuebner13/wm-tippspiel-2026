@@ -2569,3 +2569,51 @@ html[data-theme='dark'] .rankingList li.rankingBronze {
   border-color: #d97706;
   box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
 }
+
+/* v36: blue borders for locked/evaluated games and right-aligned pre-lock prediction status. */
+.matchCardLockedBlue {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12), var(--shadow);
+}
+
+.resultMatchEvaluated {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12), var(--shadow);
+}
+
+html[data-theme='dark'] .matchCardLockedBlue,
+html[data-theme='dark'] .resultMatchEvaluated {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.14), var(--shadow);
+}
+
+.predictionOverviewRowLocked {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+}
+
+.predictionOverviewRowLocked > .predictionStatus {
+  grid-column: 2;
+  justify-self: end;
+}
+
+.predictionOverviewRowUnlocked {
+  grid-template-columns: minmax(0, 1fr) minmax(76px, 120px) minmax(78px, 96px) !important;
+}
+
+.predictionOverviewRowUnlocked > .otherPredictionPoints {
+  justify-self: end;
+}
+
+@media (max-width: 520px) {
+  .predictionOverviewRowLocked {
+    grid-template-columns: minmax(0, 1fr) minmax(112px, auto) !important;
+  }
+
+  .predictionOverviewRowUnlocked {
+    grid-template-columns: minmax(0, 1fr) minmax(54px, 74px) minmax(74px, 90px) !important;
+  }
+
+  .predictionOverviewRowUnlocked > .otherPredictionPoints {
+    font-size: 11px;
+  }
+}

@@ -143,7 +143,11 @@ export default async function ResultsPage({ searchParams }: ResultsPageProps) {
         <div className="list resultsListNew">
           {matches.map((match) => {
             return (
-              <article className="card resultMatchCard" key={match.id} data-result-scroll-target={match.match_number}>
+              <article
+                className={`card resultMatchCard ${hasResult(match) && match.is_finished ? 'resultMatchEvaluated' : ''}`}
+                key={match.id}
+                data-result-scroll-target={match.match_number}
+              >
                 <div className="matchTitleLine">
                   <span>Spiel {match.match_number}</span>
                   <span>{match.stage === 'group' && match.group_name ? `Gruppe ${match.group_name}` : getStageLabel(match.stage)}</span>
