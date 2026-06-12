@@ -340,7 +340,7 @@ export function MatchCard({
                     complete ? (
                       <>
                         {prediction && <strong>{scoreText(prediction)}</strong>}
-                        {match.is_finished && prediction && <span>{calculateTotalPoints(match, prediction)} Punkte</span>}
+                        {match.is_finished && prediction && <span className="otherPredictionPoints">{calculateTotalPoints(match, prediction)}&nbsp;Punkte</span>}
                       </>
                     ) : (
                       <span className="predictionStatus predictionStatusMissing">Kein gültiger Tipp</span>

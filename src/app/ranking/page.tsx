@@ -73,8 +73,12 @@ export default async function RankingPage() {
         <h1>Ranking</h1>
         <section className="card">
           <ol className="rankingList rankingListExpandable">
-            {ranking.map((row, index) => (
-              <li key={row.user.id} className={row.user.id === user.id ? 'ownRanking' : ''}>
+            {ranking.map((row, index) => {
+              const medalClass = index === 0 ? 'rankingGold' : index === 1 ? 'rankingSilver' : index === 2 ? 'rankingBronze' : '';
+              const ownClass = row.user.id === user.id ? 'ownRanking' : '';
+
+              return (
+              <li key={row.user.id} className={[ownClass, medalClass].filter(Boolean).join(' ')}>
                 <details className="rankingDetails">
                   <summary>
                     <span>{index + 1}. {row.user.username}</span>
@@ -91,7 +95,8 @@ export default async function RankingPage() {
                   </div>
                 </details>
               </li>
-            ))}
+              );
+            })}
           </ol>
         </section>
       </main>

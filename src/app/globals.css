@@ -2530,3 +2530,42 @@ html[data-theme='dark'] .adminResultPartialTeamBlue {
     line-height: 1.15;
   }
 }
+
+/* v35: prediction points in one line and medal borders in ranking. */
+.otherPredictionPoints {
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+}
+
+.rankingList li.rankingGold {
+  border: 2px solid #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+}
+
+.rankingList li.rankingSilver {
+  border: 2px solid #94a3b8;
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.12);
+}
+
+.rankingList li.rankingBronze {
+  border: 2px solid #b45309;
+  box-shadow: 0 0 0 3px rgba(180, 83, 9, 0.12);
+}
+
+html[data-theme='dark'] .rankingList li.rankingGold {
+  border-color: #fbbf24;
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.16);
+}
+
+html[data-theme='dark'] .rankingList li.rankingSilver {
+  border-color: #cbd5e1;
+  box-shadow: 0 0 0 3px rgba(203, 213, 225, 0.12);
+}
+
+html[data-theme='dark'] .rankingList li.rankingBronze {
+  border-color: #d97706;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+}
