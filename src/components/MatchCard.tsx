@@ -344,7 +344,7 @@ export function MatchCard({
                         {match.is_finished && prediction && <span className="otherPredictionPoints">{calculateTotalPoints(match, prediction)}&nbsp;Punkte</span>}
                       </>
                     ) : (
-                      <span className="predictionStatus predictionStatusMissing">Kein gültiger Tipp</span>
+                      <span className="predictionStatus predictionStatusMissing predictionStatusNoTipUnlocked">Kein Tipp abgegeben</span>
                     )
                   ) : (
                     <span className={`predictionStatus ${predictionStatusClass(prediction)}`}>

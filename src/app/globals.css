@@ -2678,3 +2678,41 @@ html[data-theme='dark'] .resultMatchCard.resultMatchEvaluated {
     letter-spacing: -0.01em;
   }
 }
+
+
+/* v38: keep missing prediction label in one line after match is evaluated. */
+.predictionOverviewRowUnlocked > .predictionStatusNoTipUnlocked {
+  grid-column: 2 / 4;
+  justify-self: end;
+  text-align: right;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+@media (max-width: 520px) {
+  .predictionOverviewRowUnlocked > .predictionStatusNoTipUnlocked {
+    font-size: 10px;
+    padding: 5px 7px;
+    line-height: 1;
+  }
+}
+
+/* v39: Results page uses the same kickoff display as the Tipps page. */
+.resultPageMatchHeader {
+  margin-bottom: 14px;
+}
+
+.resultPageMatchHeader > div:first-child {
+  display: block;
+}
+
+.resultPageMatchHeader .matchTitleLine {
+  margin-bottom: 8px;
+}
+
+.resultPageMatchHeader .kickoffLine {
+  display: block;
+  grid-column: auto;
+  grid-row: auto;
+  white-space: nowrap;
+}

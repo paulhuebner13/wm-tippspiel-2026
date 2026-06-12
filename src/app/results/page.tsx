@@ -148,10 +148,14 @@ export default async function ResultsPage({ searchParams }: ResultsPageProps) {
                 key={match.id}
                 data-result-scroll-target={match.match_number}
               >
-                <div className="matchTitleLine">
-                  <span>Spiel {match.match_number}</span>
-                  <span>{match.stage === 'group' && match.group_name ? `Gruppe ${match.group_name}` : getStageLabel(match.stage)}</span>
-                  <span>{formatKickoff(match.kickoff_time)}</span>
+                <div className="matchHeader resultPageMatchHeader">
+                  <div>
+                    <div className="matchTitleLine">
+                      <span>Spiel {match.match_number}</span>
+                      <span>{match.stage === 'group' && match.group_name ? `Gruppe ${match.group_name}` : getStageLabel(match.stage)}</span>
+                    </div>
+                    <div className="kickoffLine">Spielbeginn: {formatKickoff(match.kickoff_time)}</div>
+                  </div>
                 </div>
 
                 <div className="resultMatchGrid">
