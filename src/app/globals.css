@@ -2617,3 +2617,73 @@ html[data-theme='dark'] .resultMatchEvaluated {
     font-size: 11px;
   }
 }
+
+/* v37 manual fix: match header layout and stronger result borders */
+
+/* Tipps-Tab: Countdown und Spielbeginn sauber untereinander */
+.matchHeader {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.countdownBox {
+  justify-self: start;
+  text-align: left;
+  width: 100%;
+}
+
+.kickoffLine {
+  display: block;
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+/* Größere Screens: Countdown darf rechts stehen, aber ohne Überlappung */
+@media (min-width: 640px) {
+  .matchHeader {
+    grid-template-columns: 1fr auto;
+    align-items: start;
+  }
+
+  .countdownBox {
+    justify-self: end;
+    text-align: right;
+    max-width: 220px;
+  }
+
+  .kickoffLine {
+    margin-top: 6px;
+  }
+}
+
+/* Ergebnisse-Tab: ausgewertete Spiele deutlicher blau */
+.resultMatchCard.matchCardFinished,
+.resultMatchCard.finished,
+.resultMatchCard.resultFinished,
+.resultMatchCard[data-finished='true'] {
+  border-width: 4px;
+  border-color: #2563eb;
+  background: color-mix(in srgb, #2563eb 5%, var(--card));
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12), var(--shadow);
+}
+
+/* Falls die Resultate-Karten die Admin-Result-Klassen verwenden */
+.adminResultSavedGreen,
+.adminResultCard.adminResultSavedGreen {
+  border-width: 4px;
+  border-color: #2563eb;
+  background: color-mix(in srgb, #2563eb 5%, var(--card));
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12), var(--shadow);
+}
+
+html[data-theme='dark'] .resultMatchCard.matchCardFinished,
+html[data-theme='dark'] .resultMatchCard.finished,
+html[data-theme='dark'] .resultMatchCard.resultFinished,
+html[data-theme='dark'] .resultMatchCard[data-finished='true'],
+html[data-theme='dark'] .adminResultSavedGreen,
+html[data-theme='dark'] .adminResultCard.adminResultSavedGreen {
+  border-color: #60a5fa;
+  background: color-mix(in srgb, #60a5fa 9%, var(--card));
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.16), var(--shadow);
+}
