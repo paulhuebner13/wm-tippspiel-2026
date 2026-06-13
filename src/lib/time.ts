@@ -18,6 +18,7 @@ export function isMatchStillRelevant(kickoffTime: string, now = new Date()): boo
 
 export function formatKickoff(kickoffTime: string): string {
   return new Intl.DateTimeFormat('de-AT', {
+    timeZone: 'Europe/Vienna',
     weekday: 'short',
     day: '2-digit',
     month: '2-digit',
