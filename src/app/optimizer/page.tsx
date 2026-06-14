@@ -14,6 +14,8 @@ export default async function OptimizerPage({ searchParams }: { searchParams: Se
   type OptimizerPageMatch = Match & { home_team?: any; away_team?: any };
   let match: OptimizerPageMatch | null = null;
   let oddsText = '';
+  let maxGoals = 7;
+  let rankingWeight = 0.15;
   let homeRating: number | null = null;
   let awayRating: number | null = null;
 
@@ -33,11 +35,13 @@ export default async function OptimizerPage({ searchParams }: { searchParams: Se
     if (match) {
       const { data: storedOdds } = await supabaseAdmin
         .from('tip_optimizer_inputs')
-        .select('odds_text')
+        .select('odds_text, max_goals, ranking_weight')
         .eq('match_id', match.id)
         .maybeSingle();
 
       oddsText = storedOdds?.odds_text ?? '';
+      maxGoals = Number(storedOdds?.max_goals ?? 7);
+      rankingWeight = Number(storedOdds?.ranking_weight ?? 0.15);
 
       const teamIds = [match.home_team_id, match.away_team_id].filter(Boolean) as string[];
       if (teamIds.length > 0) {
@@ -78,6 +82,8 @@ export default async function OptimizerPage({ searchParams }: { searchParams: Se
             initialOddsText={oddsText}
             homeRating={homeRating}
             awayRating={awayRating}
+            initialMaxGoals={maxGoals}
+            initialRankingWeight={rankingWeight}
           />
         )}
       </main>

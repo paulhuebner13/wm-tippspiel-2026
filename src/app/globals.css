@@ -2938,3 +2938,352 @@ html[data-theme='dark'] .resultMatchCard.resultMatchEvaluated {
     grid-template-columns: 1fr;
   }
 }
+
+/* v45 optimizer mobile order and adjustable weights */
+.optimizerStack {
+  display: grid;
+  gap: 14px;
+}
+
+.optimizerMatchCard,
+.optimizerTopCard,
+.optimizerInputCard,
+.optimizerOutputCard,
+.optimizerSettingsCard {
+  padding: 16px;
+}
+
+.optimizerMatchCard .optimizerMatchHeader {
+  margin-bottom: 10px;
+}
+
+.optimizerTeamSide span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.optimizerTopCard h2,
+.optimizerOutputCard h2,
+.optimizerSettingsCard h2 {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.compactTopTips {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 8px 0 10px;
+}
+
+.compactTopTips .optimizerTipCard {
+  padding: 8px 7px;
+  border-radius: 13px;
+  gap: 2px;
+}
+
+.compactTopTips .optimizerTipCard strong {
+  font-size: 1.25rem;
+  line-height: 1.05;
+}
+
+.compactTopTips .optimizerTipCard span:last-child {
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.compactAltTips {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.compactAltTips .optimizerAltTip {
+  padding: 8px 10px;
+  font-size: 0.9rem;
+}
+
+.compactSummary {
+  margin: 8px 0 0;
+}
+
+.optimizerInputCard .optimizerTextarea {
+  min-height: 230px;
+}
+
+.optimizerSettingsCard {
+  display: grid;
+  gap: 14px;
+}
+
+.optimizerPresetRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.optimizerPresetRow button {
+  border: 1px solid var(--border);
+  background: var(--pill);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 800;
+}
+
+.optimizerSliderLabel {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.optimizerSliderLabel input {
+  width: 100%;
+}
+
+.optimizerSettingsGrid {
+  display: grid;
+  gap: 10px;
+}
+
+.optimizerSettingsGrid label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.optimizerSettingsGrid input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 10px;
+}
+
+@media (max-width: 520px) {
+  .optimizerMatchCard,
+  .optimizerTopCard,
+  .optimizerInputCard,
+  .optimizerOutputCard,
+  .optimizerSettingsCard {
+    padding: 13px;
+  }
+
+  .optimizerMatchHeader {
+    gap: 8px;
+  }
+
+  .optimizerTeamSide strong {
+    font-size: 0.86rem;
+  }
+
+  .optimizerVersus {
+    font-size: 0.82rem;
+  }
+
+  .compactTopTips {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .compactTopTips .optimizerTipCard {
+    padding: 7px 4px;
+  }
+
+  .compactTopTips .optimizerTipCard strong {
+    font-size: 1.05rem;
+  }
+
+  .compactTopTips .optimizerTipRank,
+  .compactTopTips .optimizerTipCard span:last-child {
+    font-size: 0.7rem;
+  }
+
+  .compactAltTips {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .compactAltTips .optimizerAltTip {
+    padding: 7px 8px;
+    font-size: 0.8rem;
+  }
+
+  .optimizerInputCard .optimizerTextarea {
+    min-height: 210px;
+  }
+
+  .optimizerTable {
+    font-size: 0.78rem;
+  }
+
+  .optimizerTable th,
+  .optimizerTable td {
+    padding: 7px 8px;
+  }
+}
+
+@media (min-width: 900px) {
+  .optimizerStack {
+    grid-template-columns: minmax(0, 0.92fr) minmax(360px, 1.08fr);
+    align-items: start;
+  }
+
+  .optimizerMatchCard,
+  .optimizerInputCard,
+  .optimizerSettingsCard {
+    grid-column: 1;
+  }
+
+  .optimizerTopCard,
+  .optimizerOutputCard {
+    grid-column: 2;
+  }
+
+  .optimizerTopCard {
+    grid-row: 1 / span 2;
+  }
+
+  .optimizerOutputCard {
+    grid-row: 3 / span 2;
+  }
+
+  .optimizerSettingsGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* v46 optimizer mobile overflow fix */
+.searchCard,
+.optimizerStack,
+.optimizerStack *,
+.optimizerInputCard,
+.optimizerOutputCard,
+.optimizerSettingsCard,
+.optimizerMatchCard,
+.optimizerTopCard {
+  box-sizing: border-box;
+}
+
+.searchCard,
+.optimizerStack,
+.optimizerStack > *,
+.optimizerInputCard,
+.optimizerOutputCard,
+.optimizerSettingsCard,
+.optimizerMatchCard,
+.optimizerTopCard {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.searchRow {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.searchRow input {
+  width: 100%;
+  min-width: 0;
+}
+
+.searchRow button {
+  flex-shrink: 0;
+}
+
+.optimizerTextarea,
+.optimizerInputCard .optimizerTextarea {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-x: auto;
+}
+
+.optimizerMatchHeader,
+.optimizerTeamSide,
+.optimizerMetaLine,
+.optimizerTopTips,
+.optimizerAltTips,
+.optimizerSummary,
+.optimizerPresetRow,
+.optimizerSettingsGrid {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.optimizerTeamSide strong,
+.optimizerMetaLine span,
+.optimizerSummary span,
+.optimizerTipCard,
+.optimizerAltTip,
+.optimizerPresetRow button,
+.optimizerSliderLabel span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.optimizerTableWrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.optimizerTable {
+  min-width: 520px;
+}
+
+.optimizerSettingsGrid input,
+.optimizerSliderLabel input {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 520px) {
+  .searchCard {
+    padding: 12px;
+  }
+
+  .searchRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .searchRow input {
+    max-width: none;
+  }
+
+  .searchRow button {
+    padding-left: 11px;
+    padding-right: 11px;
+    white-space: nowrap;
+  }
+
+  .optimizerInputCard .optimizerTextarea {
+    font-size: 0.86rem;
+    line-height: 1.35;
+    padding: 10px;
+  }
+
+  .optimizerMetaLine {
+    gap: 6px;
+  }
+
+  .optimizerMetaLine span,
+  .optimizerSummary span {
+    font-size: 0.74rem;
+    padding: 4px 7px;
+  }
+
+  .optimizerPresetRow button {
+    flex: 1 1 calc(50% - 8px);
+    padding: 8px 9px;
+  }
+}
