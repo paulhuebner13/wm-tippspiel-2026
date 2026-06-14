@@ -21,6 +21,7 @@ export function Nav({ user }: { user: Profile }) {
         {user.is_admin && <Link className="adminNavLink" href="/players">Spieler</Link>}
         {user.is_admin && <Link className="adminNavLink" href="/groups">Gruppen</Link>}
         {user.is_admin && <Link className="adminNavLink" href="/changes">Änderungen</Link>}
+        {user.is_admin && <Link className="adminNavLink" href="/optimizer">Optimierer</Link>}
         <form action={logoutAction}>
           <button className="linkButton">Logout</button>
         </form>

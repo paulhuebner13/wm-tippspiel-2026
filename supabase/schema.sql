@@ -2,6 +2,8 @@ create extension if not exists pgcrypto;
 
 drop table if exists group_members cascade;
 drop table if exists player_groups cascade;
+drop table if exists tip_optimizer_inputs cascade;
+drop table if exists team_ratings cascade;
 drop table if exists predictions cascade;
 drop table if exists matches cascade;
 drop table if exists teams cascade;
@@ -46,6 +48,23 @@ create table matches (
   constraint match_has_away check (away_team_id is not null or away_placeholder is not null)
 );
 
+
+create table team_ratings (
+  team_id uuid primary key references teams(id) on delete cascade,
+  fifa_points numeric not null,
+  source text not null default 'FIFA live ranking 2026-06-11',
+  updated_at timestamptz not null default now()
+);
+
+create table tip_optimizer_inputs (
+  match_id uuid primary key references matches(id) on delete cascade,
+  odds_text text not null default '',
+  max_goals integer not null default 7,
+  ranking_weight numeric not null default 0.15,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table player_groups (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
@@ -74,5 +93,6 @@ create table predictions (
 create index idx_group_members_group on group_members(group_id);
 create index idx_group_members_profile on group_members(profile_id);
 create index idx_matches_kickoff on matches(kickoff_time);
+create index idx_tip_optimizer_updated on tip_optimizer_inputs(updated_at);
 create index idx_predictions_user on predictions(user_id);
 create index idx_predictions_match on predictions(match_id);

@@ -787,3 +787,33 @@ export async function overridePredictionAction(formData: FormData) {
   revalidatePath("/ranking");
   redirect(`/changes?profileId=${userId}&matchNumber=${matchNumber}&saved=1`);
 }
+
+export async function saveOptimizerOddsInlineAction(input: {
+  matchId: string;
+  oddsText: string;
+  maxGoals?: number;
+  rankingWeight?: number;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireAdmin();
+
+  if (!input.matchId) {
+    return { ok: false, error: 'missing_match' };
+  }
+
+  const { error } = await supabaseAdmin.from('tip_optimizer_inputs').upsert(
+    {
+      match_id: input.matchId,
+      odds_text: input.oddsText,
+      max_goals: input.maxGoals ?? 7,
+      ranking_weight: input.rankingWeight ?? 0.15,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'match_id' },
+  );
+
+  if (error) {
+    return { ok: false, error: 'optimizer_save_failed' };
+  }
+
+  return { ok: true };
+}
