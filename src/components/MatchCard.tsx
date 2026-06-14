@@ -310,9 +310,7 @@ export function MatchCard({
             </div>
 
             <div className="lockedScoreBox">
-              {match.is_finished ? (
-                <strong>{match.home_score}:{match.away_score}</strong>
-              ) : savedPrediction ? (
+              {savedPrediction ? (
                 <strong>{scoreText(savedPrediction)}</strong>
               ) : (
                 <strong>- : -</strong>
