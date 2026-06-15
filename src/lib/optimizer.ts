@@ -33,14 +33,12 @@ export type OptimizerResult = {
   errors: string[];
   summary: {
     inputOddsCount: number;
+    inputProbabilityCount: number;
     estimatedCount: number;
     minHome: number;
     minAway: number;
-    homeRating: number | null;
-    awayRating: number | null;
-    rankingWeight: number;
+    sourceBlendWeight: number;
     stageMultiplier: number;
-    sourceMode: OptimizerSourceMode;
   };
 };
 
@@ -262,49 +260,6 @@ function normaliseOddsProbabilities(results: OptimizerOddResult[]) {
   return results.map((r) => ({ ...r, oddsProbability: rawSum > 0 ? r.rawProbability / rawSum : 0 }));
 }
 
-function buildRankingProbabilities(
-  results: (OptimizerOddResult & { oddsProbability: number })[],
-  homeRating: number | null,
-  awayRating: number | null,
-) {
-  const avgHome = results.reduce((sum, r) => sum + r.home * r.oddsProbability, 0);
-  const avgAway = results.reduce((sum, r) => sum + r.away * r.oddsProbability, 0);
-  const totalGoals = clamp(avgHome + avgAway || 2.7, 1.1, 6.5);
-
-  if (homeRating === null || awayRating === null) {
-    return results.map((r) => ({ ...r, rankingProbability: r.oddsProbability }));
-  }
-
-  const diff = homeRating - awayRating;
-  const homeShare = 1 / (1 + Math.exp(-diff / 360));
-  const lambdaHome = clamp(totalGoals * homeShare, 0.15, 6.5);
-  const lambdaAway = clamp(totalGoals * (1 - homeShare), 0.15, 6.5);
-
-  const raw = results.map((r) => ({
-    ...r,
-    rankingRawProbability: poisson(r.home, lambdaHome) * poisson(r.away, lambdaAway),
-  }));
-  const rawSum = raw.reduce((sum, r) => sum + r.rankingRawProbability, 0);
-
-  return raw.map((r) => ({
-    ...r,
-    rankingProbability: rawSum > 0 ? r.rankingRawProbability / rawSum : r.oddsProbability,
-  }));
-}
-
-function blendProbabilities(
-  results: (OptimizerOddResult & { oddsProbability: number; rankingProbability: number })[],
-  rankingWeight: number,
-) {
-  const w = clamp(rankingWeight, 0, 0.35);
-  const blended = results.map((r) => ({
-    ...r,
-    probability: r.oddsProbability * (1 - w) + r.rankingProbability * w,
-  }));
-  const sum = blended.reduce((total, r) => total + r.probability, 0);
-  return blended.map((r) => ({ ...r, probability: sum > 0 ? r.probability / sum : r.probability }));
-}
-
 function outcome(score: { home: number; away: number }) {
   if (score.home > score.away) return 'home';
   if (score.home < score.away) return 'away';
@@ -421,47 +376,81 @@ export function runTipOptimizer(input: {
   maxGoals?: number;
   currentHome?: number | null;
   currentAway?: number | null;
-  rankingWeight?: number;
+  sourceBlendWeight?: number;
 }): OptimizerResult {
   const maxGoals = input.maxGoals ?? 7;
-  const rankingWeight = input.rankingWeight ?? 0.15;
-  const sourceMode = input.sourceMode ?? 'odds';
-  const parsed = sourceMode === 'probabilities'
+  const sourceBlendWeight = clamp(input.sourceBlendWeight ?? 0.5, 0, 1);
+  const oddsParsed = input.oddsText.trim() ? parseOdds(input.oddsText) : { results: [], errors: [] };
+  const probabilitiesParsed = (input.probabilitiesText ?? '').trim()
     ? parseScoreProbabilities(input.probabilitiesText ?? '')
-    : parseOdds(input.oddsText);
+    : { results: [], errors: [] };
+  const allParsedResults = [...oddsParsed.results, ...probabilitiesParsed.results];
 
-  if (parsed.results.length === 0) {
+  if (allParsedResults.length === 0) {
     return {
       rows: [],
       bestThree: [],
       alternativeDiffs: [],
       possibleResults: [],
-      errors: parsed.errors,
+      errors: oddsParsed.errors.length > 0 || probabilitiesParsed.errors.length > 0
+        ? [...oddsParsed.errors, ...probabilitiesParsed.errors]
+        : ['Füge Quoten ein oder lade eine Wahrscheinlichkeits-CSV hoch.'],
       summary: {
         inputOddsCount: 0,
+        inputProbabilityCount: 0,
         estimatedCount: 0,
         minHome: 0,
         minAway: 0,
-        homeRating: input.homeRating,
-        awayRating: input.awayRating,
-        rankingWeight,
+        sourceBlendWeight,
         stageMultiplier: STAGE_MULTIPLIERS[input.match.stage],
-        sourceMode,
       },
     };
   }
 
-  const inferredMinimum = inferMinimumScore(parsed.results);
+  const inferredMinimum = inferMinimumScore(allParsedResults);
   const minHome = input.currentHome ?? inferredMinimum.minHome;
   const minAway = input.currentAway ?? inferredMinimum.minAway;
-  const possibleInputResults = parsed.results.filter((r) => r.home >= minHome && r.away >= minAway);
-  const withMissing =
-    sourceMode === 'probabilities'
-      ? possibleInputResults
-      : estimateMissingResults(possibleInputResults, maxGoals, minHome, minAway);
-  const oddsNormalised = normaliseOddsProbabilities(withMissing) as (OptimizerOddResult & { oddsProbability: number })[];
-  const rankingNormalised = buildRankingProbabilities(oddsNormalised, input.homeRating, input.awayRating);
-  const possibleResults = blendProbabilities(rankingNormalised, rankingWeight) as OptimizerResult['possibleResults'];
+  const possibleOddsInputResults = oddsParsed.results.filter((r) => r.home >= minHome && r.away >= minAway);
+  const possibleProbabilityInputResults = probabilitiesParsed.results.filter((r) => r.home >= minHome && r.away >= minAway);
+  const oddsWithMissing = estimateMissingResults(possibleOddsInputResults, maxGoals, minHome, minAway);
+  const oddsNormalised = normaliseOddsProbabilities(oddsWithMissing) as (OptimizerOddResult & { oddsProbability: number })[];
+  const probabilitiesNormalised = normaliseOddsProbabilities(possibleProbabilityInputResults) as (OptimizerOddResult & { oddsProbability: number })[];
+  const oddsMap = new Map(oddsNormalised.map((result) => [result.label, result]));
+  const probabilitiesMap = new Map(probabilitiesNormalised.map((result) => [result.label, result]));
+  const labels = new Set([...oddsMap.keys(), ...probabilitiesMap.keys()]);
+  const oddsAvailable = oddsNormalised.length > 0;
+  const probabilitiesAvailable = probabilitiesNormalised.length > 0;
+  const modelWeight = oddsAvailable && probabilitiesAvailable ? sourceBlendWeight : probabilitiesAvailable ? 1 : 0;
+
+  const combined = Array.from(labels).map((label) => {
+    const oddsResult = oddsMap.get(label);
+    const probabilityResult = probabilitiesMap.get(label);
+    const template = probabilityResult ?? oddsResult;
+    const oddsProbability = oddsResult?.oddsProbability ?? 0;
+    const modelProbability = probabilityResult?.oddsProbability ?? 0;
+    const probability = oddsProbability * (1 - modelWeight) + modelProbability * modelWeight;
+
+    return {
+      home: template?.home ?? 0,
+      away: template?.away ?? 0,
+      label,
+      odd: probability > 0 ? 1 / probability : 999999999,
+      estimated: Boolean(oddsResult?.estimated && !probabilityResult),
+      rawProbability: probability,
+      oddsProbability,
+      rankingProbability: modelProbability,
+      probability,
+    };
+  });
+
+  const probabilitySum = combined.reduce((sum, result) => sum + result.probability, 0);
+  const possibleResults = combined
+    .map((result) => ({
+      ...result,
+      probability: probabilitySum > 0 ? result.probability / probabilitySum : result.probability,
+      rawProbability: probabilitySum > 0 ? result.rawProbability / probabilitySum : result.rawProbability,
+    }))
+    .filter((result) => result.probability > 0) as OptimizerResult['possibleResults'];
   const stageMultiplier = STAGE_MULTIPLIERS[input.match.stage];
   const rows = calculateAllTips(possibleResults, maxGoals, minHome, minAway, stageMultiplier);
   const bestThree = rows.slice(0, 3);
@@ -472,17 +461,15 @@ export function runTipOptimizer(input: {
     bestThree,
     alternativeDiffs,
     possibleResults,
-    errors: parsed.errors,
+    errors: [...oddsParsed.errors, ...probabilitiesParsed.errors],
     summary: {
-      inputOddsCount: possibleInputResults.length,
+      inputOddsCount: possibleOddsInputResults.length,
+      inputProbabilityCount: possibleProbabilityInputResults.length,
       estimatedCount: possibleResults.filter((r) => r.estimated).length,
       minHome,
       minAway,
-      homeRating: input.homeRating,
-      awayRating: input.awayRating,
-      rankingWeight,
+      sourceBlendWeight,
       stageMultiplier,
-      sourceMode,
     },
   };
 }

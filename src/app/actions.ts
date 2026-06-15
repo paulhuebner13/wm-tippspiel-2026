@@ -792,9 +792,8 @@ export async function saveOptimizerOddsInlineAction(input: {
   matchId: string;
   oddsText: string;
   probabilitiesText?: string;
-  inputMode?: 'odds' | 'probabilities';
   maxGoals?: number;
-  rankingWeight?: number;
+  sourceBlendWeight?: number;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireAdmin();
 
@@ -807,9 +806,7 @@ export async function saveOptimizerOddsInlineAction(input: {
       match_id: input.matchId,
       odds_text: input.oddsText,
       probabilities_text: input.probabilitiesText ?? '',
-      input_mode: input.inputMode ?? 'odds',
       max_goals: input.maxGoals ?? 7,
-      ranking_weight: input.rankingWeight ?? 0.15,
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'match_id' },
@@ -817,6 +814,20 @@ export async function saveOptimizerOddsInlineAction(input: {
 
   if (error) {
     return { ok: false, error: 'optimizer_save_failed' };
+  }
+
+  const sourceBlendWeight = input.sourceBlendWeight ?? 0.5;
+  const { error: settingsError } = await supabaseAdmin.from('tip_optimizer_settings').upsert(
+    {
+      id: 1,
+      source_blend_weight: Math.max(0, Math.min(1, sourceBlendWeight)),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'id' },
+  );
+
+  if (settingsError) {
+    return { ok: false, error: 'optimizer_settings_save_failed' };
   }
 
   return { ok: true };

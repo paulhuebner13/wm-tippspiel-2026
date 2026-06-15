@@ -15,11 +15,16 @@ export default async function OptimizerPage({ searchParams }: { searchParams: Se
   let match: OptimizerPageMatch | null = null;
   let oddsText = '';
   let probabilitiesText = '';
-  let inputMode: 'odds' | 'probabilities' = 'odds';
   let maxGoals = 7;
-  let rankingWeight = 0.15;
-  let homeRating: number | null = null;
-  let awayRating: number | null = null;
+  let sourceBlendWeight = 0.5;
+
+  const { data: optimizerSettings } = await supabaseAdmin
+    .from('tip_optimizer_settings')
+    .select('source_blend_weight')
+    .eq('id', 1)
+    .maybeSingle();
+
+  sourceBlendWeight = Number(optimizerSettings?.source_blend_weight ?? 0.5);
 
   if (Number.isInteger(matchNumber) && matchNumber > 0) {
     const { data: matchData } = await supabaseAdmin
@@ -37,27 +42,13 @@ export default async function OptimizerPage({ searchParams }: { searchParams: Se
     if (match) {
       const { data: storedOdds } = await supabaseAdmin
         .from('tip_optimizer_inputs')
-        .select('odds_text, probabilities_text, input_mode, max_goals, ranking_weight')
+        .select('odds_text, probabilities_text, max_goals')
         .eq('match_id', match.id)
         .maybeSingle();
 
       oddsText = storedOdds?.odds_text ?? '';
       probabilitiesText = storedOdds?.probabilities_text ?? '';
-      inputMode = storedOdds?.input_mode === 'probabilities' ? 'probabilities' : 'odds';
       maxGoals = Number(storedOdds?.max_goals ?? 7);
-      rankingWeight = Number(storedOdds?.ranking_weight ?? 0.15);
-
-      const teamIds = [match.home_team_id, match.away_team_id].filter(Boolean) as string[];
-      if (teamIds.length > 0) {
-        const { data: ratings } = await supabaseAdmin
-          .from('team_ratings')
-          .select('team_id, fifa_points')
-          .in('team_id', teamIds);
-
-        const ratingMap = new Map((ratings ?? []).map((rating) => [rating.team_id, rating.fifa_points]));
-        homeRating = match.home_team_id ? Number(ratingMap.get(match.home_team_id) ?? null) : null;
-        awayRating = match.away_team_id ? Number(ratingMap.get(match.away_team_id) ?? null) : null;
-      }
     }
   }
 
@@ -66,7 +57,7 @@ export default async function OptimizerPage({ searchParams }: { searchParams: Se
       <Nav user={user} />
       <main className="page">
         <h1>Optimierer</h1>
-        <p className="subtle">Quoten einfügen, erwartete Punkte berechnen und Quoten je Spiel speichern. Das ändert keine Tipps.</p>
+        <p className="subtle">Quoten und Modell-Wahrscheinlichkeiten kombinieren, erwartete Punkte berechnen und Eingaben je Spiel speichern. Das ändert keine Tipps.</p>
 
         <form className="searchCard" action="/optimizer">
           <label className="fieldLabel" htmlFor="matchNumber">Spielnummer</label>
@@ -85,11 +76,10 @@ export default async function OptimizerPage({ searchParams }: { searchParams: Se
             match={match}
             initialOddsText={oddsText}
             initialProbabilitiesText={probabilitiesText}
-            initialInputMode={inputMode}
-            homeRating={homeRating}
-            awayRating={awayRating}
+            homeRating={null}
+            awayRating={null}
             initialMaxGoals={maxGoals}
-            initialRankingWeight={rankingWeight}
+            initialSourceBlendWeight={sourceBlendWeight}
           />
         )}
       </main>

@@ -33,6 +33,17 @@ create table if not exists team_ratings (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists tip_optimizer_settings (
+  id integer primary key default 1 check (id = 1),
+  source_blend_weight numeric not null default 0.5 check (source_blend_weight >= 0 and source_blend_weight <= 1),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+insert into tip_optimizer_settings (id, source_blend_weight)
+values (1, 0.5)
+on conflict (id) do nothing;
+
 insert into team_ratings (team_id, fifa_points)
 select id, points
 from (
