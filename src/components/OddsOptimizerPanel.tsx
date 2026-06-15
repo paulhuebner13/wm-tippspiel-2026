@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { saveOptimizerOddsInlineAction } from '@/app/actions';
-import { runTipOptimizer } from '@/lib/optimizer';
+import { runTipOptimizer, type OptimizerSourceMode } from '@/lib/optimizer';
 import type { Match } from '@/lib/types';
 import { Flag } from '@/components/Flag';
 
@@ -14,6 +14,8 @@ type OptimizerMatch = Match & {
 type Props = {
   match: OptimizerMatch;
   initialOddsText: string;
+  initialProbabilitiesText: string;
+  initialInputMode: OptimizerSourceMode;
   homeRating: number | null;
   awayRating: number | null;
   initialMaxGoals: number;
@@ -66,12 +68,16 @@ function TipTable({ rows }: { rows: ReturnType<typeof runTipOptimizer>['rows'] }
 export function OddsOptimizerPanel({
   match,
   initialOddsText,
+  initialProbabilitiesText,
+  initialInputMode,
   homeRating,
   awayRating,
   initialMaxGoals,
   initialRankingWeight,
 }: Props) {
   const [oddsText, setOddsText] = useState(initialOddsText);
+  const [probabilitiesText, setProbabilitiesText] = useState(initialProbabilitiesText);
+  const [inputMode, setInputMode] = useState<OptimizerSourceMode>(initialInputMode ?? 'odds');
   const [maxGoals, setMaxGoals] = useState(Number.isFinite(initialMaxGoals) ? initialMaxGoals : 7);
   const [rankingWeight, setRankingWeight] = useState(
     Number.isFinite(initialRankingWeight) ? initialRankingWeight : 0.15,
@@ -87,6 +93,8 @@ export function OddsOptimizerPanel({
   const result = useMemo(() => {
     return runTipOptimizer({
       oddsText,
+      probabilitiesText,
+      sourceMode: inputMode,
       match,
       homeRating,
       awayRating,
@@ -95,7 +103,7 @@ export function OddsOptimizerPanel({
       currentAway: Number.isFinite(currentAwayValue) ? currentAwayValue : null,
       rankingWeight,
     });
-  }, [awayRating, currentAwayValue, currentHomeValue, homeRating, match, maxGoals, oddsText, rankingWeight]);
+  }, [awayRating, currentAwayValue, currentHomeValue, homeRating, inputMode, match, maxGoals, oddsText, probabilitiesText, rankingWeight]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -104,6 +112,8 @@ export function OddsOptimizerPanel({
         const response = await saveOptimizerOddsInlineAction({
           matchId: match.id,
           oddsText,
+          probabilitiesText,
+          inputMode,
           maxGoals,
           rankingWeight,
         });
@@ -112,11 +122,19 @@ export function OddsOptimizerPanel({
     }, 450);
 
     return () => window.clearTimeout(timeout);
-  }, [match.id, maxGoals, oddsText, rankingWeight, startTransition]);
+  }, [inputMode, match.id, maxGoals, oddsText, probabilitiesText, rankingWeight, startTransition]);
 
   const canOptimize = Boolean(match.home_team && match.away_team);
   const statusText = saveState === 'saving' ? 'speichert ...' : saveState === 'saved' ? 'gespeichert' : saveState === 'error' ? 'konnte nicht gespeichert werden' : 'bereit';
   const oddsWeight = 1 - rankingWeight;
+  const activeInputCount = result.summary.inputOddsCount;
+
+  async function readProbabilityFile(file: File | null) {
+    if (!file) return;
+    const text = await file.text();
+    setProbabilitiesText(text);
+    setInputMode('probabilities');
+  }
 
   return (
     <div className="optimizerStack">
@@ -139,6 +157,7 @@ export function OddsOptimizerPanel({
           <span>Spiel {match.match_number}</span>
           <span>{match.stage}</span>
           <span>Gewichtung {formatWeight(oddsWeight)} / {formatWeight(rankingWeight)}</span>
+          <span>{inputMode === 'probabilities' ? 'CSV-Wahrscheinlichkeiten' : 'Quoten'}</span>
           <span>{statusText}</span>
         </div>
 
@@ -173,25 +192,79 @@ export function OddsOptimizerPanel({
 
             <div className="optimizerSummary compactSummary">
               <span>Multiplikator ×{result.summary.stageMultiplier}</span>
-              <span>geschätzt {result.summary.estimatedCount}</span>
-              <span>Quoten {result.summary.inputOddsCount}</span>
+              <span>{inputMode === 'probabilities' ? `direkt ${activeInputCount}` : `geschätzt ${result.summary.estimatedCount}`}</span>
+              <span>{inputMode === 'probabilities' ? 'Wahrscheinlichkeiten' : 'Quoten'} {activeInputCount}</span>
             </div>
           </>
         ) : (
-          <p className="subtle">Füge Quoten ein, um die erwarteten Punkte zu berechnen.</p>
+          <p className="subtle">
+            {inputMode === 'probabilities'
+              ? 'Lade eine Wahrscheinlichkeits-CSV hoch, um die erwarteten Punkte zu berechnen.'
+              : 'Füge Quoten ein, um die erwarteten Punkte zu berechnen.'}
+          </p>
         )}
       </section>
 
       <section className="card optimizerInputCard adminSoftCard">
-        <label className="fieldLabel" htmlFor="oddsText">Quoten einfügen</label>
-        <textarea
-          id="oddsText"
-          className="optimizerTextarea"
-          value={oddsText}
-          onChange={(event) => setOddsText(event.target.value)}
-          placeholder={'1:0 7.00\n2:0 9.25\n2:1 8.50'}
-        />
-        <p className="subtle smallText">Format pro Zeile: Ergebnis und Quote, z. B. 2:1 8.50. Die Quoten werden automatisch für dieses Spiel gespeichert.</p>
+        <div className="optimizerInputHeader">
+          <div>
+            <label className="fieldLabel">Berechnungsquelle</label>
+            <div className="optimizerModeToggle" role="group" aria-label="Berechnungsquelle auswählen">
+              <button
+                type="button"
+                className={inputMode === 'odds' ? 'active' : ''}
+                onClick={() => setInputMode('odds')}
+              >
+                Quoten
+              </button>
+              <button
+                type="button"
+                className={inputMode === 'probabilities' ? 'active' : ''}
+                onClick={() => setInputMode('probabilities')}
+              >
+                Wahrscheinlichkeiten CSV
+              </button>
+            </div>
+          </div>
+
+          <label className="optimizerFileButton">
+            CSV hochladen
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              onChange={(event) => {
+                void readProbabilityFile(event.target.files?.[0] ?? null);
+                event.currentTarget.value = '';
+              }}
+            />
+          </label>
+        </div>
+
+        {inputMode === 'odds' ? (
+          <>
+            <label className="fieldLabel" htmlFor="oddsText">Quoten einfügen</label>
+            <textarea
+              id="oddsText"
+              className="optimizerTextarea"
+              value={oddsText}
+              onChange={(event) => setOddsText(event.target.value)}
+              placeholder={'1:0 7.00\n2:0 9.25\n2:1 8.50'}
+            />
+            <p className="subtle smallText">Format pro Zeile: Ergebnis und Quote, z. B. 2:1 8.50. Die Quoten werden automatisch für dieses Spiel gespeichert.</p>
+          </>
+        ) : (
+          <>
+            <label className="fieldLabel" htmlFor="probabilitiesText">Score-Wahrscheinlichkeiten einfügen oder hochladen</label>
+            <textarea
+              id="probabilitiesText"
+              className="optimizerTextarea"
+              value={probabilitiesText}
+              onChange={(event) => setProbabilitiesText(event.target.value)}
+              placeholder={'home_goals,away_goals,score,probability,probability_percent\n2,1,2:1,0.083,8.3'}
+            />
+            <p className="subtle smallText">Akzeptiert CSVs wie dein Modell-Output mit home_goals, away_goals, score und probability/probability_percent. Die Datei wird als Text für dieses Spiel gespeichert.</p>
+          </>
+        )}
       </section>
 
       {canOptimize && result.rows.length > 0 && (

@@ -40,8 +40,11 @@ export type OptimizerResult = {
     awayRating: number | null;
     rankingWeight: number;
     stageMultiplier: number;
+    sourceMode: OptimizerSourceMode;
   };
 };
+
+export type OptimizerSourceMode = 'odds' | 'probabilities';
 
 export function parseOdds(text: string) {
   const lines = text.split(/\n+/);
@@ -76,6 +79,122 @@ export function parseOdds(text: string) {
   }
 
   if (results.length === 0) errors.push('Es wurden keine gültigen Quoten gefunden.');
+  return { results, errors };
+}
+
+function splitCsvLine(line: string, separator: string) {
+  const values: string[] = [];
+  let current = '';
+  let quoted = false;
+
+  for (const char of line) {
+    if (char === '"') {
+      quoted = !quoted;
+    } else if (char === separator && !quoted) {
+      values.push(current.trim().replace(/^"|"$/g, ''));
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  values.push(current.trim().replace(/^"|"$/g, ''));
+  return values;
+}
+
+function parseProbabilityNumber(value: string | undefined) {
+  if (!value) return null;
+  const normalized = value.trim().replace('%', '').replace(',', '.');
+  if (normalized === '') return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function parseScoreProbabilities(text: string) {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const results: OptimizerOddResult[] = [];
+  const errors: string[] = [];
+  const seen = new Set<string>();
+
+  if (lines.length === 0) {
+    return { results, errors: ['Es wurden keine Wahrscheinlichkeiten gefunden.'] };
+  }
+
+  const separator = lines[0].includes(';') && !lines[0].includes(',') ? ';' : ',';
+  const header = splitCsvLine(lines[0], separator).map((entry) => entry.toLowerCase());
+  const homeIndex = header.indexOf('home_goals');
+  const awayIndex = header.indexOf('away_goals');
+  const scoreIndex = header.indexOf('score');
+  const probabilityIndex = header.indexOf('probability');
+  const probabilityPercentIndex = header.indexOf('probability_percent');
+
+  const hasHeader = homeIndex >= 0 || awayIndex >= 0 || scoreIndex >= 0 || probabilityIndex >= 0 || probabilityPercentIndex >= 0;
+  const startIndex = hasHeader ? 1 : 0;
+
+  for (let i = startIndex; i < lines.length; i++) {
+    const line = lines[i];
+    const cells = splitCsvLine(line, separator);
+    const lineNumber = i + 1;
+
+    let home: number | null = null;
+    let away: number | null = null;
+    let label = '';
+
+    if (hasHeader && homeIndex >= 0 && awayIndex >= 0) {
+      home = Number(cells[homeIndex]);
+      away = Number(cells[awayIndex]);
+      label = `${home}:${away}`;
+    } else {
+      const scoreCell = hasHeader && scoreIndex >= 0 ? cells[scoreIndex] : cells[0];
+      const scoreMatch = scoreCell?.match(/^(\d+)\s*[:\-]\s*(\d+)$/);
+      if (scoreMatch) {
+        home = Number(scoreMatch[1]);
+        away = Number(scoreMatch[2]);
+        label = `${home}:${away}`;
+      }
+    }
+
+    if (!Number.isInteger(home) || !Number.isInteger(away) || home < 0 || away < 0) {
+      errors.push(`Zeile ${lineNumber} hat kein gültiges Ergebnis: ${line}`);
+      continue;
+    }
+
+    let probability =
+      hasHeader && probabilityIndex >= 0
+        ? parseProbabilityNumber(cells[probabilityIndex])
+        : parseProbabilityNumber(cells[1]);
+
+    if ((probability === null || probability <= 0) && hasHeader && probabilityPercentIndex >= 0) {
+      const percent = parseProbabilityNumber(cells[probabilityPercentIndex]);
+      probability = percent === null ? null : percent / 100;
+    }
+
+    if (probability !== null && probability > 1) {
+      probability = probability / 100;
+    }
+
+    if (probability === null || probability <= 0) {
+      errors.push(`Zeile ${lineNumber} hat keine gültige Wahrscheinlichkeit: ${line}`);
+      continue;
+    }
+
+    if (seen.has(label)) {
+      errors.push(`Doppeltes Ergebnis ignoriert: ${label}`);
+      continue;
+    }
+
+    seen.add(label);
+    results.push({
+      home,
+      away,
+      label,
+      odd: 1 / probability,
+      estimated: false,
+      rawProbability: probability,
+    });
+  }
+
+  if (results.length === 0) errors.push('Es wurden keine gültigen Score-Wahrscheinlichkeiten gefunden.');
   return { results, errors };
 }
 
@@ -294,6 +413,8 @@ function pickAlternativeDiffs(rows: OptimizerTipRow[], bestThree: OptimizerTipRo
 
 export function runTipOptimizer(input: {
   oddsText: string;
+  probabilitiesText?: string;
+  sourceMode?: OptimizerSourceMode;
   match: Match & { home_team?: Team | null; away_team?: Team | null };
   homeRating: number | null;
   awayRating: number | null;
@@ -304,7 +425,10 @@ export function runTipOptimizer(input: {
 }): OptimizerResult {
   const maxGoals = input.maxGoals ?? 7;
   const rankingWeight = input.rankingWeight ?? 0.15;
-  const parsed = parseOdds(input.oddsText);
+  const sourceMode = input.sourceMode ?? 'odds';
+  const parsed = sourceMode === 'probabilities'
+    ? parseScoreProbabilities(input.probabilitiesText ?? '')
+    : parseOdds(input.oddsText);
 
   if (parsed.results.length === 0) {
     return {
@@ -322,6 +446,7 @@ export function runTipOptimizer(input: {
         awayRating: input.awayRating,
         rankingWeight,
         stageMultiplier: STAGE_MULTIPLIERS[input.match.stage],
+        sourceMode,
       },
     };
   }
@@ -330,7 +455,10 @@ export function runTipOptimizer(input: {
   const minHome = input.currentHome ?? inferredMinimum.minHome;
   const minAway = input.currentAway ?? inferredMinimum.minAway;
   const possibleInputResults = parsed.results.filter((r) => r.home >= minHome && r.away >= minAway);
-  const withMissing = estimateMissingResults(possibleInputResults, maxGoals, minHome, minAway);
+  const withMissing =
+    sourceMode === 'probabilities'
+      ? possibleInputResults
+      : estimateMissingResults(possibleInputResults, maxGoals, minHome, minAway);
   const oddsNormalised = normaliseOddsProbabilities(withMissing) as (OptimizerOddResult & { oddsProbability: number })[];
   const rankingNormalised = buildRankingProbabilities(oddsNormalised, input.homeRating, input.awayRating);
   const possibleResults = blendProbabilities(rankingNormalised, rankingWeight) as OptimizerResult['possibleResults'];
@@ -354,6 +482,7 @@ export function runTipOptimizer(input: {
       awayRating: input.awayRating,
       rankingWeight,
       stageMultiplier,
+      sourceMode,
     },
   };
 }

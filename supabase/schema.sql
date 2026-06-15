@@ -59,6 +59,8 @@ create table team_ratings (
 create table tip_optimizer_inputs (
   match_id uuid primary key references matches(id) on delete cascade,
   odds_text text not null default '',
+  probabilities_text text not null default '',
+  input_mode text not null default 'odds' check (input_mode in ('odds','probabilities')),
   max_goals integer not null default 7,
   ranking_weight numeric not null default 0.15,
   created_at timestamptz not null default now(),

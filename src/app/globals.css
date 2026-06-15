@@ -3063,6 +3063,48 @@ html[data-theme='dark'] .resultMatchCard.resultMatchEvaluated {
   padding: 9px 10px;
 }
 
+.optimizerInputHeader {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.optimizerModeToggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 7px;
+}
+
+.optimizerModeToggle button,
+.optimizerFileButton {
+  border: 1px solid var(--border);
+  background: var(--pill);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.optimizerModeToggle button.active {
+  border-color: #2563eb;
+  background: color-mix(in srgb, #2563eb 14%, var(--pill));
+  color: var(--text);
+}
+
+.optimizerFileButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  min-width: 0;
+}
+
+.optimizerFileButton input {
+  display: none;
+}
+
 @media (max-width: 520px) {
   .optimizerMatchCard,
   .optimizerTopCard,
@@ -3211,6 +3253,8 @@ html[data-theme='dark'] .resultMatchCard.resultMatchEvaluated {
 .optimizerAltTips,
 .optimizerSummary,
 .optimizerPresetRow,
+.optimizerInputHeader,
+.optimizerModeToggle,
 .optimizerSettingsGrid {
   min-width: 0;
   max-width: 100%;
@@ -3222,6 +3266,8 @@ html[data-theme='dark'] .resultMatchCard.resultMatchEvaluated {
 .optimizerTipCard,
 .optimizerAltTip,
 .optimizerPresetRow button,
+.optimizerModeToggle button,
+.optimizerFileButton,
 .optimizerSliderLabel span {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -3285,5 +3331,15 @@ html[data-theme='dark'] .resultMatchCard.resultMatchEvaluated {
   .optimizerPresetRow button {
     flex: 1 1 calc(50% - 8px);
     padding: 8px 9px;
+  }
+
+  .optimizerModeToggle {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .optimizerModeToggle button,
+  .optimizerFileButton {
+    width: 100%;
   }
 }

@@ -1,11 +1,30 @@
 create table if not exists tip_optimizer_inputs (
   match_id uuid primary key references matches(id) on delete cascade,
   odds_text text not null default '',
+  probabilities_text text not null default '',
+  input_mode text not null default 'odds' check (input_mode in ('odds','probabilities')),
   max_goals integer not null default 7,
   ranking_weight numeric not null default 0.15,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table tip_optimizer_inputs
+  add column if not exists probabilities_text text not null default '',
+  add column if not exists input_mode text not null default 'odds';
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'tip_optimizer_inputs_input_mode_check'
+  ) then
+    alter table tip_optimizer_inputs
+      add constraint tip_optimizer_inputs_input_mode_check
+      check (input_mode in ('odds','probabilities'));
+  end if;
+end $$;
 
 create table if not exists team_ratings (
   team_id uuid primary key references teams(id) on delete cascade,

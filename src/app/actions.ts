@@ -791,6 +791,8 @@ export async function overridePredictionAction(formData: FormData) {
 export async function saveOptimizerOddsInlineAction(input: {
   matchId: string;
   oddsText: string;
+  probabilitiesText?: string;
+  inputMode?: 'odds' | 'probabilities';
   maxGoals?: number;
   rankingWeight?: number;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -804,6 +806,8 @@ export async function saveOptimizerOddsInlineAction(input: {
     {
       match_id: input.matchId,
       odds_text: input.oddsText,
+      probabilities_text: input.probabilitiesText ?? '',
+      input_mode: input.inputMode ?? 'odds',
       max_goals: input.maxGoals ?? 7,
       ranking_weight: input.rankingWeight ?? 0.15,
       updated_at: new Date().toISOString(),
