@@ -154,7 +154,7 @@ export function parseScoreProbabilities(text: string) {
       }
     }
 
-    if (!Number.isInteger(home) || !Number.isInteger(away) || home < 0 || away < 0) {
+    if (home === null || away === null || !Number.isInteger(home) || !Number.isInteger(away) || home < 0 || away < 0) {
       errors.push(`Zeile ${lineNumber} hat kein gültiges Ergebnis: ${line}`);
       continue;
     }
