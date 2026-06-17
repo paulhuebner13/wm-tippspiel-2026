@@ -33,15 +33,13 @@ function formatWeight(value: number) {
   return Math.round(value * 100);
 }
 
+function DrawFlag() {
+  return <span className="drawFlagMini">Draw</span>;
+}
+
 function formatSignedDiff(value: number) {
   if (value > 0) return `+${value}`;
   return String(value);
-}
-
-function getOutcomeLabel(outcome: 'home' | 'draw' | 'away', match: OptimizerMatch) {
-  if (outcome === 'home') return `Sieg ${match.home_team?.short_name ?? match.home_team?.name ?? 'Team 1'}`;
-  if (outcome === 'away') return `Sieg ${match.away_team?.short_name ?? match.away_team?.name ?? 'Team 2'}`;
-  return 'Unentschieden';
 }
 
 function getProbabilityInsights(possibleResults: ReturnType<typeof runTipOptimizer>['possibleResults']) {
@@ -208,27 +206,34 @@ export function OddsOptimizerPanel({
         {result.errors.length > 0 && <div className="errorBox">{result.errors.join('\n')}</div>}
         {canOptimize && result.bestThree.length > 0 ? (
           <>
-            <div className="optimizerOutcomeBar" aria-label="1X2-Wahrscheinlichkeiten">
-              <div
-                className="optimizerOutcomeSegment optimizerOutcomeHome"
-                style={{ flexGrow: Math.max(probabilityInsights.outcomeProbabilities.home, 0.01) }}
-              >
-                <span>{getOutcomeLabel('home', match)}</span>
-                <strong>{formatPercent(probabilityInsights.outcomeProbabilities.home)}</strong>
+            <div className="optimizerOutcomeBlock" aria-label="1X2-Wahrscheinlichkeiten">
+              <div className="optimizerOutcomeHeader">
+                <div>
+                  {match.home_team && <Flag team={match.home_team} />}
+                  <strong>{formatPercent(probabilityInsights.outcomeProbabilities.home)}</strong>
+                </div>
+                <div>
+                  <DrawFlag />
+                  <strong>{formatPercent(probabilityInsights.outcomeProbabilities.draw)}</strong>
+                </div>
+                <div>
+                  {match.away_team && <Flag team={match.away_team} />}
+                  <strong>{formatPercent(probabilityInsights.outcomeProbabilities.away)}</strong>
+                </div>
               </div>
-              <div
-                className="optimizerOutcomeSegment optimizerOutcomeDraw"
-                style={{ flexGrow: Math.max(probabilityInsights.outcomeProbabilities.draw, 0.01) }}
-              >
-                <span>Unentschieden</span>
-                <strong>{formatPercent(probabilityInsights.outcomeProbabilities.draw)}</strong>
-              </div>
-              <div
-                className="optimizerOutcomeSegment optimizerOutcomeAway"
-                style={{ flexGrow: Math.max(probabilityInsights.outcomeProbabilities.away, 0.01) }}
-              >
-                <span>{getOutcomeLabel('away', match)}</span>
-                <strong>{formatPercent(probabilityInsights.outcomeProbabilities.away)}</strong>
+              <div className="optimizerOutcomeBar">
+                <div
+                  className="optimizerOutcomeSegment optimizerOutcomeHome"
+                  style={{ flexGrow: Math.max(probabilityInsights.outcomeProbabilities.home, 0.01) }}
+                />
+                <div
+                  className="optimizerOutcomeSegment optimizerOutcomeDraw"
+                  style={{ flexGrow: Math.max(probabilityInsights.outcomeProbabilities.draw, 0.01) }}
+                />
+                <div
+                  className="optimizerOutcomeSegment optimizerOutcomeAway"
+                  style={{ flexGrow: Math.max(probabilityInsights.outcomeProbabilities.away, 0.01) }}
+                />
               </div>
             </div>
 

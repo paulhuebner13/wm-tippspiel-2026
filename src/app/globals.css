@@ -393,16 +393,16 @@ h1 {
 }
 
 .matchCardActions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: start;
+  position: relative;
+  min-width: 0;
   margin-top: 12px;
+  padding-right: 46px;
 }
 
 .matchCardActions .allPredictions {
   margin-top: 0;
   min-width: 0;
+  width: 100%;
 }
 
 .matchCardActions .allPredictions summary {
@@ -411,27 +411,56 @@ h1 {
   max-width: 100%;
   min-height: 34px;
   align-items: center;
+  gap: 5px;
   padding: 6px 0;
+}
+
+.matchCardActions .allPredictions summary::before {
+  content: '';
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 6px solid var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.matchCardActions .allPredictions[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.matchCardActions .allPredictions summary::marker {
+  content: '';
+}
+
+.matchCardActions .allPredictions summary::-webkit-details-marker {
+  display: none;
+}
+
+.matchCardActions .allPredictions ul {
+  margin-right: -46px;
 }
 
 .matchOptimizerToggle {
   width: 38px;
   height: 34px;
-  justify-self: end;
+  position: absolute;
+  top: 0;
+  right: 0;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 12px;
   background: color-mix(in srgb, var(--panel) 86%, transparent);
   color: var(--muted);
-  font-size: 17px;
-  line-height: 1;
-  font-weight: 950;
-  letter-spacing: 1px;
   cursor: pointer;
+}
+
+.matchOptimizerToggle span {
+  display: none;
 }
 
 .matchOptimizerToggleActive {
   border-color: #2563eb;
-  color: #2563eb;
   background: color-mix(in srgb, #2563eb 9%, var(--panel));
 }
 
@@ -445,39 +474,47 @@ h1 {
   gap: 12px;
 }
 
-.matchOptimizerOutcomeBar {
-  display: flex;
-  width: 100%;
-  min-width: 0;
-  overflow: hidden;
-  border-radius: 13px;
-  border: 1px solid var(--line);
-}
-
-.matchOptimizerOutcomeSegment {
-  min-width: 58px;
-  padding: 8px 5px;
+.matchOptimizerOutcomeBlock {
   display: grid;
-  gap: 2px;
+  gap: 6px;
+  min-width: 0;
+}
+
+.matchOptimizerOutcomeHeader {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.matchOptimizerOutcomeHeader > div {
+  min-width: 0;
+  display: grid;
   justify-items: center;
-  align-content: center;
+  gap: 4px;
   text-align: center;
-  color: white;
 }
 
-.matchOptimizerOutcomeSegment span {
-  max-width: 100%;
-  font-size: 10px;
-  line-height: 1.05;
-  font-weight: 900;
-  overflow-wrap: anywhere;
-}
-
-.matchOptimizerOutcomeSegment strong {
+.matchOptimizerOutcomeHeader strong {
+  color: var(--text);
   font-size: 13px;
   line-height: 1;
   font-weight: 950;
   white-space: nowrap;
+}
+
+.matchOptimizerOutcomeBar {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  height: 18px;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+
+.matchOptimizerOutcomeSegment {
+  min-width: 3px;
 }
 
 .matchOptimizerOutcomeHome {
@@ -570,9 +607,11 @@ h1 {
 .matchOptimizerProbabilityRow strong {
   font-size: 14px;
   font-weight: 950;
+  justify-self: center;
+  text-align: center;
 }
 
-.matchOptimizerProbabilityRow span:last-child {
+.matchOptimizerProbabilityRow > span:last-child {
   color: var(--muted);
   font-size: 12px;
   font-weight: 900;
@@ -580,11 +619,11 @@ h1 {
 }
 
 .matchOptimizerDiffRow {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
 .matchOptimizerDiffRow strong {
-  justify-self: start;
+  justify-self: center;
 }
 
 .matchOptimizerEmpty {
@@ -598,24 +637,21 @@ h1 {
   justify-content: center;
 }
 
-.matchOptimizerScoreFlagdraw {
-  justify-content: space-between;
-  gap: 0;
-}
-
-.matchOptimizerScoreFlagdraw .flagFrame {
-  flex-basis: 28px;
-  width: 28px;
-}
-
-.matchOptimizerScoreFlagdraw .flagImage {
-  max-width: 28px;
-}
-
-.matchOptimizerScoreFlaghome + strong,
-.matchOptimizerScoreFlagaway + strong,
-.matchOptimizerScoreFlagdraw + strong {
-  justify-self: start;
+.drawFlagMini {
+  width: 38px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(100, 116, 139, 0.45);
+  border-radius: 3px;
+  background: #fff;
+  color: #475569;
+  font-size: 8px;
+  line-height: 1;
+  font-weight: 950;
+  text-transform: uppercase;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 
 @media (min-width: 720px) {
@@ -626,7 +662,11 @@ h1 {
 
 @media (max-width: 520px) {
   .matchCardActions {
-    gap: 8px;
+    padding-right: 42px;
+  }
+
+  .matchCardActions .allPredictions ul {
+    margin-right: -42px;
   }
 
   .matchCardActions .allPredictions summary {
@@ -643,17 +683,12 @@ h1 {
     gap: 10px;
   }
 
-  .matchOptimizerOutcomeSegment {
-    min-width: 50px;
-    padding: 7px 3px;
-  }
-
-  .matchOptimizerOutcomeSegment span {
-    font-size: 9px;
-  }
-
-  .matchOptimizerOutcomeSegment strong {
+  .matchOptimizerOutcomeHeader strong {
     font-size: 11px;
+  }
+
+  .matchOptimizerOutcomeBar {
+    height: 16px;
   }
 
   .matchOptimizerTips {
@@ -3254,41 +3289,49 @@ html[data-theme='dark'] .resultMatchCard.resultMatchEvaluated {
   margin-bottom: 10px;
 }
 
-.optimizerOutcomeBar {
-  display: flex;
-  width: 100%;
-  min-width: 0;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  margin: 8px 0 12px;
-  background: var(--panel);
-}
-
-.optimizerOutcomeSegment {
-  min-width: 74px;
-  padding: 8px 7px;
+.optimizerOutcomeBlock {
   display: grid;
-  gap: 2px;
-  align-content: center;
+  gap: 7px;
+  margin: 8px 0 12px;
+  min-width: 0;
+}
+
+.optimizerOutcomeHeader {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+
+.optimizerOutcomeHeader > div {
+  min-width: 0;
+  display: grid;
   justify-items: center;
+  gap: 5px;
   text-align: center;
-  color: white;
 }
 
-.optimizerOutcomeSegment span {
-  max-width: 100%;
-  font-size: 0.68rem;
-  line-height: 1.08;
-  font-weight: 900;
-  overflow-wrap: anywhere;
-}
-
-.optimizerOutcomeSegment strong {
+.optimizerOutcomeHeader strong {
+  color: var(--text);
   font-size: 0.88rem;
   line-height: 1;
   font-weight: 950;
   white-space: nowrap;
+}
+
+.optimizerOutcomeBar {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  height: 22px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+}
+
+.optimizerOutcomeSegment {
+  min-width: 3px;
 }
 
 .optimizerOutcomeHome {
@@ -3522,17 +3565,12 @@ html[data-theme='dark'] .resultMatchCard.resultMatchEvaluated {
     gap: 6px;
   }
 
-  .optimizerOutcomeSegment {
-    min-width: 58px;
-    padding: 7px 4px;
-  }
-
-  .optimizerOutcomeSegment span {
-    font-size: 0.6rem;
-  }
-
-  .optimizerOutcomeSegment strong {
+  .optimizerOutcomeHeader strong {
     font-size: 0.74rem;
+  }
+
+  .optimizerOutcomeBar {
+    height: 18px;
   }
 
   .compactTopTips .optimizerTipCard {

@@ -84,6 +84,10 @@ function formatSignedDiff(value: number) {
   return value > 0 ? `+${value}` : String(value);
 }
 
+function DrawFlag() {
+  return <span className="drawFlagMini">Draw</span>;
+}
+
 function isCompletePrediction(prediction: LocalPrediction | Prediction | undefined, knockoutStage: boolean): boolean {
   if (!prediction || prediction.predicted_home_score === null || prediction.predicted_away_score === null) return false;
   if (knockoutStage && prediction.predicted_home_score === prediction.predicted_away_score && !prediction.advance_team_id) return false;
@@ -408,7 +412,7 @@ export function MatchCard({
                 aria-expanded={optimizerOpen}
                 aria-label="Optimierer-Daten anzeigen"
               >
-                ...
+                <span aria-hidden="true" />
               </button>
             )}
           </div>
@@ -417,18 +421,25 @@ export function MatchCard({
             <div className="matchOptimizerPanel">
               {optimizerPreview ? (
                 <>
-                  <div className="matchOptimizerOutcomeBar" aria-label="Optimierer 1X2-Wahrscheinlichkeiten">
-                    <div className="matchOptimizerOutcomeSegment matchOptimizerOutcomeHome" style={{ flexGrow: Math.max(optimizerPreview.outcomes.home, 0.01) }}>
-                      <span>Sieg {match.home_team?.short_name ?? 'Team 1'}</span>
-                      <strong>{formatOptimizerPercent(optimizerPreview.outcomes.home)}</strong>
+                  <div className="matchOptimizerOutcomeBlock" aria-label="Optimierer 1X2-Wahrscheinlichkeiten">
+                    <div className="matchOptimizerOutcomeHeader">
+                      <div>
+                        {match.home_team && <Flag team={match.home_team} />}
+                        <strong>{formatOptimizerPercent(optimizerPreview.outcomes.home)}</strong>
+                      </div>
+                      <div>
+                        <DrawFlag />
+                        <strong>{formatOptimizerPercent(optimizerPreview.outcomes.draw)}</strong>
+                      </div>
+                      <div>
+                        {match.away_team && <Flag team={match.away_team} />}
+                        <strong>{formatOptimizerPercent(optimizerPreview.outcomes.away)}</strong>
+                      </div>
                     </div>
-                    <div className="matchOptimizerOutcomeSegment matchOptimizerOutcomeDraw" style={{ flexGrow: Math.max(optimizerPreview.outcomes.draw, 0.01) }}>
-                      <span>Unentschieden</span>
-                      <strong>{formatOptimizerPercent(optimizerPreview.outcomes.draw)}</strong>
-                    </div>
-                    <div className="matchOptimizerOutcomeSegment matchOptimizerOutcomeAway" style={{ flexGrow: Math.max(optimizerPreview.outcomes.away, 0.01) }}>
-                      <span>Sieg {match.away_team?.short_name ?? 'Team 2'}</span>
-                      <strong>{formatOptimizerPercent(optimizerPreview.outcomes.away)}</strong>
+                    <div className="matchOptimizerOutcomeBar">
+                      <div className="matchOptimizerOutcomeSegment matchOptimizerOutcomeHome" style={{ flexGrow: Math.max(optimizerPreview.outcomes.home, 0.01) }} />
+                      <div className="matchOptimizerOutcomeSegment matchOptimizerOutcomeDraw" style={{ flexGrow: Math.max(optimizerPreview.outcomes.draw, 0.01) }} />
+                      <div className="matchOptimizerOutcomeSegment matchOptimizerOutcomeAway" style={{ flexGrow: Math.max(optimizerPreview.outcomes.away, 0.01) }} />
                     </div>
                   </div>
 
@@ -464,12 +475,7 @@ export function MatchCard({
                               <span className={`matchOptimizerScoreFlag matchOptimizerScoreFlag${outcome}`}>
                                 {outcome === 'home' && <Flag team={match.home_team} />}
                                 {outcome === 'away' && <Flag team={match.away_team} />}
-                                {outcome === 'draw' && (
-                                  <>
-                                    <Flag team={match.home_team} />
-                                    <Flag team={match.away_team} />
-                                  </>
-                                )}
+                                {outcome === 'draw' && <DrawFlag />}
                               </span>
                               <strong>{score.label}</strong>
                               <span>{formatOptimizerPercent(score.probability)}</span>
@@ -484,6 +490,11 @@ export function MatchCard({
                       <div className="matchOptimizerList">
                         {optimizerPreview.topDiffs.map((diff) => (
                           <div className="matchOptimizerProbabilityRow matchOptimizerDiffRow" key={diff.diff}>
+                            <span className="matchOptimizerScoreFlag">
+                              {diff.diff > 0 && <Flag team={match.home_team} />}
+                              {diff.diff < 0 && <Flag team={match.away_team} />}
+                              {diff.diff === 0 && <DrawFlag />}
+                            </span>
                             <strong>{formatSignedDiff(diff.diff)}</strong>
                             <span>{formatOptimizerPercent(diff.probability)}</span>
                           </div>
