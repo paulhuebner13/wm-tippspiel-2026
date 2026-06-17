@@ -10,7 +10,7 @@ import { formatKickoff } from '@/lib/time';
 import type { Match, Prediction, Profile } from '@/lib/types';
 
 type ResultsPageProps = {
-  searchParams?: Promise<{ compareUserId?: string }>;
+  searchParams?: Promise<{ compareUserId?: string; compareUserIds?: string }>;
 };
 
 function resultTeamName(match: Match, side: 'home' | 'away') {
@@ -103,10 +103,17 @@ export default async function ResultsPage({ searchParams }: ResultsPageProps) {
 
   const visibleProfiles = await getVisibleProfilesForUser(user);
   const otherProfiles = visibleProfiles.filter((profile) => profile.id !== user.id);
-  const selectedCompareUserId =
-    params?.compareUserId && otherProfiles.some((profile) => profile.id === params.compareUserId) ? params.compareUserId : null;
-  const compareProfile = otherProfiles.find((profile) => profile.id === selectedCompareUserId) ?? null;
-  const shownProfiles = compareProfile ? [user, compareProfile] : [user];
+  const requestedCompareUserIds = [
+    ...(params?.compareUserIds ?? '').split(','),
+    ...(params?.compareUserId ? [params.compareUserId] : []),
+  ].filter(Boolean);
+  const selectedCompareUserIds = Array.from(
+    new Set(requestedCompareUserIds.filter((profileId) => otherProfiles.some((profile) => profile.id === profileId))),
+  );
+  const compareProfiles = selectedCompareUserIds
+    .map((profileId) => otherProfiles.find((profile) => profile.id === profileId))
+    .filter((profile): profile is Profile => Boolean(profile));
+  const shownProfiles = [user, ...compareProfiles];
   const shownProfileIds = shownProfiles.map((profile) => profile.id);
 
   const { data: matchesData } = await supabaseAdmin
@@ -138,7 +145,7 @@ export default async function ResultsPage({ searchParams }: ResultsPageProps) {
           </div>
         </div>
 
-        <ResultsComparePicker profiles={otherProfiles} selectedCompareUserId={selectedCompareUserId} />
+        <ResultsComparePicker profiles={otherProfiles} selectedCompareUserIds={selectedCompareUserIds} />
 
         <div className="list resultsListNew">
           {matches.map((match) => {
@@ -175,7 +182,7 @@ export default async function ResultsPage({ searchParams }: ResultsPageProps) {
                   </div>
                 </div>
 
-                <div className={`resultPlayersGrid ${compareProfile ? 'resultPlayersGridCompare' : ''}`}>
+                <div className={`resultPlayersGrid ${shownProfiles.length > 1 ? 'resultPlayersGridCompare' : ''}`}>
                   {shownProfiles.map((profile) => (
                     <ResultPlayerPanel
                       key={profile.id}

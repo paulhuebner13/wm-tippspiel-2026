@@ -4,34 +4,34 @@ import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { Profile } from '@/lib/types';
 
-export function ResultsComparePicker({ profiles, selectedCompareUserId }: { profiles: Profile[]; selectedCompareUserId: string | null }) {
+export function ResultsComparePicker({ profiles, selectedCompareUserIds }: { profiles: Profile[]; selectedCompareUserIds: string[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    if (!selectedCompareUserId) return;
+    if (selectedCompareUserIds.length === 0) return;
 
     const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
-    const keepSelection = sessionStorage.getItem('results-compare-click');
-
-    if (keepSelection === '1') {
-      sessionStorage.removeItem('results-compare-click');
-      return;
-    }
-
     if (navigation?.type === 'reload') {
       router.replace('/results', { scroll: false });
     }
-  }, [router, selectedCompareUserId]);
+  }, [router, selectedCompareUserIds.length]);
 
   function toggleProfile(profileId: string) {
-    sessionStorage.setItem('results-compare-click', '1');
     const params = new URLSearchParams(searchParams.toString());
+    const nextSelectedIds = new Set(selectedCompareUserIds);
 
-    if (selectedCompareUserId === profileId) {
-      params.delete('compareUserId');
+    if (nextSelectedIds.has(profileId)) {
+      nextSelectedIds.delete(profileId);
     } else {
-      params.set('compareUserId', profileId);
+      nextSelectedIds.add(profileId);
+    }
+
+    params.delete('compareUserId');
+    if (nextSelectedIds.size > 0) {
+      params.set('compareUserIds', Array.from(nextSelectedIds).join(','));
+    } else {
+      params.delete('compareUserIds');
     }
 
     const query = params.toString();
@@ -46,7 +46,7 @@ export function ResultsComparePicker({ profiles, selectedCompareUserId }: { prof
     <div className="resultCompareSticky">
       <div className="resultCompareScroller" aria-label="Spieler vergleichen">
         {profiles.map((profile) => {
-          const selected = selectedCompareUserId === profile.id;
+          const selected = selectedCompareUserIds.includes(profile.id);
           return (
             <button
               key={profile.id}
