@@ -5,8 +5,8 @@ import { savePredictionInlineAction } from '@/app/actions';
 import { Flag } from './Flag';
 import { Countdown } from './Countdown';
 import { calculateTotalPoints, getStageLabel, isKnockoutStage } from '@/lib/scoring';
-import { getFifaRanking, type FifaRanking } from '@/lib/fifaRankings';
 import { getTeamColor } from '@/lib/teamColors';
+import { getFifaRanking } from '@/lib/fifaRankings';
 import { formatKickoff, isPredictionLocked } from '@/lib/time';
 import type { Match, Prediction, Profile } from '@/lib/types';
 
@@ -20,12 +20,10 @@ type DraftStatus = 'empty' | 'dirty' | 'saving' | 'saved' | 'closed';
 
 export type MatchHistoryEntry = {
   id: string;
-  leftTeam: Match['home_team'];
-  rightTeam: Match['away_team'];
-  leftScore: number;
-  rightScore: number;
-  leftIsCurrent: boolean;
-  rightIsCurrent: boolean;
+  homeTeam: Match['home_team'];
+  awayTeam: Match['away_team'];
+  homeScore: number;
+  awayScore: number;
 };
 
 export type OptimizerMatchPreview = {
@@ -102,18 +100,6 @@ function DrawFlag() {
   return <span className="drawFlagMini">Draw</span>;
 }
 
-function RankingCard({ team, ranking, align }: { team: Match['home_team']; ranking: FifaRanking | null; align: 'left' | 'right' }) {
-  return (
-    <div className={`matchRankingCard matchRankingCard${align === 'left' ? 'Left' : 'Right'}`}>
-      <Flag team={team} />
-      <div>
-        <strong>{ranking?.rank ? `#${ranking.rank}` : 'Rang -'}</strong>
-        <span>{ranking?.points !== null && ranking?.points !== undefined ? `${ranking.points.toFixed(2)} Punkte` : 'Punkte -'}</span>
-      </div>
-    </div>
-  );
-}
-
 function isCompletePrediction(prediction: LocalPrediction | Prediction | undefined, knockoutStage: boolean): boolean {
   if (!prediction || prediction.predicted_home_score === null || prediction.predicted_away_score === null) return false;
   if (knockoutStage && prediction.predicted_home_score === prediction.predicted_away_score && !prediction.advance_team_id) return false;
@@ -157,10 +143,10 @@ export function MatchCard({
   const lastRequestKey = useRef('');
   const homeColor = getTeamColor(match.home_team);
   const awayColor = getTeamColor(match.away_team);
-  const homeRanking = getFifaRanking(match.home_team);
-  const awayRanking = getFifaRanking(match.away_team);
   const hasInsightsControl = Boolean(match.home_team && match.away_team);
   const historyMatches = previousMatches ?? [];
+  const homeRanking = getFifaRanking(match.home_team?.name);
+  const awayRanking = getFifaRanking(match.away_team?.name);
 
   const homeNumber = scoreInputToNumber(homeScore);
   const awayNumber = scoreInputToNumber(awayScore);
@@ -470,9 +456,17 @@ export function MatchCard({
 
           {hasInsightsControl && optimizerOpen && (
             <div className="matchOptimizerPanel">
-              <div className="matchRankingOverview" aria-label="FIFA-Weltrangliste">
-                <RankingCard team={match.home_team} ranking={homeRanking} align="left" />
-                <RankingCard team={match.away_team} ranking={awayRanking} align="right" />
+              <div className="matchFifaRankings" aria-label="FIFA-Weltrangliste">
+                <div className="matchFifaRankingTeam">
+                  {match.home_team && <Flag team={match.home_team} />}
+                  <strong>Rang {homeRanking?.rank ?? '-'}</strong>
+                  <span>{homeRanking ? Math.round(homeRanking.points) : '-'} Punkte</span>
+                </div>
+                <div className="matchFifaRankingTeam">
+                  {match.away_team && <Flag team={match.away_team} />}
+                  <strong>Rang {awayRanking?.rank ?? '-'}</strong>
+                  <span>{awayRanking ? Math.round(awayRanking.points) : '-'} Punkte</span>
+                </div>
               </div>
 
               {showOptimizerControl && optimizerPreview ? (
@@ -586,14 +580,14 @@ export function MatchCard({
                   <div className="matchOptimizerList">
                     {historyMatches.map((previousMatch) => (
                       <div className="matchOptimizerHistoryRow" key={previousMatch.id}>
-                        <span className={`matchOptimizerHistoryTeam ${previousMatch.leftIsCurrent ? 'matchOptimizerHistoryTeamCurrent' : ''}`}>
-                          <Flag team={previousMatch.leftTeam} />
-                          <span>{previousMatch.leftTeam?.name ?? 'Offen'}</span>
+                        <span className={`matchOptimizerHistoryTeam ${isCurrentMatchTeam(previousMatch.homeTeam?.id) ? 'matchOptimizerHistoryTeamCurrent' : ''}`}>
+                          <Flag team={previousMatch.homeTeam} />
+                          <span>{previousMatch.homeTeam?.name ?? 'Offen'}</span>
                         </span>
-                        <strong>{previousMatch.leftScore}:{previousMatch.rightScore}</strong>
-                        <span className={`matchOptimizerHistoryTeam matchOptimizerHistoryTeamAway ${previousMatch.rightIsCurrent ? 'matchOptimizerHistoryTeamCurrent' : ''}`}>
-                          <span>{previousMatch.rightTeam?.name ?? 'Offen'}</span>
-                          <Flag team={previousMatch.rightTeam} />
+                        <strong>{previousMatch.homeScore}:{previousMatch.awayScore}</strong>
+                        <span className={`matchOptimizerHistoryTeam matchOptimizerHistoryTeamAway ${isCurrentMatchTeam(previousMatch.awayTeam?.id) ? 'matchOptimizerHistoryTeamCurrent' : ''}`}>
+                          <span>{previousMatch.awayTeam?.name ?? 'Offen'}</span>
+                          <Flag team={previousMatch.awayTeam} />
                         </span>
                       </div>
                     ))}
