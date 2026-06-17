@@ -49,9 +49,11 @@ const FIFA_RANKING = [
   ['Neuseeland', 1275.58],
 ] as const;
 
-const rankingByTeam = new Map(
-  FIFA_RANKING.map(([name, points], index) => [name, { rank: index + 1, points }]),
-);
+const rankingByTeam = new Map<string, { rank: number; points: number }>();
+
+FIFA_RANKING.forEach(([name, points], index) => {
+  rankingByTeam.set(name, { rank: index + 1, points });
+});
 
 export function getFifaRanking(teamName: string | undefined) {
   return teamName ? rankingByTeam.get(teamName) ?? null : null;
