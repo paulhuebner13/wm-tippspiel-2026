@@ -2747,7 +2747,8 @@ html[data-theme='dark'] .resultMatchCard.resultMatchEvaluated {
 }
 
 .optimizerInputCard,
-.optimizerOutputCard {
+.optimizerOutputCard,
+.optimizerProbabilityCard {
   padding: 18px;
 }
 
@@ -2949,6 +2950,7 @@ html[data-theme='dark'] .resultMatchCard.resultMatchEvaluated {
 .optimizerTopCard,
 .optimizerInputCard,
 .optimizerOutputCard,
+.optimizerProbabilityCard,
 .optimizerSettingsCard {
   padding: 16px;
 }
@@ -2965,9 +2967,97 @@ html[data-theme='dark'] .resultMatchCard.resultMatchEvaluated {
 
 .optimizerTopCard h2,
 .optimizerOutputCard h2,
+.optimizerProbabilityCard h2,
 .optimizerSettingsCard h2 {
   margin-top: 0;
   margin-bottom: 10px;
+}
+
+.optimizerOutcomeBar {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin: 8px 0 12px;
+  background: var(--panel);
+}
+
+.optimizerOutcomeSegment {
+  min-width: 74px;
+  padding: 8px 7px;
+  display: grid;
+  gap: 2px;
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+  color: white;
+}
+
+.optimizerOutcomeSegment span {
+  max-width: 100%;
+  font-size: 0.68rem;
+  line-height: 1.08;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.optimizerOutcomeSegment strong {
+  font-size: 0.88rem;
+  line-height: 1;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.optimizerOutcomeHome {
+  background: #2563eb;
+}
+
+.optimizerOutcomeDraw {
+  background: #64748b;
+}
+
+.optimizerOutcomeAway {
+  background: #dc2626;
+}
+
+.optimizerProbabilityGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.optimizerProbabilityGrid h3 {
+  margin: 0 0 7px;
+  font-size: 0.92rem;
+}
+
+.optimizerProbabilityList {
+  display: grid;
+  gap: 6px;
+}
+
+.optimizerProbabilityRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: var(--panel);
+}
+
+.optimizerProbabilityRow strong {
+  font-size: 1rem;
+  font-weight: 950;
+}
+
+.optimizerProbabilityRow span {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .compactTopTips {
@@ -3129,6 +3219,7 @@ html[data-theme='dark'] .resultMatchCard.resultMatchEvaluated {
   .optimizerTopCard,
   .optimizerInputCard,
   .optimizerOutputCard,
+  .optimizerProbabilityCard,
   .optimizerSettingsCard {
     padding: 13px;
   }
@@ -3148,6 +3239,19 @@ html[data-theme='dark'] .resultMatchCard.resultMatchEvaluated {
   .compactTopTips {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
+  }
+
+  .optimizerOutcomeSegment {
+    min-width: 58px;
+    padding: 7px 4px;
+  }
+
+  .optimizerOutcomeSegment span {
+    font-size: 0.6rem;
+  }
+
+  .optimizerOutcomeSegment strong {
+    font-size: 0.74rem;
   }
 
   .compactTopTips .optimizerTipCard {
@@ -3200,6 +3304,7 @@ html[data-theme='dark'] .resultMatchCard.resultMatchEvaluated {
   }
 
   .optimizerTopCard,
+  .optimizerProbabilityCard,
   .optimizerOutputCard {
     grid-column: 2;
   }
@@ -3208,8 +3313,12 @@ html[data-theme='dark'] .resultMatchCard.resultMatchEvaluated {
     grid-row: 1 / span 2;
   }
 
+  .optimizerProbabilityCard {
+    grid-row: 3;
+  }
+
   .optimizerOutputCard {
-    grid-row: 3 / span 2;
+    grid-row: 4 / span 2;
   }
 
   .optimizerSettingsGrid {
@@ -3223,6 +3332,7 @@ html[data-theme='dark'] .resultMatchCard.resultMatchEvaluated {
 .optimizerStack *,
 .optimizerInputCard,
 .optimizerOutputCard,
+.optimizerProbabilityCard,
 .optimizerSettingsCard,
 .optimizerMatchCard,
 .optimizerTopCard {
@@ -3234,6 +3344,7 @@ html[data-theme='dark'] .resultMatchCard.resultMatchEvaluated {
 .optimizerStack > *,
 .optimizerInputCard,
 .optimizerOutputCard,
+.optimizerProbabilityCard,
 .optimizerSettingsCard,
 .optimizerMatchCard,
 .optimizerTopCard {

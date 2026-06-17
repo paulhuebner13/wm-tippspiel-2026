@@ -33,6 +33,47 @@ function formatWeight(value: number) {
   return Math.round(value * 100);
 }
 
+function formatSignedDiff(value: number) {
+  if (value > 0) return `+${value}`;
+  return String(value);
+}
+
+function getOutcomeLabel(outcome: 'home' | 'draw' | 'away', match: OptimizerMatch) {
+  if (outcome === 'home') return `Sieg ${match.home_team?.short_name ?? match.home_team?.name ?? 'Team 1'}`;
+  if (outcome === 'away') return `Sieg ${match.away_team?.short_name ?? match.away_team?.name ?? 'Team 2'}`;
+  return 'Unentschieden';
+}
+
+function getProbabilityInsights(possibleResults: ReturnType<typeof runTipOptimizer>['possibleResults']) {
+  const outcomeProbabilities = possibleResults.reduce(
+    (totals, result) => {
+      if (result.home > result.away) totals.home += result.probability;
+      else if (result.home < result.away) totals.away += result.probability;
+      else totals.draw += result.probability;
+      return totals;
+    },
+    { home: 0, draw: 0, away: 0 },
+  );
+
+  const topScores = [...possibleResults]
+    .sort((a, b) => b.probability - a.probability)
+    .slice(0, 7)
+    .map((result) => ({ label: result.label, probability: result.probability }));
+
+  const diffMap = new Map<number, number>();
+  for (const result of possibleResults) {
+    const diff = result.home - result.away;
+    diffMap.set(diff, (diffMap.get(diff) ?? 0) + result.probability);
+  }
+
+  const topDiffs = Array.from(diffMap.entries())
+    .map(([diff, probability]) => ({ diff, probability }))
+    .sort((a, b) => b.probability - a.probability)
+    .slice(0, 7);
+
+  return { outcomeProbabilities, topScores, topDiffs };
+}
+
 function TipTable({ rows }: { rows: ReturnType<typeof runTipOptimizer>['rows'] }) {
   if (rows.length === 0) return null;
 
@@ -123,6 +164,11 @@ export function OddsOptimizerPanel({
   const statusText = saveState === 'saving' ? 'speichert ...' : saveState === 'saved' ? 'gespeichert' : saveState === 'error' ? 'konnte nicht gespeichert werden' : 'bereit';
   const oddsWeight = 1 - sourceBlendWeight;
   const modelWeight = sourceBlendWeight;
+  const probabilityInsights = useMemo(() => getProbabilityInsights(result.possibleResults), [result.possibleResults]);
+  const outcomeTotal =
+    probabilityInsights.outcomeProbabilities.home +
+    probabilityInsights.outcomeProbabilities.draw +
+    probabilityInsights.outcomeProbabilities.away;
 
   async function readProbabilityFile(file: File | null) {
     if (!file) return;
@@ -162,6 +208,30 @@ export function OddsOptimizerPanel({
         {result.errors.length > 0 && <div className="errorBox">{result.errors.join('\n')}</div>}
         {canOptimize && result.bestThree.length > 0 ? (
           <>
+            <div className="optimizerOutcomeBar" aria-label="1X2-Wahrscheinlichkeiten">
+              <div
+                className="optimizerOutcomeSegment optimizerOutcomeHome"
+                style={{ flexGrow: Math.max(probabilityInsights.outcomeProbabilities.home, 0.01) }}
+              >
+                <span>{getOutcomeLabel('home', match)}</span>
+                <strong>{formatPercent(probabilityInsights.outcomeProbabilities.home)}</strong>
+              </div>
+              <div
+                className="optimizerOutcomeSegment optimizerOutcomeDraw"
+                style={{ flexGrow: Math.max(probabilityInsights.outcomeProbabilities.draw, 0.01) }}
+              >
+                <span>Unentschieden</span>
+                <strong>{formatPercent(probabilityInsights.outcomeProbabilities.draw)}</strong>
+              </div>
+              <div
+                className="optimizerOutcomeSegment optimizerOutcomeAway"
+                style={{ flexGrow: Math.max(probabilityInsights.outcomeProbabilities.away, 0.01) }}
+              >
+                <span>{getOutcomeLabel('away', match)}</span>
+                <strong>{formatPercent(probabilityInsights.outcomeProbabilities.away)}</strong>
+              </div>
+            </div>
+
             <div className="optimizerTopTips compactTopTips">
               {result.bestThree.map((row, index) => (
                 <div className="optimizerTipCard" key={row.label}>
@@ -241,10 +311,42 @@ export function OddsOptimizerPanel({
       </section>
 
       {canOptimize && result.rows.length > 0 && (
-        <section className="card optimizerOutputCard">
-          <h2>Alle Tipps</h2>
-          <TipTable rows={result.rows} />
-        </section>
+        <>
+          <section className="card optimizerProbabilityCard">
+            <h2>Wahrscheinlichkeiten</h2>
+            <div className="optimizerProbabilityGrid">
+              <div>
+                <h3>Wahrscheinlichste Ergebnisse</h3>
+                <div className="optimizerProbabilityList">
+                  {probabilityInsights.topScores.map((score) => (
+                    <div className="optimizerProbabilityRow" key={score.label}>
+                      <strong>{score.label}</strong>
+                      <span>{formatPercent(score.probability)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h3>Wahrscheinlichste Tordifferenzen</h3>
+                <div className="optimizerProbabilityList">
+                  {probabilityInsights.topDiffs.map((entry) => (
+                    <div className="optimizerProbabilityRow" key={entry.diff}>
+                      <strong>{formatSignedDiff(entry.diff)}</strong>
+                      <span>{formatPercent(entry.probability)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <p className="subtle smallText">Basis: gemischte Ergebniswahrscheinlichkeiten aus Quoten und CSV. Summe 1X2: {formatPercent(outcomeTotal)}.</p>
+          </section>
+
+          <section className="card optimizerOutputCard">
+            <h2>Alle Tipps</h2>
+            <TipTable rows={result.rows} />
+          </section>
+        </>
       )}
 
       <section className="card optimizerSettingsCard">
