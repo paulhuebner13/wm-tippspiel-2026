@@ -5,6 +5,7 @@ import { savePredictionInlineAction } from '@/app/actions';
 import { Flag } from './Flag';
 import { Countdown } from './Countdown';
 import { calculateTotalPoints, getStageLabel, isKnockoutStage } from '@/lib/scoring';
+import { getFifaRanking, type FifaRanking } from '@/lib/fifaRankings';
 import { getTeamColor } from '@/lib/teamColors';
 import { formatKickoff, isPredictionLocked } from '@/lib/time';
 import type { Match, Prediction, Profile } from '@/lib/types';
@@ -101,6 +102,18 @@ function DrawFlag() {
   return <span className="drawFlagMini">Draw</span>;
 }
 
+function RankingCard({ team, ranking, align }: { team: Match['home_team']; ranking: FifaRanking | null; align: 'left' | 'right' }) {
+  return (
+    <div className={`matchRankingCard matchRankingCard${align === 'left' ? 'Left' : 'Right'}`}>
+      <Flag team={team} />
+      <div>
+        <strong>{ranking?.rank ? `#${ranking.rank}` : 'Rang -'}</strong>
+        <span>{ranking?.points !== null && ranking?.points !== undefined ? `${ranking.points.toFixed(2)} Punkte` : 'Punkte -'}</span>
+      </div>
+    </div>
+  );
+}
+
 function isCompletePrediction(prediction: LocalPrediction | Prediction | undefined, knockoutStage: boolean): boolean {
   if (!prediction || prediction.predicted_home_score === null || prediction.predicted_away_score === null) return false;
   if (knockoutStage && prediction.predicted_home_score === prediction.predicted_away_score && !prediction.advance_team_id) return false;
@@ -144,6 +157,8 @@ export function MatchCard({
   const lastRequestKey = useRef('');
   const homeColor = getTeamColor(match.home_team);
   const awayColor = getTeamColor(match.away_team);
+  const homeRanking = getFifaRanking(match.home_team);
+  const awayRanking = getFifaRanking(match.away_team);
   const hasInsightsControl = Boolean(match.home_team && match.away_team);
   const historyMatches = previousMatches ?? [];
 
@@ -455,6 +470,11 @@ export function MatchCard({
 
           {hasInsightsControl && optimizerOpen && (
             <div className="matchOptimizerPanel">
+              <div className="matchRankingOverview" aria-label="FIFA-Weltrangliste">
+                <RankingCard team={match.home_team} ranking={homeRanking} align="left" />
+                <RankingCard team={match.away_team} ranking={awayRanking} align="right" />
+              </div>
+
               {showOptimizerControl && optimizerPreview ? (
                 <>
                   {(!optimizerPreview.hasOdds || !optimizerPreview.hasProbabilities) && (

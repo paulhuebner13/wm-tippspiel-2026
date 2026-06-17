@@ -4362,3 +4362,78 @@ html[data-theme='dark'] .predictionOverviewRowSelf {
 html[data-theme='dark'] .predictionOverviewRowSelf > span:first-child {
   color: #93c5fd;
 }
+
+/* v66 FIFA ranking cards in match insights */
+.matchRankingOverview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.matchRankingCard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--card) 88%, var(--muted));
+}
+
+.matchRankingCardRight {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.matchRankingCardRight .flag {
+  order: 2;
+}
+
+.matchRankingCardRight > div {
+  order: 1;
+}
+
+.matchRankingCard .flag,
+.matchRankingCard img {
+  flex: 0 0 auto;
+}
+
+.matchRankingCard > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.matchRankingCard strong {
+  font-size: 1.05rem;
+  line-height: 1.1;
+  font-weight: 800;
+}
+
+.matchRankingCard span {
+  font-size: 0.78rem;
+  color: var(--mutedText);
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .matchRankingOverview {
+    gap: 8px;
+  }
+
+  .matchRankingCard {
+    padding: 8px 9px;
+    gap: 7px;
+  }
+
+  .matchRankingCard strong {
+    font-size: 0.98rem;
+  }
+
+  .matchRankingCard span {
+    font-size: 0.72rem;
+  }
+}
