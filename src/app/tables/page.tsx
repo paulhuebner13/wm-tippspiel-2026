@@ -134,11 +134,11 @@ function BracketTeam({ match, side }: { match: MatchWithTeams; side: 'home' | 'a
   );
 }
 
-function BracketMatch({ match }: { match: MatchWithTeams }) {
+function BracketMatch({ match, displayNumber }: { match: MatchWithTeams; displayNumber: number }) {
   return (
     <article className={`bracketMatch ${hasResult(match) ? 'bracketMatchDone' : ''}`}>
       <div className="bracketMatchMeta">
-        <span>Spiel {match.match_number}</span>
+        <span>Spiel {displayNumber}</span>
         <span>{formatKickoff(match.kickoff_time)}</span>
       </div>
       <BracketTeam match={match} side="home" />
@@ -170,12 +170,20 @@ export default async function TablesPage() {
   const standings = buildStandings(teams, matches);
   const currentStage = getCurrentStage(matches);
   const thirdPlaceMatch = matches.find((match) => match.stage === 'third_place');
+  const displayNumbers = new Map(
+    [...matches]
+      .sort((a, b) => {
+        const dateDiff = new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime();
+        return dateDiff !== 0 ? dateDiff : a.match_number - b.match_number;
+      })
+      .map((match, index) => [match.id, index + 1]),
+  );
 
   return (
     <>
       <Nav user={user} />
       <main className="page tablesPage">
-        <h1>Tabellen</h1>
+        <h1>Turnierbaum</h1>
 
         <section className="tablesGrid">
           {standings.map((group) => (
@@ -230,14 +238,17 @@ export default async function TablesPage() {
               {BRACKET_STAGES.map((stage) => {
                 const stageMatches = matches
                   .filter((match) => match.stage === stage)
-                  .sort((a, b) => a.match_number - b.match_number);
+                  .sort((a, b) => {
+                    const dateDiff = new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime();
+                    return dateDiff !== 0 ? dateDiff : a.match_number - b.match_number;
+                  });
 
                 return (
                   <section className={`bracketColumn bracketColumn-${stage}`} data-bracket-stage={stage} key={stage}>
                     <h3>{getStageLabel(stage)}</h3>
                     <div className="bracketColumnMatches">
                       {stageMatches.map((match) => (
-                        <BracketMatch key={match.id} match={match} />
+                        <BracketMatch key={match.id} match={match} displayNumber={displayNumbers.get(match.id) ?? match.match_number} />
                       ))}
                     </div>
                   </section>
@@ -248,7 +259,7 @@ export default async function TablesPage() {
                 <section className="bracketColumn bracketColumn-third_place" data-bracket-stage="third_place">
                   <h3>Spiel um Platz 3</h3>
                   <div className="bracketColumnMatches">
-                    <BracketMatch match={thirdPlaceMatch} />
+                    <BracketMatch match={thirdPlaceMatch} displayNumber={displayNumbers.get(thirdPlaceMatch.id) ?? thirdPlaceMatch.match_number} />
                   </div>
                 </section>
               )}

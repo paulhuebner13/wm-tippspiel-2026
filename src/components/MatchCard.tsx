@@ -73,6 +73,7 @@ export function MatchCard({
   currentUserId,
   visibleProfiles,
   current,
+  displayMatchNumber,
 }: {
   match: MatchWithPredictions;
   ownPrediction?: Prediction;
@@ -80,6 +81,7 @@ export function MatchCard({
   currentUserId: string;
   visibleProfiles: Profile[];
   current: boolean;
+  displayMatchNumber?: number;
 }) {
   const locked = isPredictionLocked(match.kickoff_time);
   const canPredict = Boolean(match.is_open_for_predictions && !match.is_finished && !locked && match.home_team && match.away_team);
@@ -210,7 +212,7 @@ export function MatchCard({
       <div className="matchHeader">
         <div>
           <div className="matchTitleLine">
-            <span>Spiel {match.match_number}</span>
+            <span>Spiel {displayMatchNumber ?? match.match_number}</span>
             <span>{groupOrStage(match)}</span>
           </div>
           <div className="kickoffLine">Spielbeginn: {formatKickoff(match.kickoff_time)}</div>

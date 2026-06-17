@@ -3816,3 +3816,25 @@ html[data-theme='dark'] .predictionOverviewRowSelf {
     padding-bottom: 124px;
   }
 }
+
+/* v53: chronological bracket numbers, subtle own tip highlight, and tab rename polish. */
+.predictionOverviewRowSelf {
+  border: 2px solid rgba(37, 99, 235, 0.55);
+  background: transparent;
+  box-shadow: none;
+  font-weight: 850;
+}
+
+html[data-theme='dark'] .predictionOverviewRowSelf {
+  border-color: rgba(96, 165, 250, 0.65);
+  background: transparent;
+  box-shadow: none;
+}
+
+.predictionOverviewRowSelf > span:first-child {
+  color: #2563eb;
+}
+
+html[data-theme='dark'] .predictionOverviewRowSelf > span:first-child {
+  color: #93c5fd;
+}

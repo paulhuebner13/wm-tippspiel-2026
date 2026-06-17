@@ -35,6 +35,14 @@ export default async function MatchesPage() {
   const predictions = ((predictionsData ?? []) as Prediction[]).filter((prediction) => prediction.user_id === user.id || visibleProfileIds.has(prediction.user_id));
   const now = new Date();
   const currentMatchId = matches.find((match) => isMatchStillRelevant(match.kickoff_time, now))?.id;
+  const displayNumbers = new Map(
+    [...matches]
+      .sort((a, b) => {
+        const dateDiff = new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime();
+        return dateDiff !== 0 ? dateDiff : a.match_number - b.match_number;
+      })
+      .map((match, index) => [match.id, index + 1]),
+  );
 
   return (
     <>
@@ -58,6 +66,7 @@ export default async function MatchesPage() {
                 currentUserId={user.id}
                 visibleProfiles={visibleProfiles as Profile[]}
                 current={match.id === currentMatchId}
+                displayMatchNumber={displayNumbers.get(match.id)}
               />
             );
           })}
