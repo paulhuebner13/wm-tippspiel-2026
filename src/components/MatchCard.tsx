@@ -17,6 +17,8 @@ type LocalPrediction = Pick<Prediction, 'id' | 'predicted_home_score' | 'predict
 type DraftStatus = 'empty' | 'dirty' | 'saving' | 'saved' | 'closed';
 
 export type OptimizerMatchPreview = {
+  hasOdds: boolean;
+  hasProbabilities: boolean;
   outcomes: {
     home: number;
     draw: number;
@@ -26,6 +28,13 @@ export type OptimizerMatchPreview = {
   alternativeDiffs: { label: string; expectedPoints: number }[];
   topScores: { home: number; away: number; label: string; probability: number }[];
   topDiffs: { diff: number; probability: number }[];
+  previousMatches: {
+    id: string;
+    homeTeam: Match['home_team'];
+    awayTeam: Match['away_team'];
+    homeScore: number;
+    awayScore: number;
+  }[];
 };
 
 function teamName(match: Match, side: 'home' | 'away'): string {
@@ -125,6 +134,7 @@ export function MatchCard({
   const [advanceTeamId, setAdvanceTeamId] = useState(ownPrediction?.advance_team_id ?? '');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'error'>('idle');
   const [optimizerOpen, setOptimizerOpen] = useState(false);
+  const [allPredictionsOpen, setAllPredictionsOpen] = useState(false);
   const lastRequestKey = useRef('');
 
   const homeNumber = scoreInputToNumber(homeScore);
@@ -372,7 +382,15 @@ export function MatchCard({
         <>
           <div className="matchCardActions">
             {predictionProfiles.length > 0 && (
-              <details className="allPredictions">
+              <details
+                className="allPredictions"
+                open={allPredictionsOpen}
+                onToggle={(event) => {
+                  const open = event.currentTarget.open;
+                  setAllPredictionsOpen(open);
+                  if (open) setOptimizerOpen(false);
+                }}
+              >
                 <summary>Alle Tipps anzeigen</summary>
                 <ul>
                   {predictionProfiles.map((profile) => {
@@ -408,7 +426,11 @@ export function MatchCard({
               <button
                 type="button"
                 className={`matchOptimizerToggle ${optimizerOpen ? 'matchOptimizerToggleActive' : ''}`}
-                onClick={() => setOptimizerOpen((open) => !open)}
+                onClick={() => {
+                  const nextOpen = !optimizerOpen;
+                  setOptimizerOpen(nextOpen);
+                  if (nextOpen) setAllPredictionsOpen(false);
+                }}
                 aria-expanded={optimizerOpen}
                 aria-label="Optimierer-Daten anzeigen"
               >
@@ -421,6 +443,16 @@ export function MatchCard({
             <div className="matchOptimizerPanel">
               {optimizerPreview ? (
                 <>
+                  {(!optimizerPreview.hasOdds || !optimizerPreview.hasProbabilities) && (
+                    <div className="matchOptimizerWarning">
+                      {!optimizerPreview.hasOdds && !optimizerPreview.hasProbabilities
+                        ? 'Es fehlen noch Quoten und CSV-Daten.'
+                        : !optimizerPreview.hasOdds
+                          ? 'Es fehlen noch Quoten. Die Anzeige basiert nur auf CSV-Daten.'
+                          : 'Es fehlen noch CSV-Daten. Die Anzeige basiert nur auf Quoten.'}
+                    </div>
+                  )}
+
                   <div className="matchOptimizerOutcomeBlock" aria-label="Optimierer 1X2-Wahrscheinlichkeiten">
                     <div className="matchOptimizerOutcomeHeader">
                       <div>
@@ -500,6 +532,25 @@ export function MatchCard({
                           </div>
                         ))}
                       </div>
+
+                      {optimizerPreview.previousMatches.length > 0 && (
+                        <div className="matchOptimizerHistory">
+                          <h4>Bisherige WM-Spiele</h4>
+                          <div className="matchOptimizerList">
+                            {optimizerPreview.previousMatches.map((previousMatch) => (
+                              <div className="matchOptimizerHistoryRow" key={previousMatch.id}>
+                                <span className="matchOptimizerScoreFlag">
+                                  <Flag team={previousMatch.homeTeam} />
+                                </span>
+                                <strong>{previousMatch.homeScore}:{previousMatch.awayScore}</strong>
+                                <span className="matchOptimizerScoreFlag">
+                                  <Flag team={previousMatch.awayTeam} />
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </>

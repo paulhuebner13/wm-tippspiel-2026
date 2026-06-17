@@ -9,9 +9,11 @@ import { runTipOptimizer } from '@/lib/optimizer';
 import type { Match, Prediction, Profile } from '@/lib/types';
 import type { OptimizerMatchPreview } from '@/components/MatchCard';
 
-function buildOptimizerPreview(match: Match, optimizerInput: any, sourceBlendWeight: number): OptimizerMatchPreview | null {
+function buildOptimizerPreview(match: Match, optimizerInput: any, sourceBlendWeight: number, allMatches: Match[]): OptimizerMatchPreview | null {
   if (!match.home_team || !match.away_team || !optimizerInput) return null;
-  if (!String(optimizerInput.odds_text ?? '').trim() && !String(optimizerInput.probabilities_text ?? '').trim()) return null;
+  const hasOdds = Boolean(String(optimizerInput.odds_text ?? '').trim());
+  const hasProbabilities = Boolean(String(optimizerInput.probabilities_text ?? '').trim());
+  if (!hasOdds && !hasProbabilities) return null;
 
   const result = runTipOptimizer({
     match,
@@ -41,7 +43,31 @@ function buildOptimizerPreview(match: Match, optimizerInput: any, sourceBlendWei
     diffMap.set(diff, (diffMap.get(diff) ?? 0) + possibleResult.probability);
   }
 
+  const teamIds = new Set([match.home_team_id, match.away_team_id].filter(Boolean));
+  const previousMatches = allMatches
+    .filter((candidate) => {
+      if (candidate.id === match.id) return false;
+      if (!candidate.is_finished || candidate.home_score === null || candidate.away_score === null) return false;
+      return Boolean(
+        (candidate.home_team_id && teamIds.has(candidate.home_team_id)) ||
+        (candidate.away_team_id && teamIds.has(candidate.away_team_id)),
+      );
+    })
+    .sort((a, b) => {
+      const dateDiff = new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime();
+      return dateDiff !== 0 ? dateDiff : a.match_number - b.match_number;
+    })
+    .map((candidate) => ({
+      id: candidate.id,
+      homeTeam: candidate.home_team,
+      awayTeam: candidate.away_team,
+      homeScore: candidate.home_score as number,
+      awayScore: candidate.away_score as number,
+    }));
+
   return {
+    hasOdds,
+    hasProbabilities,
     outcomes,
     bestThree: result.bestThree.map((row) => ({ label: row.label, expectedPoints: row.expectedPoints })),
     alternativeDiffs: result.alternativeDiffs.map((row) => ({ label: row.label, expectedPoints: row.expectedPoints })),
@@ -53,6 +79,7 @@ function buildOptimizerPreview(match: Match, optimizerInput: any, sourceBlendWei
       .map(([diff, probability]) => ({ diff, probability }))
       .sort((a, b) => b.probability - a.probability)
       .slice(0, 7),
+    previousMatches,
   };
 }
 
@@ -101,7 +128,7 @@ export default async function MatchesPage() {
     const optimizerInputByMatchId = new Map((optimizerInputs ?? []).map((input: any) => [input.match_id, input]));
 
     for (const match of matches) {
-      const preview = buildOptimizerPreview(match, optimizerInputByMatchId.get(match.id), sourceBlendWeight);
+      const preview = buildOptimizerPreview(match, optimizerInputByMatchId.get(match.id), sourceBlendWeight, matches);
       if (preview) optimizerPreviewByMatchId.set(match.id, preview);
     }
   }
