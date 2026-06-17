@@ -7,9 +7,34 @@ import { getVisibleProfilesForUser, getVisibleProfileIdSet } from '@/lib/visibil
 import { isMatchStillRelevant, isPredictionLocked } from '@/lib/time';
 import { runTipOptimizer } from '@/lib/optimizer';
 import type { Match, Prediction, Profile } from '@/lib/types';
-import type { OptimizerMatchPreview } from '@/components/MatchCard';
+import type { MatchHistoryEntry, OptimizerMatchPreview } from '@/components/MatchCard';
 
-function buildOptimizerPreview(match: Match, optimizerInput: any, sourceBlendWeight: number, allMatches: Match[]): OptimizerMatchPreview | null {
+function buildPreviousMatches(match: Match, allMatches: Match[]): MatchHistoryEntry[] {
+  const teamIds = new Set([match.home_team_id, match.away_team_id].filter(Boolean));
+
+  return allMatches
+    .filter((candidate) => {
+      if (candidate.id === match.id) return false;
+      if (!candidate.is_finished || candidate.home_score === null || candidate.away_score === null) return false;
+      return Boolean(
+        (candidate.home_team_id && teamIds.has(candidate.home_team_id)) ||
+        (candidate.away_team_id && teamIds.has(candidate.away_team_id)),
+      );
+    })
+    .sort((a, b) => {
+      const dateDiff = new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime();
+      return dateDiff !== 0 ? dateDiff : a.match_number - b.match_number;
+    })
+    .map((candidate) => ({
+      id: candidate.id,
+      homeTeam: candidate.home_team,
+      awayTeam: candidate.away_team,
+      homeScore: candidate.home_score as number,
+      awayScore: candidate.away_score as number,
+    }));
+}
+
+function buildOptimizerPreview(match: Match, optimizerInput: any, sourceBlendWeight: number): OptimizerMatchPreview | null {
   if (!match.home_team || !match.away_team || !optimizerInput) return null;
   const hasOdds = Boolean(String(optimizerInput.odds_text ?? '').trim());
   const hasProbabilities = Boolean(String(optimizerInput.probabilities_text ?? '').trim());
@@ -43,28 +68,6 @@ function buildOptimizerPreview(match: Match, optimizerInput: any, sourceBlendWei
     diffMap.set(diff, (diffMap.get(diff) ?? 0) + possibleResult.probability);
   }
 
-  const teamIds = new Set([match.home_team_id, match.away_team_id].filter(Boolean));
-  const previousMatches = allMatches
-    .filter((candidate) => {
-      if (candidate.id === match.id) return false;
-      if (!candidate.is_finished || candidate.home_score === null || candidate.away_score === null) return false;
-      return Boolean(
-        (candidate.home_team_id && teamIds.has(candidate.home_team_id)) ||
-        (candidate.away_team_id && teamIds.has(candidate.away_team_id)),
-      );
-    })
-    .sort((a, b) => {
-      const dateDiff = new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime();
-      return dateDiff !== 0 ? dateDiff : a.match_number - b.match_number;
-    })
-    .map((candidate) => ({
-      id: candidate.id,
-      homeTeam: candidate.home_team,
-      awayTeam: candidate.away_team,
-      homeScore: candidate.home_score as number,
-      awayScore: candidate.away_score as number,
-    }));
-
   return {
     hasOdds,
     hasProbabilities,
@@ -79,7 +82,6 @@ function buildOptimizerPreview(match: Match, optimizerInput: any, sourceBlendWei
       .map(([diff, probability]) => ({ diff, probability }))
       .sort((a, b) => b.probability - a.probability)
       .slice(0, 7),
-    previousMatches,
   };
 }
 
@@ -110,6 +112,7 @@ export default async function MatchesPage() {
   const matches = (matchesData ?? []) as Match[];
   const predictions = ((predictionsData ?? []) as Prediction[]).filter((prediction) => prediction.user_id === user.id || visibleProfileIds.has(prediction.user_id));
   const optimizerPreviewByMatchId = new Map<string, OptimizerMatchPreview>();
+  const previousMatchesByMatchId = new Map(matches.map((match) => [match.id, buildPreviousMatches(match, matches)]));
 
   if (user.is_admin && matches.length > 0) {
     const [{ data: optimizerInputs }, { data: optimizerSettings }] = await Promise.all([
@@ -128,7 +131,7 @@ export default async function MatchesPage() {
     const optimizerInputByMatchId = new Map((optimizerInputs ?? []).map((input: any) => [input.match_id, input]));
 
     for (const match of matches) {
-      const preview = buildOptimizerPreview(match, optimizerInputByMatchId.get(match.id), sourceBlendWeight, matches);
+      const preview = buildOptimizerPreview(match, optimizerInputByMatchId.get(match.id), sourceBlendWeight);
       if (preview) optimizerPreviewByMatchId.set(match.id, preview);
     }
   }
@@ -169,6 +172,7 @@ export default async function MatchesPage() {
                 displayMatchNumber={displayNumbers.get(match.id)}
                 showOptimizerControl={user.is_admin}
                 optimizerPreview={user.is_admin ? optimizerPreviewByMatchId.get(match.id) : undefined}
+                previousMatches={previousMatchesByMatchId.get(match.id) ?? []}
               />
             );
           })}

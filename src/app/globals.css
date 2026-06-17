@@ -459,9 +459,27 @@ h1 {
   display: none;
 }
 
+.matchOptimizerToggle::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 7px solid var(--muted);
+  transform: translate(-50%, -38%);
+}
+
 .matchOptimizerToggleActive {
   border-color: #2563eb;
   background: color-mix(in srgb, #2563eb 9%, var(--panel));
+}
+
+.matchOptimizerToggleActive::before {
+  border-top-color: #2563eb;
+  transform: translate(-50%, -55%) rotate(180deg);
 }
 
 .matchOptimizerPanel {
@@ -648,7 +666,7 @@ h1 {
 .matchOptimizerHistoryRow {
   min-width: 0;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: 8px;
   align-items: center;
   border: 1px solid var(--line);
@@ -661,6 +679,34 @@ h1 {
   justify-self: center;
   text-align: center;
   font-size: 14px;
+  font-weight: 950;
+}
+
+.matchOptimizerHistoryTeam {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.15;
+}
+
+.matchOptimizerHistoryTeam > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.matchOptimizerHistoryTeamAway {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.matchOptimizerHistoryTeamCurrent {
+  color: var(--text);
   font-weight: 950;
 }
 
@@ -742,6 +788,16 @@ h1 {
   }
 
   .matchOptimizerTip em {
+    font-size: 10px;
+  }
+
+  .matchOptimizerHistoryRow {
+    gap: 6px;
+    padding: 7px 6px;
+  }
+
+  .matchOptimizerHistoryTeam {
+    gap: 5px;
     font-size: 10px;
   }
 }

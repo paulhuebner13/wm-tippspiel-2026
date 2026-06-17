@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { saveOptimizerOddsInlineAction } from '@/app/actions';
 import { runTipOptimizer } from '@/lib/optimizer';
+import { getTeamColor } from '@/lib/teamColors';
 import type { Match } from '@/lib/types';
 import { Flag } from '@/components/Flag';
 
@@ -162,6 +163,8 @@ export function OddsOptimizerPanel({
   const statusText = saveState === 'saving' ? 'speichert ...' : saveState === 'saved' ? 'gespeichert' : saveState === 'error' ? 'konnte nicht gespeichert werden' : 'bereit';
   const oddsWeight = 1 - sourceBlendWeight;
   const modelWeight = sourceBlendWeight;
+  const homeColor = getTeamColor(match.home_team);
+  const awayColor = getTeamColor(match.away_team);
   const probabilityInsights = useMemo(() => getProbabilityInsights(result.possibleResults), [result.possibleResults]);
   const outcomeTotal =
     probabilityInsights.outcomeProbabilities.home +
@@ -224,7 +227,7 @@ export function OddsOptimizerPanel({
               <div className="optimizerOutcomeBar">
                 <div
                   className="optimizerOutcomeSegment optimizerOutcomeHome"
-                  style={{ flexGrow: Math.max(probabilityInsights.outcomeProbabilities.home, 0.01) }}
+                  style={{ flexGrow: Math.max(probabilityInsights.outcomeProbabilities.home, 0.01), backgroundColor: homeColor }}
                 />
                 <div
                   className="optimizerOutcomeSegment optimizerOutcomeDraw"
@@ -232,7 +235,7 @@ export function OddsOptimizerPanel({
                 />
                 <div
                   className="optimizerOutcomeSegment optimizerOutcomeAway"
-                  style={{ flexGrow: Math.max(probabilityInsights.outcomeProbabilities.away, 0.01) }}
+                  style={{ flexGrow: Math.max(probabilityInsights.outcomeProbabilities.away, 0.01), backgroundColor: awayColor }}
                 />
               </div>
             </div>

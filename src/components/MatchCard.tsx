@@ -5,6 +5,7 @@ import { savePredictionInlineAction } from '@/app/actions';
 import { Flag } from './Flag';
 import { Countdown } from './Countdown';
 import { calculateTotalPoints, getStageLabel, isKnockoutStage } from '@/lib/scoring';
+import { getTeamColor } from '@/lib/teamColors';
 import { formatKickoff, isPredictionLocked } from '@/lib/time';
 import type { Match, Prediction, Profile } from '@/lib/types';
 
@@ -15,6 +16,14 @@ type MatchWithPredictions = Match & {
 type LocalPrediction = Pick<Prediction, 'id' | 'predicted_home_score' | 'predicted_away_score' | 'advance_team_id'>;
 
 type DraftStatus = 'empty' | 'dirty' | 'saving' | 'saved' | 'closed';
+
+export type MatchHistoryEntry = {
+  id: string;
+  homeTeam: Match['home_team'];
+  awayTeam: Match['away_team'];
+  homeScore: number;
+  awayScore: number;
+};
 
 export type OptimizerMatchPreview = {
   hasOdds: boolean;
@@ -28,13 +37,6 @@ export type OptimizerMatchPreview = {
   alternativeDiffs: { label: string; expectedPoints: number }[];
   topScores: { home: number; away: number; label: string; probability: number }[];
   topDiffs: { diff: number; probability: number }[];
-  previousMatches: {
-    id: string;
-    homeTeam: Match['home_team'];
-    awayTeam: Match['away_team'];
-    homeScore: number;
-    awayScore: number;
-  }[];
 };
 
 function teamName(match: Match, side: 'home' | 'away'): string {
@@ -113,6 +115,7 @@ export function MatchCard({
   displayMatchNumber,
   showOptimizerControl,
   optimizerPreview,
+  previousMatches,
 }: {
   match: MatchWithPredictions;
   ownPrediction?: Prediction;
@@ -123,6 +126,7 @@ export function MatchCard({
   displayMatchNumber?: number;
   showOptimizerControl?: boolean;
   optimizerPreview?: OptimizerMatchPreview;
+  previousMatches?: MatchHistoryEntry[];
 }) {
   const locked = isPredictionLocked(match.kickoff_time);
   const canPredict = Boolean(match.is_open_for_predictions && !match.is_finished && !locked && match.home_team && match.away_team);
@@ -136,6 +140,10 @@ export function MatchCard({
   const [optimizerOpen, setOptimizerOpen] = useState(false);
   const [allPredictionsOpen, setAllPredictionsOpen] = useState(false);
   const lastRequestKey = useRef('');
+  const homeColor = getTeamColor(match.home_team);
+  const awayColor = getTeamColor(match.away_team);
+  const hasInsightsControl = Boolean(match.home_team && match.away_team);
+  const historyMatches = previousMatches ?? [];
 
   const homeNumber = scoreInputToNumber(homeScore);
   const awayNumber = scoreInputToNumber(awayScore);
@@ -193,6 +201,10 @@ export function MatchCard({
     if (score.home > score.away) return 'home';
     if (score.home < score.away) return 'away';
     return 'draw';
+  }
+
+  function isCurrentMatchTeam(teamId: string | undefined) {
+    return Boolean(teamId && (teamId === match.home_team_id || teamId === match.away_team_id));
   }
 
   useEffect(() => {
@@ -378,7 +390,7 @@ export function MatchCard({
           </div>        </div>
       )}
 
-      {(predictionProfiles.length > 0 || showOptimizerControl) && (
+      {(predictionProfiles.length > 0 || hasInsightsControl) && (
         <>
           <div className="matchCardActions">
             {predictionProfiles.length > 0 && (
@@ -422,7 +434,7 @@ export function MatchCard({
               </details>
             )}
 
-            {showOptimizerControl && (
+            {hasInsightsControl && (
               <button
                 type="button"
                 className={`matchOptimizerToggle ${optimizerOpen ? 'matchOptimizerToggleActive' : ''}`}
@@ -432,16 +444,16 @@ export function MatchCard({
                   if (nextOpen) setAllPredictionsOpen(false);
                 }}
                 aria-expanded={optimizerOpen}
-                aria-label="Optimierer-Daten anzeigen"
+                aria-label="Bisherige Spiele anzeigen"
               >
                 <span aria-hidden="true" />
               </button>
             )}
           </div>
 
-          {showOptimizerControl && optimizerOpen && (
+          {hasInsightsControl && optimizerOpen && (
             <div className="matchOptimizerPanel">
-              {optimizerPreview ? (
+              {showOptimizerControl && optimizerPreview ? (
                 <>
                   {(!optimizerPreview.hasOdds || !optimizerPreview.hasProbabilities) && (
                     <div className="matchOptimizerWarning">
@@ -469,9 +481,15 @@ export function MatchCard({
                       </div>
                     </div>
                     <div className="matchOptimizerOutcomeBar">
-                      <div className="matchOptimizerOutcomeSegment matchOptimizerOutcomeHome" style={{ flexGrow: Math.max(optimizerPreview.outcomes.home, 0.01) }} />
+                      <div
+                        className="matchOptimizerOutcomeSegment matchOptimizerOutcomeHome"
+                        style={{ flexGrow: Math.max(optimizerPreview.outcomes.home, 0.01), backgroundColor: homeColor }}
+                      />
                       <div className="matchOptimizerOutcomeSegment matchOptimizerOutcomeDraw" style={{ flexGrow: Math.max(optimizerPreview.outcomes.draw, 0.01) }} />
-                      <div className="matchOptimizerOutcomeSegment matchOptimizerOutcomeAway" style={{ flexGrow: Math.max(optimizerPreview.outcomes.away, 0.01) }} />
+                      <div
+                        className="matchOptimizerOutcomeSegment matchOptimizerOutcomeAway"
+                        style={{ flexGrow: Math.max(optimizerPreview.outcomes.away, 0.01), backgroundColor: awayColor }}
+                      />
                     </div>
                   </div>
 
@@ -533,30 +551,35 @@ export function MatchCard({
                         ))}
                       </div>
 
-                      {optimizerPreview.previousMatches.length > 0 && (
-                        <div className="matchOptimizerHistory">
-                          <h4>Bisherige WM-Spiele</h4>
-                          <div className="matchOptimizerList">
-                            {optimizerPreview.previousMatches.map((previousMatch) => (
-                              <div className="matchOptimizerHistoryRow" key={previousMatch.id}>
-                                <span className="matchOptimizerScoreFlag">
-                                  <Flag team={previousMatch.homeTeam} />
-                                </span>
-                                <strong>{previousMatch.homeScore}:{previousMatch.awayScore}</strong>
-                                <span className="matchOptimizerScoreFlag">
-                                  <Flag team={previousMatch.awayTeam} />
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </>
-              ) : (
+              ) : showOptimizerControl ? (
                 <p className="subtle smallText matchOptimizerEmpty">Für dieses Spiel sind noch keine Optimierer-Daten gespeichert.</p>
-              )}
+              ) : null}
+
+              <div className="matchOptimizerHistory">
+                <h4>Bisherige WM-Spiele</h4>
+                {historyMatches.length > 0 ? (
+                  <div className="matchOptimizerList">
+                    {historyMatches.map((previousMatch) => (
+                      <div className="matchOptimizerHistoryRow" key={previousMatch.id}>
+                        <span className={`matchOptimizerHistoryTeam ${isCurrentMatchTeam(previousMatch.homeTeam?.id) ? 'matchOptimizerHistoryTeamCurrent' : ''}`}>
+                          <Flag team={previousMatch.homeTeam} />
+                          <span>{previousMatch.homeTeam?.name ?? 'Offen'}</span>
+                        </span>
+                        <strong>{previousMatch.homeScore}:{previousMatch.awayScore}</strong>
+                        <span className={`matchOptimizerHistoryTeam matchOptimizerHistoryTeamAway ${isCurrentMatchTeam(previousMatch.awayTeam?.id) ? 'matchOptimizerHistoryTeamCurrent' : ''}`}>
+                          <span>{previousMatch.awayTeam?.name ?? 'Offen'}</span>
+                          <Flag team={previousMatch.awayTeam} />
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="subtle smallText matchOptimizerEmpty">Noch keine Spiele gespielt.</p>
+                )}
+              </div>
             </div>
           )}
         </>
