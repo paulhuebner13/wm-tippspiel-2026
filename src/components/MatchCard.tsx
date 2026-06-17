@@ -128,7 +128,10 @@ export function MatchCard({
   const startedOrFinished = locked || Boolean(match.is_finished);
   const statusClass = !canPredict && startedOrFinished ? 'matchCardLockedBlue' : cardStateClass(effectiveStatus);
 
-  const otherVisibleProfiles = visibleProfiles.filter((profile) => profile.id !== currentUserId);
+  const predictionProfiles = [
+    ...visibleProfiles.filter((profile) => profile.id === currentUserId),
+    ...visibleProfiles.filter((profile) => profile.id !== currentUserId),
+  ];
   const predictionsByUserId = new Map((match.predictions ?? []).map((prediction) => [prediction.user_id, prediction]));
 
   function predictionStatusClass(prediction: Prediction | undefined) {
@@ -324,17 +327,18 @@ export function MatchCard({
           </div>        </div>
       )}
 
-      {otherVisibleProfiles.length > 0 && (
+      {predictionProfiles.length > 0 && (
         <details className="allPredictions">
-          <summary>Tipps der anderen anzeigen</summary>
+          <summary>Alle Tipps anzeigen</summary>
           <ul>
-            {otherVisibleProfiles.map((profile) => {
+            {predictionProfiles.map((profile) => {
               const prediction = predictionsByUserId.get(profile.id);
               const complete = isCompletePrediction(prediction, knockoutStage);
+              const self = profile.id === currentUserId;
 
               return (
-                <li key={profile.id} className={`predictionOverviewRow ${showAllPredictions ? 'predictionOverviewRowUnlocked' : 'predictionOverviewRowLocked'}`}>
-                  <span>{profile.username}</span>
+                <li key={profile.id} className={`predictionOverviewRow ${self ? 'predictionOverviewRowSelf' : ''} ${showAllPredictions ? 'predictionOverviewRowUnlocked' : 'predictionOverviewRowLocked'}`}>
+                  <span>{self ? `Du (${profile.username})` : profile.username}</span>
                   {showAllPredictions ? (
                     complete ? (
                       <>

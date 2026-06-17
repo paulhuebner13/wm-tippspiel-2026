@@ -14,6 +14,7 @@ export function Nav({ user }: { user: Profile }) {
       <nav>
         <Link href="/matches">Tipps</Link>
         <Link href="/results">Ergebnisse</Link>
+        <Link href="/tables">Tabellen</Link>
         <Link href="/ranking">Ranking</Link>
         <Link href="/rules">Regeln</Link>
         <Link href="/countdown">Countdown</Link>
