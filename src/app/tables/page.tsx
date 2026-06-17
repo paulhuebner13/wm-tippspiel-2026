@@ -176,7 +176,6 @@ export default async function TablesPage() {
       <Nav user={user} />
       <main className="page tablesPage">
         <h1>Tabellen</h1>
-        <p className="subtle">Gruppenstände und Turnierbaum. Der Turnierbaum scrollt automatisch zur aktuellen Phase.</p>
 
         <section className="tablesGrid">
           {standings.map((group) => (
@@ -208,7 +207,7 @@ export default async function TablesPage() {
                         <td>{row.won}</td>
                         <td>{row.drawn}</td>
                         <td>{row.lost}</td>
-                        <td>{row.points}</td>
+                        <td className="standingsPoints">{row.points}</td>
                         <td>{row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}</td>
                       </tr>
                     ))}
