@@ -10,7 +10,9 @@ import type { Match, Prediction, Profile } from '@/lib/types';
 import type { MatchHistoryEntry, OptimizerMatchPreview } from '@/components/MatchCard';
 
 function buildPreviousMatches(match: Match, allMatches: Match[]): MatchHistoryEntry[] {
-  const teamIds = new Set([match.home_team_id, match.away_team_id].filter(Boolean));
+  const currentHomeId = match.home_team_id;
+  const currentAwayId = match.away_team_id;
+  const teamIds = new Set([currentHomeId, currentAwayId].filter(Boolean));
 
   return allMatches
     .filter((candidate) => {
@@ -25,13 +27,55 @@ function buildPreviousMatches(match: Match, allMatches: Match[]): MatchHistoryEn
       const dateDiff = new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime();
       return dateDiff !== 0 ? dateDiff : a.match_number - b.match_number;
     })
-    .map((candidate) => ({
-      id: candidate.id,
-      homeTeam: candidate.home_team,
-      awayTeam: candidate.away_team,
-      homeScore: candidate.home_score as number,
-      awayScore: candidate.away_score as number,
-    }));
+    .map((candidate) => {
+      const candidateHomeScore = candidate.home_score as number;
+      const candidateAwayScore = candidate.away_score as number;
+
+      const currentHomePlayedHome = candidate.home_team_id === currentHomeId;
+      const currentHomePlayedAway = candidate.away_team_id === currentHomeId;
+      const currentAwayPlayedHome = candidate.home_team_id === currentAwayId;
+      const currentAwayPlayedAway = candidate.away_team_id === currentAwayId;
+
+      if (currentHomePlayedHome || currentHomePlayedAway) {
+        const leftTeam = currentHomePlayedHome ? candidate.home_team : candidate.away_team;
+        const rightTeam = currentAwayPlayedHome || currentAwayPlayedAway
+          ? (currentAwayPlayedHome ? candidate.home_team : candidate.away_team)
+          : (currentHomePlayedHome ? candidate.away_team : candidate.home_team);
+        const leftScore = currentHomePlayedHome ? candidateHomeScore : candidateAwayScore;
+        const rightScore = currentAwayPlayedHome
+          ? candidateHomeScore
+          : currentAwayPlayedAway
+            ? candidateAwayScore
+            : currentHomePlayedHome
+              ? candidateAwayScore
+              : candidateHomeScore;
+
+        return {
+          id: candidate.id,
+          leftTeam,
+          rightTeam,
+          leftScore,
+          rightScore,
+          leftIsCurrent: true,
+          rightIsCurrent: Boolean(currentAwayPlayedHome || currentAwayPlayedAway),
+        };
+      }
+
+      const rightTeam = currentAwayPlayedHome ? candidate.home_team : candidate.away_team;
+      const leftTeam = currentAwayPlayedHome ? candidate.away_team : candidate.home_team;
+      const rightScore = currentAwayPlayedHome ? candidateHomeScore : candidateAwayScore;
+      const leftScore = currentAwayPlayedHome ? candidateAwayScore : candidateHomeScore;
+
+      return {
+        id: candidate.id,
+        leftTeam,
+        rightTeam,
+        leftScore,
+        rightScore,
+        leftIsCurrent: false,
+        rightIsCurrent: true,
+      };
+    });
 }
 
 function buildOptimizerPreview(match: Match, optimizerInput: any, sourceBlendWeight: number): OptimizerMatchPreview | null {

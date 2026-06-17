@@ -19,10 +19,12 @@ type DraftStatus = 'empty' | 'dirty' | 'saving' | 'saved' | 'closed';
 
 export type MatchHistoryEntry = {
   id: string;
-  homeTeam: Match['home_team'];
-  awayTeam: Match['away_team'];
-  homeScore: number;
-  awayScore: number;
+  leftTeam: Match['home_team'];
+  rightTeam: Match['away_team'];
+  leftScore: number;
+  rightScore: number;
+  leftIsCurrent: boolean;
+  rightIsCurrent: boolean;
 };
 
 export type OptimizerMatchPreview = {
@@ -564,14 +566,14 @@ export function MatchCard({
                   <div className="matchOptimizerList">
                     {historyMatches.map((previousMatch) => (
                       <div className="matchOptimizerHistoryRow" key={previousMatch.id}>
-                        <span className={`matchOptimizerHistoryTeam ${isCurrentMatchTeam(previousMatch.homeTeam?.id) ? 'matchOptimizerHistoryTeamCurrent' : ''}`}>
-                          <Flag team={previousMatch.homeTeam} />
-                          <span>{previousMatch.homeTeam?.name ?? 'Offen'}</span>
+                        <span className={`matchOptimizerHistoryTeam ${previousMatch.leftIsCurrent ? 'matchOptimizerHistoryTeamCurrent' : ''}`}>
+                          <Flag team={previousMatch.leftTeam} />
+                          <span>{previousMatch.leftTeam?.name ?? 'Offen'}</span>
                         </span>
-                        <strong>{previousMatch.homeScore}:{previousMatch.awayScore}</strong>
-                        <span className={`matchOptimizerHistoryTeam matchOptimizerHistoryTeamAway ${isCurrentMatchTeam(previousMatch.awayTeam?.id) ? 'matchOptimizerHistoryTeamCurrent' : ''}`}>
-                          <span>{previousMatch.awayTeam?.name ?? 'Offen'}</span>
-                          <Flag team={previousMatch.awayTeam} />
+                        <strong>{previousMatch.leftScore}:{previousMatch.rightScore}</strong>
+                        <span className={`matchOptimizerHistoryTeam matchOptimizerHistoryTeamAway ${previousMatch.rightIsCurrent ? 'matchOptimizerHistoryTeamCurrent' : ''}`}>
+                          <span>{previousMatch.rightTeam?.name ?? 'Offen'}</span>
+                          <Flag team={previousMatch.rightTeam} />
                         </span>
                       </div>
                     ))}
