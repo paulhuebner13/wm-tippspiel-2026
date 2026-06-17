@@ -16,6 +16,18 @@ type LocalPrediction = Pick<Prediction, 'id' | 'predicted_home_score' | 'predict
 
 type DraftStatus = 'empty' | 'dirty' | 'saving' | 'saved' | 'closed';
 
+export type OptimizerMatchPreview = {
+  outcomes: {
+    home: number;
+    draw: number;
+    away: number;
+  };
+  bestThree: { label: string; expectedPoints: number }[];
+  alternativeDiffs: { label: string; expectedPoints: number }[];
+  topScores: { home: number; away: number; label: string; probability: number }[];
+  topDiffs: { diff: number; probability: number }[];
+};
+
 function teamName(match: Match, side: 'home' | 'away'): string {
   if (side === 'home') return match.home_team?.name ?? match.home_placeholder ?? 'Offen';
   return match.away_team?.name ?? match.away_placeholder ?? 'Offen';
@@ -60,6 +72,18 @@ function scoreText(prediction: LocalPrediction | Prediction): string {
   return `${home}:${away}`;
 }
 
+function formatOptimizerPercent(value: number) {
+  return `${(value * 100).toFixed(1)} %`;
+}
+
+function formatExpectedPoints(value: number) {
+  return value.toFixed(2);
+}
+
+function formatSignedDiff(value: number) {
+  return value > 0 ? `+${value}` : String(value);
+}
+
 function isCompletePrediction(prediction: LocalPrediction | Prediction | undefined, knockoutStage: boolean): boolean {
   if (!prediction || prediction.predicted_home_score === null || prediction.predicted_away_score === null) return false;
   if (knockoutStage && prediction.predicted_home_score === prediction.predicted_away_score && !prediction.advance_team_id) return false;
@@ -74,6 +98,8 @@ export function MatchCard({
   visibleProfiles,
   current,
   displayMatchNumber,
+  showOptimizerControl,
+  optimizerPreview,
 }: {
   match: MatchWithPredictions;
   ownPrediction?: Prediction;
@@ -82,6 +108,8 @@ export function MatchCard({
   visibleProfiles: Profile[];
   current: boolean;
   displayMatchNumber?: number;
+  showOptimizerControl?: boolean;
+  optimizerPreview?: OptimizerMatchPreview;
 }) {
   const locked = isPredictionLocked(match.kickoff_time);
   const canPredict = Boolean(match.is_open_for_predictions && !match.is_finished && !locked && match.home_team && match.away_team);
@@ -92,6 +120,7 @@ export function MatchCard({
   const [awayScore, setAwayScore] = useState(ownPrediction?.predicted_away_score?.toString() ?? '');
   const [advanceTeamId, setAdvanceTeamId] = useState(ownPrediction?.advance_team_id ?? '');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'error'>('idle');
+  const [optimizerOpen, setOptimizerOpen] = useState(false);
   const lastRequestKey = useRef('');
 
   const homeNumber = scoreInputToNumber(homeScore);
@@ -144,6 +173,12 @@ export function MatchCard({
   function predictionStatusText(prediction: Prediction | undefined) {
     if (!prediction) return 'Kein Tipp abgegeben';
     return isCompletePrediction(prediction, knockoutStage) ? 'Tipp abgegeben' : 'Tipp unvollständig';
+  }
+
+  function scoreOutcomeClass(score: { home: number; away: number }) {
+    if (score.home > score.away) return 'home';
+    if (score.home < score.away) return 'away';
+    return 'draw';
   }
 
   useEffect(() => {
@@ -329,37 +364,140 @@ export function MatchCard({
           </div>        </div>
       )}
 
-      {predictionProfiles.length > 0 && (
-        <details className="allPredictions">
-          <summary>Alle Tipps anzeigen</summary>
-          <ul>
-            {predictionProfiles.map((profile) => {
-              const prediction = predictionsByUserId.get(profile.id);
-              const complete = isCompletePrediction(prediction, knockoutStage);
-              const self = profile.id === currentUserId;
+      {(predictionProfiles.length > 0 || showOptimizerControl) && (
+        <>
+          <div className="matchCardActions">
+            {predictionProfiles.length > 0 && (
+              <details className="allPredictions">
+                <summary>Alle Tipps anzeigen</summary>
+                <ul>
+                  {predictionProfiles.map((profile) => {
+                    const prediction = predictionsByUserId.get(profile.id);
+                    const complete = isCompletePrediction(prediction, knockoutStage);
+                    const self = profile.id === currentUserId;
 
-              return (
-                <li key={profile.id} className={`predictionOverviewRow ${self ? 'predictionOverviewRowSelf' : ''} ${showAllPredictions ? 'predictionOverviewRowUnlocked' : 'predictionOverviewRowLocked'}`}>
-                  <span>{self ? `Du (${profile.username})` : profile.username}</span>
-                  {showAllPredictions ? (
-                    complete ? (
-                      <>
-                        {prediction && <strong>{scoreText(prediction)}</strong>}
-                        {match.is_finished && prediction && <span className="otherPredictionPoints">{calculateTotalPoints(match, prediction)}&nbsp;Punkte</span>}
-                      </>
-                    ) : (
-                      <span className="predictionStatus predictionStatusMissing predictionStatusNoTipUnlocked">Kein Tipp abgegeben</span>
-                    )
-                  ) : (
-                    <span className={`predictionStatus ${predictionStatusClass(prediction)}`}>
-                      {predictionStatusText(prediction)}
-                    </span>
+                    return (
+                      <li key={profile.id} className={`predictionOverviewRow ${self ? 'predictionOverviewRowSelf' : ''} ${showAllPredictions ? 'predictionOverviewRowUnlocked' : 'predictionOverviewRowLocked'}`}>
+                        <span>{self ? `Du (${profile.username})` : profile.username}</span>
+                        {showAllPredictions ? (
+                          complete ? (
+                            <>
+                              {prediction && <strong>{scoreText(prediction)}</strong>}
+                              {match.is_finished && prediction && <span className="otherPredictionPoints">{calculateTotalPoints(match, prediction)}&nbsp;Punkte</span>}
+                            </>
+                          ) : (
+                            <span className="predictionStatus predictionStatusMissing predictionStatusNoTipUnlocked">Kein Tipp abgegeben</span>
+                          )
+                        ) : (
+                          <span className={`predictionStatus ${predictionStatusClass(prediction)}`}>
+                            {predictionStatusText(prediction)}
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </details>
+            )}
+
+            {showOptimizerControl && (
+              <button
+                type="button"
+                className={`matchOptimizerToggle ${optimizerOpen ? 'matchOptimizerToggleActive' : ''}`}
+                onClick={() => setOptimizerOpen((open) => !open)}
+                aria-expanded={optimizerOpen}
+                aria-label="Optimierer-Daten anzeigen"
+              >
+                ...
+              </button>
+            )}
+          </div>
+
+          {showOptimizerControl && optimizerOpen && (
+            <div className="matchOptimizerPanel">
+              {optimizerPreview ? (
+                <>
+                  <div className="matchOptimizerOutcomeBar" aria-label="Optimierer 1X2-Wahrscheinlichkeiten">
+                    <div className="matchOptimizerOutcomeSegment matchOptimizerOutcomeHome" style={{ flexGrow: Math.max(optimizerPreview.outcomes.home, 0.01) }}>
+                      <span>Sieg {match.home_team?.short_name ?? 'Team 1'}</span>
+                      <strong>{formatOptimizerPercent(optimizerPreview.outcomes.home)}</strong>
+                    </div>
+                    <div className="matchOptimizerOutcomeSegment matchOptimizerOutcomeDraw" style={{ flexGrow: Math.max(optimizerPreview.outcomes.draw, 0.01) }}>
+                      <span>Unentschieden</span>
+                      <strong>{formatOptimizerPercent(optimizerPreview.outcomes.draw)}</strong>
+                    </div>
+                    <div className="matchOptimizerOutcomeSegment matchOptimizerOutcomeAway" style={{ flexGrow: Math.max(optimizerPreview.outcomes.away, 0.01) }}>
+                      <span>Sieg {match.away_team?.short_name ?? 'Team 2'}</span>
+                      <strong>{formatOptimizerPercent(optimizerPreview.outcomes.away)}</strong>
+                    </div>
+                  </div>
+
+                  <div className="matchOptimizerTips">
+                    {optimizerPreview.bestThree.map((tip, index) => (
+                      <div className="matchOptimizerTip matchOptimizerBestTip" key={tip.label}>
+                        <span>#{index + 1}</span>
+                        <strong>{tip.label}</strong>
+                        <em>{formatExpectedPoints(tip.expectedPoints)} EP</em>
+                      </div>
+                    ))}
+                  </div>
+
+                  {optimizerPreview.alternativeDiffs.length > 0 && (
+                    <div className="matchOptimizerTips matchOptimizerAltTips">
+                      {optimizerPreview.alternativeDiffs.map((tip) => (
+                        <div className="matchOptimizerTip" key={tip.label}>
+                          <strong>{tip.label}</strong>
+                          <em>{formatExpectedPoints(tip.expectedPoints)} EP</em>
+                        </div>
+                      ))}
+                    </div>
                   )}
-                </li>
-              );
-            })}
-          </ul>
-        </details>
+
+                  <div className="matchOptimizerLists">
+                    <div>
+                      <h4>Wahrscheinlichste Ergebnisse</h4>
+                      <div className="matchOptimizerList">
+                        {optimizerPreview.topScores.map((score) => {
+                          const outcome = scoreOutcomeClass(score);
+                          return (
+                            <div className="matchOptimizerProbabilityRow" key={score.label}>
+                              <span className={`matchOptimizerScoreFlag matchOptimizerScoreFlag${outcome}`}>
+                                {outcome === 'home' && <Flag team={match.home_team} />}
+                                {outcome === 'away' && <Flag team={match.away_team} />}
+                                {outcome === 'draw' && (
+                                  <>
+                                    <Flag team={match.home_team} />
+                                    <Flag team={match.away_team} />
+                                  </>
+                                )}
+                              </span>
+                              <strong>{score.label}</strong>
+                              <span>{formatOptimizerPercent(score.probability)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4>Wahrscheinlichste Tordifferenzen</h4>
+                      <div className="matchOptimizerList">
+                        {optimizerPreview.topDiffs.map((diff) => (
+                          <div className="matchOptimizerProbabilityRow matchOptimizerDiffRow" key={diff.diff}>
+                            <strong>{formatSignedDiff(diff.diff)}</strong>
+                            <span>{formatOptimizerPercent(diff.probability)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="subtle smallText matchOptimizerEmpty">Für dieses Spiel sind noch keine Optimierer-Daten gespeichert.</p>
+              )}
+            </div>
+          )}
+        </>
       )}
     </article>
   );

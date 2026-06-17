@@ -392,6 +392,287 @@ h1 {
   font-weight: 700;
 }
 
+.matchCardActions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  margin-top: 12px;
+}
+
+.matchCardActions .allPredictions {
+  margin-top: 0;
+  min-width: 0;
+}
+
+.matchCardActions .allPredictions summary {
+  display: inline-flex;
+  width: auto;
+  max-width: 100%;
+  min-height: 34px;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.matchOptimizerToggle {
+  width: 38px;
+  height: 34px;
+  justify-self: end;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 86%, transparent);
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.matchOptimizerToggleActive {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: color-mix(in srgb, #2563eb 9%, var(--panel));
+}
+
+.matchOptimizerPanel {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--panel) 82%, var(--card));
+  display: grid;
+  gap: 12px;
+}
+
+.matchOptimizerOutcomeBar {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 13px;
+  border: 1px solid var(--line);
+}
+
+.matchOptimizerOutcomeSegment {
+  min-width: 58px;
+  padding: 8px 5px;
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  align-content: center;
+  text-align: center;
+  color: white;
+}
+
+.matchOptimizerOutcomeSegment span {
+  max-width: 100%;
+  font-size: 10px;
+  line-height: 1.05;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.matchOptimizerOutcomeSegment strong {
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.matchOptimizerOutcomeHome {
+  background: #2563eb;
+}
+
+.matchOptimizerOutcomeDraw {
+  background: #64748b;
+}
+
+.matchOptimizerOutcomeAway {
+  background: #dc2626;
+}
+
+.matchOptimizerTips {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.matchOptimizerAltTips {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.matchOptimizerTip {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 7px 6px;
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  text-align: center;
+  background: var(--card);
+}
+
+.matchOptimizerBestTip {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: color-mix(in srgb, #f59e0b 8%, var(--card));
+}
+
+.matchOptimizerTip span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.matchOptimizerTip strong {
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.matchOptimizerTip em {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1;
+  font-style: normal;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.matchOptimizerLists {
+  display: grid;
+  gap: 12px;
+}
+
+.matchOptimizerLists h4 {
+  margin: 0 0 7px;
+  font-size: 13px;
+}
+
+.matchOptimizerList {
+  display: grid;
+  gap: 6px;
+}
+
+.matchOptimizerProbabilityRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 7px 8px;
+  background: var(--card);
+}
+
+.matchOptimizerProbabilityRow strong {
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.matchOptimizerProbabilityRow span:last-child {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.matchOptimizerDiffRow {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.matchOptimizerDiffRow strong {
+  justify-self: start;
+}
+
+.matchOptimizerEmpty {
+  margin: 0;
+}
+
+.matchOptimizerScoreFlag {
+  min-width: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.matchOptimizerScoreFlagdraw {
+  justify-content: space-between;
+  gap: 0;
+}
+
+.matchOptimizerScoreFlagdraw .flagFrame {
+  flex-basis: 28px;
+  width: 28px;
+}
+
+.matchOptimizerScoreFlagdraw .flagImage {
+  max-width: 28px;
+}
+
+.matchOptimizerScoreFlaghome + strong,
+.matchOptimizerScoreFlagaway + strong,
+.matchOptimizerScoreFlagdraw + strong {
+  justify-self: start;
+}
+
+@media (min-width: 720px) {
+  .matchOptimizerLists {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .matchCardActions {
+    gap: 8px;
+  }
+
+  .matchCardActions .allPredictions summary {
+    font-size: 13px;
+  }
+
+  .matchOptimizerToggle {
+    width: 36px;
+    height: 32px;
+  }
+
+  .matchOptimizerPanel {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .matchOptimizerOutcomeSegment {
+    min-width: 50px;
+    padding: 7px 3px;
+  }
+
+  .matchOptimizerOutcomeSegment span {
+    font-size: 9px;
+  }
+
+  .matchOptimizerOutcomeSegment strong {
+    font-size: 11px;
+  }
+
+  .matchOptimizerTips {
+    gap: 5px;
+  }
+
+  .matchOptimizerTip {
+    padding: 6px 4px;
+  }
+
+  .matchOptimizerTip strong {
+    font-size: 16px;
+  }
+
+  .matchOptimizerTip em {
+    font-size: 10px;
+  }
+}
+
 .allPredictions ul,
 .rankingList {
   list-style: none;
