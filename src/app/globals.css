@@ -4458,8 +4458,8 @@ html[data-theme='dark'] .predictionOverviewRowSelf > span:first-child {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  min-width: 26px;
+  width: 42px;
+  min-width: 42px;
 }
 
 .predictionOverviewTipFlag .flag,
@@ -4467,6 +4467,10 @@ html[data-theme='dark'] .predictionOverviewRowSelf > span:first-child {
   width: 24px;
   height: 18px;
   object-fit: cover;
+}
+
+.predictionOverviewTipFlag .drawFlagMini {
+  flex: 0 0 38px;
 }
 
 .predictionOverviewRowUnlocked .predictionStatusNoTipUnlocked {

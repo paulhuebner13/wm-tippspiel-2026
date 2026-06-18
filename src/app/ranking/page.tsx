@@ -33,8 +33,7 @@ export default async function RankingPage() {
 
   const { data: matchesData } = await supabaseAdmin
     .from('matches')
-    .select('*')
-    .eq('is_finished', true);
+    .select('*');
 
   const { data: predictionsData } = await supabaseAdmin
     .from('predictions')
