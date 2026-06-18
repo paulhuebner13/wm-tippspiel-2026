@@ -44,23 +44,33 @@ export function isKnockoutStage(stage: Stage): boolean {
 }
 
 export function calculateBasePoints(match: Match, prediction: Prediction): number {
-  const hasOfficialResult = match.home_score !== null && match.away_score !== null;
+  const officialHome = match.home_score;
+  const officialAway = match.away_score;
+  const provisionalHome = match.provisional_home_score;
+  const provisionalAway = match.provisional_away_score;
+  const hasOfficialResult =
+    typeof officialHome === 'number' && typeof officialAway === 'number';
   const hasProvisionalResult =
-    match.provisional_home_score !== null && match.provisional_away_score !== null;
+    typeof provisionalHome === 'number' && typeof provisionalAway === 'number';
 
   if (!hasOfficialResult && !hasProvisionalResult) {
     return 0;
   }
 
-  const realHome = hasOfficialResult ? match.home_score : match.provisional_home_score;
-  const realAway = hasOfficialResult ? match.away_score : match.provisional_away_score;
+  const realHome = hasOfficialResult ? officialHome : provisionalHome;
+  const realAway = hasOfficialResult ? officialAway : provisionalAway;
   const realWinnerTeamId = hasOfficialResult
-    ? match.winner_team_id
-    : match.provisional_winner_team_id;
+    ? match.winner_team_id ?? null
+    : match.provisional_winner_team_id ?? null;
   const tipHome = prediction.predicted_home_score;
   const tipAway = prediction.predicted_away_score;
 
-  if (realHome === null || realAway === null || tipHome === null || tipAway === null) {
+  if (
+    typeof realHome !== 'number' ||
+    typeof realAway !== 'number' ||
+    tipHome === null ||
+    tipAway === null
+  ) {
     return 0;
   }
 
