@@ -155,6 +155,14 @@ export function ResultAdminCard({
     matchesSaved &&
     bothEmpty;
 
+  const hasOfficialResult = savedHomeScore !== null && savedAwayScore !== null;
+  const hasProvisionalResult =
+    !hasOfficialResult &&
+    match.provisional_home_score !== null &&
+    match.provisional_home_score !== undefined &&
+    match.provisional_away_score !== null &&
+    match.provisional_away_score !== undefined;
+
   const visualStatus: ResultSaveStatus =
     completeAndValid && matchesSaved
       ? "saved"
@@ -300,7 +308,7 @@ export function ResultAdminCard({
 
   return (
     <article
-      className={`card adminCard adminResultCard ${statusClass(visualStatus)}`}
+      className={`card adminCard adminResultCard ${statusClass(visualStatus)} ${hasProvisionalResult ? "adminResultProvisionalPurple" : ""}`}
       data-current-match={current ? "true" : undefined}
     >
       <div className="matchHeader">
@@ -332,6 +340,7 @@ export function ResultAdminCard({
               min="0"
               inputMode="numeric"
               value={homeScore}
+              placeholder={hasProvisionalResult ? String(match.provisional_home_score ?? '') : undefined}
               onChange={(event) => {
                 setHomeScore(event.target.value);
                 setSaveState("idle");
@@ -344,6 +353,7 @@ export function ResultAdminCard({
               min="0"
               inputMode="numeric"
               value={awayScore}
+              placeholder={hasProvisionalResult ? String(match.provisional_away_score ?? '') : undefined}
               onChange={(event) => {
                 setAwayScore(event.target.value);
                 setSaveState("idle");

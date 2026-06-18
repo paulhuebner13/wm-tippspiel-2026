@@ -1,6 +1,7 @@
 import { createProfileAction } from '@/app/actions';
 import { Nav } from '@/components/Nav';
 import { DeleteProfileForm } from '@/components/DeleteProfileForm';
+import { ResultPermissionForm } from '@/components/ResultPermissionForm';
 import { requireAdmin } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import type { Profile } from '@/lib/types';
@@ -10,7 +11,7 @@ export default async function PlayersPage() {
 
   const { data: profilesData } = await supabaseAdmin
     .from('profiles')
-    .select('id, username, is_admin')
+    .select('id, username, is_admin, can_submit_results')
     .order('username', { ascending: true });
 
   const profiles = (profilesData ?? []) as Profile[];
@@ -49,7 +50,10 @@ export default async function PlayersPage() {
                   <span>{profile.is_admin ? 'Admin' : 'Spieler'}</span>
                 </div>
                 {profile.id !== user.id ? (
-                  <DeleteProfileForm profileId={profile.id} username={profile.username} />
+                  <div className="playerActionGroup">
+                    <ResultPermissionForm profileId={profile.id} enabled={Boolean(profile.can_submit_results)} />
+                    <DeleteProfileForm profileId={profile.id} username={profile.username} />
+                  </div>
                 ) : (
                   <span className="selfBadge">Du</span>
                 )}

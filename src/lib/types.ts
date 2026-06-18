@@ -11,6 +11,7 @@ export type Profile = {
   id: string;
   username: string;
   is_admin: boolean;
+  can_submit_results?: boolean;
 };
 
 export type Team = {
@@ -35,6 +36,10 @@ export type Match = {
   home_score: number | null;
   away_score: number | null;
   winner_team_id: string | null;
+  provisional_home_score?: number | null;
+  provisional_away_score?: number | null;
+  provisional_winner_team_id?: string | null;
+  provisional_updated_at?: string | null;
   is_finished: boolean;
   is_open_for_predictions: boolean;
   home_team?: Team | null;

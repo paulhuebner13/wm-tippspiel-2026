@@ -102,6 +102,16 @@ function DrawFlag() {
   return <span className="drawFlagMini">Draw</span>;
 }
 
+
+function predictionFlagTeam(match: Match, prediction: Prediction | undefined) {
+  if (!prediction || prediction.predicted_home_score === null || prediction.predicted_away_score === null) return null;
+  if (prediction.predicted_home_score > prediction.predicted_away_score) return match.home_team ?? null;
+  if (prediction.predicted_home_score < prediction.predicted_away_score) return match.away_team ?? null;
+  if (prediction.advance_team_id === match.home_team_id) return match.home_team ?? null;
+  if (prediction.advance_team_id === match.away_team_id) return match.away_team ?? null;
+  return null;
+}
+
 function isCompletePrediction(prediction: LocalPrediction | Prediction | undefined, knockoutStage: boolean): boolean {
   if (!prediction || prediction.predicted_home_score === null || prediction.predicted_away_score === null) return false;
   if (knockoutStage && prediction.predicted_home_score === prediction.predicted_away_score && !prediction.advance_team_id) return false;
@@ -417,8 +427,18 @@ export function MatchCard({
                         {showAllPredictions ? (
                           complete ? (
                             <>
-                              {prediction && <strong>{scoreText(prediction)}</strong>}
+                              <span className="predictionOverviewTipCenter">
+                                <span className="predictionOverviewTipFlag">
+                                  {predictionFlagTeam(match, prediction) ? <Flag team={predictionFlagTeam(match, prediction)} /> : <DrawFlag />}
+                                </span>
+                                {prediction && <strong>{scoreText(prediction)}</strong>}
+                              </span>
                               {match.is_finished && prediction && <span className="otherPredictionPoints">{calculateTotalPoints(match, prediction)}&nbsp;Punkte</span>}
+                            </>
+                          ) : match.is_finished ? (
+                            <>
+                              <span className="predictionStatus predictionStatusMissing predictionStatusNoTipUnlocked">Kein Tipp abgegeben</span>
+                              <span className="otherPredictionPoints">0&nbsp;Punkte</span>
                             </>
                           ) : (
                             <span className="predictionStatus predictionStatusMissing predictionStatusNoTipUnlocked">Kein Tipp abgegeben</span>

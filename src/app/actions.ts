@@ -94,7 +94,7 @@ export async function loginAction(formData: FormData) {
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("id, username, password_hash, is_admin")
+    .select("id, username, password_hash, is_admin, can_submit_results")
     .eq("username", username)
     .single();
 
@@ -150,7 +150,7 @@ export async function registerAction(formData: FormData) {
       password_hash: passwordHash,
       is_admin: false,
     })
-    .select("id, username, is_admin")
+    .select("id, username, is_admin, can_submit_results")
     .single();
 
   if (error || !profile) {
@@ -373,6 +373,10 @@ export async function saveResultAction(formData: FormData) {
       home_score: homeScore,
       away_score: awayScore,
       winner_team_id: knockout ? automaticWinner : null,
+      provisional_home_score: null,
+      provisional_away_score: null,
+      provisional_winner_team_id: null,
+      provisional_updated_at: null,
       is_finished: true,
       updated_at: new Date().toISOString(),
     })
@@ -460,6 +464,10 @@ export async function saveResultInlineAction(input: {
       home_score: homeScore,
       away_score: awayScore,
       winner_team_id: knockout ? storedWinnerTeamId : null,
+      provisional_home_score: isFinished ? null : undefined,
+      provisional_away_score: isFinished ? null : undefined,
+      provisional_winner_team_id: isFinished ? null : undefined,
+      provisional_updated_at: isFinished ? null : undefined,
       is_finished: isFinished,
       updated_at: new Date().toISOString(),
     })
@@ -482,6 +490,72 @@ export async function saveResultInlineAction(input: {
   // Revalidating the current admin page while the user is still typing can cause the
   // server-rendered values to overwrite the local input fields. The UI updates
   // optimistically instead, and other pages will see the saved result on their next load.
+  return { ok: true, winnerTeamId: storedWinnerTeamId };
+}
+
+
+export async function saveProvisionalResultInlineAction(input: {
+  matchId: string;
+  homeScore: number | null;
+  awayScore: number | null;
+  winnerTeamId?: string | null;
+}): Promise<{ ok: true; winnerTeamId?: string | null } | { ok: false; error: string }> {
+  const user = await requireUser();
+
+  if (!user.is_admin && !user.can_submit_results) {
+    return { ok: false, error: "forbidden" };
+  }
+
+  const { matchId, homeScore, awayScore } = input;
+  const winnerTeamId = input.winnerTeamId ?? null;
+  const scoreIsValid = (score: number | null) => score === null || (Number.isInteger(score) && score >= 0);
+
+  if (!matchId || !scoreIsValid(homeScore) || !scoreIsValid(awayScore)) {
+    return { ok: false, error: "invalid_result" };
+  }
+
+  const { data: match } = await supabaseAdmin
+    .from("matches")
+    .select("id, kickoff_time, stage, home_team_id, away_team_id, home_score, away_score, winner_team_id")
+    .eq("id", matchId)
+    .single();
+
+  if (!match) {
+    return { ok: false, error: "match_not_found" };
+  }
+
+  const hasOfficialResult = match.home_score !== null && match.away_score !== null;
+  const provisionalOpenAt = new Date(new Date(match.kickoff_time).getTime() + 105 * 60 * 1000);
+
+  if (hasOfficialResult || Date.now() < provisionalOpenAt.getTime()) {
+    return { ok: false, error: "locked" };
+  }
+
+  const hasBothScores = homeScore !== null && awayScore !== null;
+  const knockout = isKnockoutStage(match.stage);
+  let storedWinnerTeamId: string | null = null;
+
+  if (hasBothScores && knockout) {
+    if (homeScore > awayScore) storedWinnerTeamId = match.home_team_id;
+    else if (homeScore < awayScore) storedWinnerTeamId = match.away_team_id;
+    else if (winnerTeamId === match.home_team_id || winnerTeamId === match.away_team_id) storedWinnerTeamId = winnerTeamId;
+  }
+
+  const { error } = await supabaseAdmin
+    .from("matches")
+    .update({
+      provisional_home_score: homeScore,
+      provisional_away_score: awayScore,
+      provisional_winner_team_id: knockout ? storedWinnerTeamId : null,
+      provisional_updated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", matchId);
+
+  if (error) {
+    return { ok: false, error: "save_failed" };
+  }
+
   return { ok: true, winnerTeamId: storedWinnerTeamId };
 }
 
@@ -628,6 +702,7 @@ export async function createProfileAction(formData: FormData) {
       username,
       password_hash: passwordHash,
       is_admin: isAdmin,
+      can_submit_results: false,
     },
     { onConflict: "username" },
   );
@@ -656,6 +731,27 @@ export async function deleteProfileAction(formData: FormData) {
   revalidatePath("/results");
   revalidatePath("/ranking");
   redirect("/players?user_deleted=1");
+}
+
+
+export async function toggleResultSubmitterAction(formData: FormData) {
+  await requireAdmin();
+
+  const profileId = String(formData.get("profileId") ?? "");
+  const canSubmitResults = formData.get("canSubmitResults") === "on";
+
+  if (!profileId) {
+    redirect("/players?error=missing_profile");
+  }
+
+  await supabaseAdmin
+    .from("profiles")
+    .update({ can_submit_results: canSubmitResults })
+    .eq("id", profileId);
+
+  revalidatePath("/players");
+  revalidatePath("/admin");
+  redirect("/players?result_permission_saved=1");
 }
 
 export async function createGroupAction(formData: FormData) {

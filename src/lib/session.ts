@@ -54,7 +54,7 @@ export async function getCurrentUser(): Promise<Profile | null> {
 
     const { data, error } = await supabaseAdmin
       .from('profiles')
-      .select('id, username, is_admin')
+      .select('id, username, is_admin, can_submit_results')
       .eq('id', userId)
       .single();
 
@@ -74,5 +74,12 @@ export async function requireUser(): Promise<Profile> {
 export async function requireAdmin(): Promise<Profile> {
   const user = await requireUser();
   if (!user.is_admin) redirect('/matches');
+  return user;
+}
+
+
+export async function requireResultEditor(): Promise<Profile> {
+  const user = await requireUser();
+  if (!user.is_admin && !user.can_submit_results) redirect('/matches');
   return user;
 }

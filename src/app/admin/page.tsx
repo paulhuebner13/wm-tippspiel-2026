@@ -1,7 +1,8 @@
 import { Nav } from '@/components/Nav';
 import { AutoScrollToCurrent } from '@/components/AutoScrollToCurrent';
 import { ResultAdminCard } from '@/components/ResultAdminCard';
-import { requireAdmin } from '@/lib/session';
+import { ResultSubmitterCard } from '@/components/ResultSubmitterCard';
+import { requireResultEditor } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { isKnockoutStage } from '@/lib/scoring';
 import type { Match, Team } from '@/lib/types';
@@ -14,7 +15,7 @@ function hasCompleteResult(match: Match) {
 }
 
 export default async function AdminPage() {
-  const user = await requireAdmin();
+  const user = await requireResultEditor();
 
   const { data: matchesData } = await supabaseAdmin
     .from('matches')
@@ -25,12 +26,30 @@ export default async function AdminPage() {
     `)
     .order('kickoff_time', { ascending: true });
 
+  const matches = (matchesData ?? []) as Match[];
+
+  if (!user.is_admin) {
+    return (
+      <>
+        <Nav user={user} />
+        <main className="page">
+          <h1>Resultate</h1>
+          <AutoScrollToCurrent />
+          <div className="list">
+            {matches.map((match) => (
+              <ResultSubmitterCard key={match.id} match={match} />
+            ))}
+          </div>
+        </main>
+      </>
+    );
+  }
+
   const { data: teamsData } = await supabaseAdmin
     .from('teams')
     .select('*')
     .order('name', { ascending: true });
 
-  const matches = (matchesData ?? []) as Match[];
   const teams = (teamsData ?? []) as Team[];
   const firstUnenteredMatchId = matches.find((match) => !hasCompleteResult(match))?.id ?? null;
 

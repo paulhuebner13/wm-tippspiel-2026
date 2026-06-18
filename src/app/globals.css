@@ -4399,3 +4399,124 @@ html[data-theme='dark'] .predictionOverviewRowSelf {
 html[data-theme='dark'] .predictionOverviewRowSelf > span:first-child {
   color: #93c5fd;
 }
+
+/* v71 result submitters and all tips polish */
+.playerActionGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.resultPermissionForm {
+  margin: 0;
+}
+
+.resultPermissionCheck {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--card) 88%, var(--muted));
+  cursor: pointer;
+}
+
+.resultPermissionCheck input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.resultPermissionCheck span {
+  font-weight: 800;
+  opacity: 0.28;
+}
+
+.resultPermissionCheck:has(input:checked) {
+  border-color: #22c55e;
+  background: color-mix(in srgb, #22c55e 14%, var(--card));
+}
+
+.resultPermissionCheck:has(input:checked) span {
+  color: #16a34a;
+  opacity: 1;
+}
+
+.predictionOverviewTipCenter {
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 92px;
+  text-align: center;
+}
+
+.predictionOverviewTipFlag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  min-width: 26px;
+}
+
+.predictionOverviewTipFlag .flag,
+.predictionOverviewTipFlag img {
+  width: 24px;
+  height: 18px;
+  object-fit: cover;
+}
+
+.predictionOverviewRowUnlocked .predictionStatusNoTipUnlocked {
+  justify-self: center;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.predictionOverviewRowUnlocked .otherPredictionPoints {
+  justify-self: end;
+  white-space: nowrap;
+}
+
+.adminResultProvisionalPurple {
+  border-color: #a855f7 !important;
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.16), var(--shadow);
+  background: color-mix(in srgb, #a855f7 6%, var(--card));
+}
+
+.adminResultProvisionalPurple input::placeholder {
+  color: color-mix(in srgb, #a855f7 72%, var(--muted-foreground));
+  opacity: 0.7;
+}
+
+.resultSubmitterCard input:disabled {
+  opacity: 0.72;
+  cursor: default;
+}
+
+.resultSubmitterCard .adminResultScoreBlock input:disabled {
+  background: color-mix(in srgb, var(--muted) 45%, var(--card));
+}
+
+.compactError {
+  margin-top: 10px;
+  padding: 8px 10px;
+}
+
+@media (max-width: 640px) {
+  .playerActionGroup {
+    gap: 6px;
+  }
+
+  .resultPermissionCheck {
+    width: 32px;
+    height: 32px;
+  }
+
+  .predictionOverviewTipCenter {
+    min-width: 80px;
+    gap: 5px;
+  }
+}

@@ -18,8 +18,30 @@ function resultTeamName(match: Match, side: 'home' | 'away') {
   return match.away_team?.name ?? match.away_placeholder ?? 'Offen';
 }
 
+function resultHomeScore(match: Match) {
+  return match.home_score ?? match.provisional_home_score ?? null;
+}
+
+function resultAwayScore(match: Match) {
+  return match.away_score ?? match.provisional_away_score ?? null;
+}
+
 function hasResult(match: Match) {
-  return match.home_score !== null && match.away_score !== null;
+  return resultHomeScore(match) !== null && resultAwayScore(match) !== null;
+}
+
+function resultIsFinished(match: Match) {
+  return match.is_finished || hasResult(match);
+}
+
+function matchForScoring(match: Match): Match {
+  return {
+    ...match,
+    home_score: resultHomeScore(match),
+    away_score: resultAwayScore(match),
+    winner_team_id: match.winner_team_id ?? match.provisional_winner_team_id ?? null,
+    is_finished: resultIsFinished(match),
+  };
 }
 
 function hasCompletePrediction(prediction: Prediction | undefined, match: Match) {
@@ -44,19 +66,19 @@ function advanceWinnerName(prediction: Prediction | undefined, match: Match) {
 }
 
 function pointsText(match: Match, prediction: Prediction | undefined) {
-  if (!hasResult(match) || !match.is_finished) return '–';
+  if (!hasResult(match) || !resultIsFinished(match)) return '–';
   if (!hasCompletePrediction(prediction, match)) return '0';
-  return String(calculateTotalPoints(match, prediction as Prediction));
+  return String(calculateTotalPoints(matchForScoring(match), prediction as Prediction));
 }
 
 function resultScoreText(match: Match) {
   if (!hasResult(match)) return '–:–';
-  return `${match.home_score}:${match.away_score}`;
+  return `${resultHomeScore(match)}:${resultAwayScore(match)}`;
 }
 
 function ResultPlayerPanel({ profile, match, prediction, self }: { profile: Profile; match: Match; prediction?: Prediction; self: boolean }) {
   const complete = hasCompletePrediction(prediction, match);
-  const finished = hasResult(match) && match.is_finished;
+  const finished = hasResult(match) && resultIsFinished(match);
   const advanceName = finished ? advanceWinnerName(prediction, match) : null;
 
   return (
@@ -131,7 +153,7 @@ export default async function ResultsPage({ searchParams }: ResultsPageProps) {
   const predictions = (predictionsData ?? []) as Prediction[];
   const predictionsByKey = new Map(predictions.map((prediction) => [`${prediction.user_id}:${prediction.match_id}`, prediction]));
 
-  const finishedMatches = matches.filter((match) => match.is_finished && hasResult(match));
+  const finishedMatches = matches.filter((match) => resultIsFinished(match) && hasResult(match));
   const lastFinishedMatchNumber = finishedMatches.length > 0 ? finishedMatches[finishedMatches.length - 1].match_number : null;
 
   return (
@@ -151,7 +173,7 @@ export default async function ResultsPage({ searchParams }: ResultsPageProps) {
           {matches.map((match) => {
             return (
               <article
-                className={`card resultMatchCard ${hasResult(match) && match.is_finished ? 'resultMatchEvaluated' : ''}`}
+                className={`card resultMatchCard ${hasResult(match) && resultIsFinished(match) ? 'resultMatchEvaluated' : ''}`}
                 key={match.id}
                 data-result-scroll-target={match.match_number}
               >
