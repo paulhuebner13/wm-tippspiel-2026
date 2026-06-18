@@ -7,6 +7,25 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { isKnockoutStage } from '@/lib/scoring';
 import type { Match, Team } from '@/lib/types';
 
+
+function hasAnyVisibleResult(match: Match) {
+  return (
+    (match.home_score !== null && match.away_score !== null) ||
+    (match.provisional_home_score !== null &&
+      match.provisional_home_score !== undefined &&
+      match.provisional_away_score !== null &&
+      match.provisional_away_score !== undefined)
+  );
+}
+
+function provisionalCanOpen(match: Match) {
+  if (isKnockoutStage(match.stage)) return false;
+  if (match.home_score !== null && match.away_score !== null) return false;
+  const openAt = new Date(match.kickoff_time).getTime() + 105 * 60 * 1000;
+  if (Number.isNaN(openAt)) return false;
+  return Date.now() >= openAt;
+}
+
 function hasCompleteResult(match: Match) {
   if (match.home_score === null || match.away_score === null) return false;
   if (!isKnockoutStage(match.stage)) return true;
@@ -29,6 +48,8 @@ export default async function AdminPage() {
   const matches = (matchesData ?? []) as Match[];
 
   if (!user.is_admin) {
+    const firstOpenUnenteredMatchId = matches.find((match) => provisionalCanOpen(match) && !hasAnyVisibleResult(match))?.id ?? null;
+
     return (
       <>
         <Nav user={user} />
@@ -37,7 +58,11 @@ export default async function AdminPage() {
           <AutoScrollToCurrent />
           <div className="list">
             {matches.map((match) => (
-              <ResultSubmitterCard key={match.id} match={match} />
+              <ResultSubmitterCard
+                key={match.id}
+                match={match}
+                current={match.id === firstOpenUnenteredMatchId}
+              />
             ))}
           </div>
         </main>

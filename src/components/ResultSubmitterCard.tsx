@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { saveProvisionalResultInlineAction } from '@/app/actions';
 import { Flag } from '@/components/Flag';
 import { formatKickoff } from '@/lib/time';
@@ -20,13 +20,14 @@ function scoreInputToNumber(value: string): number | null {
 }
 
 function canSubmitProvisional(match: Match) {
+  if (isKnockoutStage(match.stage)) return false;
   if (match.home_score !== null && match.away_score !== null) return false;
   const openAt = new Date(new Date(match.kickoff_time).getTime() + 105 * 60 * 1000).getTime();
   if (Number.isNaN(openAt)) return false;
   return Date.now() >= openAt;
 }
 
-export function ResultSubmitterCard({ match }: { match: Match }) {
+export function ResultSubmitterCard({ match, current = false }: { match: Match; current?: boolean }) {
   const officialHome = match.home_score;
   const officialAway = match.away_score;
   const hasOfficialResult = officialHome !== null && officialAway !== null;
@@ -99,83 +100,97 @@ export function ResultSubmitterCard({ match }: { match: Match }) {
     return () => window.clearTimeout(timeout);
   }, [awayEmpty, awayNumber, editable, homeEmpty, homeNumber, match.id, matchesSaved, normalizedWinner]);
 
-  const cardClass = hasOfficialResult ? 'adminResultSavedGreen' : editable ? 'adminResultUpcomingGrey' : 'adminResultUpcomingGrey';
+  const hasProvisionalResult = !hasOfficialResult && savedHome !== null && savedAway !== null;
+  const cardClass = hasOfficialResult ? 'adminResultSavedGreen' : hasProvisionalResult ? 'adminResultProvisionalPurple' : 'adminResultUpcomingGrey';
 
   return (
-    <article className={`card adminResultCard resultSubmitterCard ${cardClass}`}>
-      <div className="matchHeader resultAdminHeader">
+    <article
+      className={`card adminCard adminResultCard resultSubmitterCard ${cardClass}`}
+      data-current-match={current ? 'true' : undefined}
+    >
+      <div className="matchHeader">
         <div>
-          <div className="matchTitleLine resultTitleLine">
+          <div className="matchTitleLine">
             <span>Spiel {match.match_number}</span>
             <span>{match.stage === 'group' && match.group_name ? `Gruppe ${match.group_name}` : getStageLabel(match.stage)}</span>
-            <span>{formatKickoff(match.kickoff_time)}</span>
+          </div>
+          <div className="kickoffLine">
+            Spielbeginn: {formatKickoff(match.kickoff_time)}
           </div>
         </div>
       </div>
 
-      <div className="adminResultBody">
-        <div className="adminResultTeam adminResultTeamHome">
-          <span className="teamName">{teamName(match, 'home')}</span>
-          <Flag team={match.home_team} />
+      <div className="resultAdminMain" aria-label="Resultat eintragen">
+        <div className="predictionMainRow">
+          <div className="predictionTeam predictionTeamHome">
+            <span className="teamName">{teamName(match, 'home')}</span>
+            <Flag team={match.home_team} />
+          </div>
+
+          <div className="scoreInputs resultScoreInputs">
+            <input
+              type="number"
+              min="0"
+              inputMode="numeric"
+              value={homeScore}
+              onChange={(event) => setHomeScore(event.target.value)}
+              aria-label={`${teamName(match, 'home')} Tore`}
+              disabled={!editable}
+            />
+            <span>:</span>
+            <input
+              type="number"
+              min="0"
+              inputMode="numeric"
+              value={awayScore}
+              onChange={(event) => setAwayScore(event.target.value)}
+              aria-label={`${teamName(match, 'away')} Tore`}
+              disabled={!editable}
+            />
+          </div>
+
+          <div className="predictionTeam predictionTeamAway">
+            <Flag team={match.away_team} />
+            <span className="teamName">{teamName(match, 'away')}</span>
+          </div>
         </div>
 
-        <div className="adminResultScoreBlock">
-          <input
-            value={homeScore}
-            onChange={(event) => setHomeScore(event.target.value)}
-            inputMode="numeric"
-            pattern="[0-9]*"
-            disabled={!editable}
-          />
-          <span>:</span>
-          <input
-            value={awayScore}
-            onChange={(event) => setAwayScore(event.target.value)}
-            inputMode="numeric"
-            pattern="[0-9]*"
-            disabled={!editable}
-          />
-        </div>
-
-        <div className="adminResultTeam adminResultTeamAway">
-          <Flag team={match.away_team} />
-          <span className="teamName">{teamName(match, 'away')}</span>
-        </div>
+        {showWinnerChoice && (
+          <div className="advanceChoiceBox">
+            <div className="advanceChoiceTitle">Wer kommt weiter?</div>
+            <div className="advanceChoices">
+              {match.home_team && (
+                <label className={winnerTeamId === match.home_team.id ? 'advanceChoice selected' : 'advanceChoice'}>
+                  <input
+                    type="radio"
+                    name={`winnerTeamId-${match.id}`}
+                    value={match.home_team.id}
+                    checked={winnerTeamId === match.home_team.id}
+                    disabled={!editable}
+                    onChange={(event) => setWinnerTeamId(event.target.value)}
+                  />
+                  <Flag team={match.home_team} />
+                  <span>{teamName(match, 'home')}</span>
+                </label>
+              )}
+              {match.away_team && (
+                <label className={winnerTeamId === match.away_team.id ? 'advanceChoice selected' : 'advanceChoice'}>
+                  <input
+                    type="radio"
+                    name={`winnerTeamId-${match.id}`}
+                    value={match.away_team.id}
+                    checked={winnerTeamId === match.away_team.id}
+                    disabled={!editable}
+                    onChange={(event) => setWinnerTeamId(event.target.value)}
+                  />
+                  <Flag team={match.away_team} />
+                  <span>{teamName(match, 'away')}</span>
+                </label>
+              )}
+            </div>
+          </div>
+        )}
       </div>
-
-      {showWinnerChoice && (
-        <div className="winnerChoice adminWinnerChoice">
-          {match.home_team && (
-            <label>
-              <input
-                type="radio"
-                name={`winner-${match.id}`}
-                value={match.home_team.id}
-                checked={winnerTeamId === match.home_team.id}
-                disabled={!editable}
-                onChange={(event) => setWinnerTeamId(event.target.value)}
-              />
-              <Flag team={match.home_team} />
-              <span>{teamName(match, 'home')}</span>
-            </label>
-          )}
-          {match.away_team && (
-            <label>
-              <input
-                type="radio"
-                name={`winner-${match.id}`}
-                value={match.away_team.id}
-                checked={winnerTeamId === match.away_team.id}
-                disabled={!editable}
-                onChange={(event) => setWinnerTeamId(event.target.value)}
-              />
-              <Flag team={match.away_team} />
-              <span>{teamName(match, 'away')}</span>
-            </label>
-          )}
-        </div>
-      )}
-
       {saveState === 'error' && <p className="errorBox compactError">Speichern fehlgeschlagen.</p>}
     </article>
   );

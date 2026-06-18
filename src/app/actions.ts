@@ -525,14 +525,14 @@ export async function saveProvisionalResultInlineAction(input: {
   }
 
   const hasOfficialResult = match.home_score !== null && match.away_score !== null;
+  const knockout = isKnockoutStage(match.stage);
   const provisionalOpenAt = new Date(new Date(match.kickoff_time).getTime() + 105 * 60 * 1000);
 
-  if (hasOfficialResult || Date.now() < provisionalOpenAt.getTime()) {
+  if (hasOfficialResult || knockout || Date.now() < provisionalOpenAt.getTime()) {
     return { ok: false, error: "locked" };
   }
 
   const hasBothScores = homeScore !== null && awayScore !== null;
-  const knockout = isKnockoutStage(match.stage);
   let storedWinnerTeamId: string | null = null;
 
   if (hasBothScores && knockout) {

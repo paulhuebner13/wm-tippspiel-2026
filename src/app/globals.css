@@ -4520,3 +4520,46 @@ html[data-theme='dark'] .predictionOverviewRowSelf > span:first-child {
     gap: 5px;
   }
 }
+
+/* v73: result submitter layout polish */
+.playerActionGroup {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.resultSubmitterCard .resultAdminMain {
+  width: 100%;
+}
+
+.resultSubmitterCard .predictionMainRow {
+  width: 100%;
+}
+
+.resultSubmitterCard .scoreInputs input:disabled {
+  opacity: 0.82;
+  cursor: default;
+}
+
+@media (max-width: 640px) {
+  .playerActionGroup {
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .userRow {
+    align-items: center;
+  }
+
+  .resultSubmitterCard .predictionMainRow {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .resultSubmitterCard .predictionTeam .teamName {
+    font-size: 0.9rem;
+  }
+}

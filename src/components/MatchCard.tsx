@@ -112,6 +112,29 @@ function predictionFlagTeam(match: Match, prediction: Prediction | undefined) {
   return null;
 }
 
+
+function resultHomeScore(match: Match): number | null {
+  return match.home_score ?? match.provisional_home_score ?? null;
+}
+
+function resultAwayScore(match: Match): number | null {
+  return match.away_score ?? match.provisional_away_score ?? null;
+}
+
+function hasVisibleResult(match: Match): boolean {
+  return resultHomeScore(match) !== null && resultAwayScore(match) !== null;
+}
+
+function matchForScoring(match: Match): Match {
+  return {
+    ...match,
+    home_score: resultHomeScore(match),
+    away_score: resultAwayScore(match),
+    winner_team_id: match.winner_team_id ?? match.provisional_winner_team_id ?? null,
+    is_finished: match.is_finished || hasVisibleResult(match),
+  };
+}
+
 function isCompletePrediction(prediction: LocalPrediction | Prediction | undefined, knockoutStage: boolean): boolean {
   if (!prediction || prediction.predicted_home_score === null || prediction.predicted_away_score === null) return false;
   if (knockoutStage && prediction.predicted_home_score === prediction.predicted_away_score && !prediction.advance_team_id) return false;
@@ -433,9 +456,9 @@ export function MatchCard({
                                 </span>
                                 {prediction && <strong>{scoreText(prediction)}</strong>}
                               </span>
-                              {match.is_finished && prediction && <span className="otherPredictionPoints">{calculateTotalPoints(match, prediction)}&nbsp;Punkte</span>}
+                              {hasVisibleResult(match) && prediction && <span className="otherPredictionPoints">{calculateTotalPoints(matchForScoring(match), prediction)}&nbsp;Punkte</span>}
                             </>
-                          ) : match.is_finished ? (
+                          ) : hasVisibleResult(match) ? (
                             <>
                               <span className="predictionStatus predictionStatusMissing predictionStatusNoTipUnlocked">Kein Tipp abgegeben</span>
                               <span className="otherPredictionPoints">0&nbsp;Punkte</span>
