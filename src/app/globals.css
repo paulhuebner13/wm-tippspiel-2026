@@ -4486,6 +4486,22 @@ html[data-theme='dark'] .predictionOverviewRowSelf > span:first-child {
   background: color-mix(in srgb, #a855f7 6%, var(--card));
 }
 
+.adminResultSubmitterOpenBlue {
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.16), var(--shadow);
+  background: color-mix(in srgb, #2563eb 5%, var(--card));
+}
+
+html[data-theme='dark'] .adminResultSubmitterOpenBlue {
+  border-color: #60a5fa !important;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2), var(--shadow);
+  background: color-mix(in srgb, #60a5fa 8%, var(--card));
+}
+
+.adminResultCard[data-current-match='true'].adminResultSubmitterOpenBlue {
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.18), var(--shadow);
+}
+
 .adminResultProvisionalPurple input::placeholder {
   color: color-mix(in srgb, #a855f7 72%, var(--muted-foreground));
   opacity: 0.7;

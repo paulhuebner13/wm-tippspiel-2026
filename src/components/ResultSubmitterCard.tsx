@@ -19,12 +19,12 @@ function scoreInputToNumber(value: string): number | null {
   return parsed;
 }
 
-function canSubmitProvisional(match: Match) {
+function canSubmitProvisional(match: Match, now: number) {
   if (isKnockoutStage(match.stage)) return false;
   if (match.home_score !== null && match.away_score !== null) return false;
   const openAt = new Date(new Date(match.kickoff_time).getTime() + 105 * 60 * 1000).getTime();
   if (Number.isNaN(openAt)) return false;
-  return Date.now() >= openAt;
+  return now >= openAt;
 }
 
 export function ResultSubmitterCard({ match, current = false }: { match: Match; current?: boolean }) {
@@ -42,10 +42,11 @@ export function ResultSubmitterCard({ match, current = false }: { match: Match; 
   const [savedAway, setSavedAway] = useState(initialAway);
   const [savedWinner, setSavedWinner] = useState(initialWinner);
   const [saveState, setSaveState] = useState<'idle' | 'error'>('idle');
+  const [now, setNow] = useState(0);
   const lastRequestKey = useRef('');
 
   const knockout = isKnockoutStage(match.stage);
-  const editable = canSubmitProvisional(match);
+  const editable = now > 0 && canSubmitProvisional(match, now);
   const homeNumber = scoreInputToNumber(homeScore);
   const awayNumber = scoreInputToNumber(awayScore);
   const homeEmpty = homeScore.trim() === '';
@@ -58,6 +59,12 @@ export function ResultSubmitterCard({ match, current = false }: { match: Match; 
     savedHome === (homeEmpty ? null : homeNumber) &&
     savedAway === (awayEmpty ? null : awayNumber) &&
     (savedWinner ?? null) === normalizedWinner;
+
+  useEffect(() => {
+    setNow(Date.now());
+    const interval = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     setHomeScore(initialHome?.toString() ?? '');
@@ -101,7 +108,13 @@ export function ResultSubmitterCard({ match, current = false }: { match: Match; 
   }, [awayEmpty, awayNumber, editable, homeEmpty, homeNumber, match.id, matchesSaved, normalizedWinner]);
 
   const hasProvisionalResult = !hasOfficialResult && savedHome !== null && savedAway !== null;
-  const cardClass = hasOfficialResult ? 'adminResultSavedGreen' : hasProvisionalResult ? 'adminResultProvisionalPurple' : 'adminResultUpcomingGrey';
+  const cardClass = hasOfficialResult
+    ? 'adminResultSavedGreen'
+    : hasProvisionalResult
+      ? 'adminResultProvisionalPurple'
+      : editable
+        ? 'adminResultSubmitterOpenBlue'
+        : 'adminResultUpcomingGrey';
 
   return (
     <article
