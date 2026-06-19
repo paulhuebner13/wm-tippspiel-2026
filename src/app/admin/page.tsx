@@ -8,16 +8,6 @@ import { isKnockoutStage } from '@/lib/scoring';
 import type { Match, Team } from '@/lib/types';
 
 
-function hasAnyVisibleResult(match: Match) {
-  return (
-    (match.home_score !== null && match.away_score !== null) ||
-    (match.provisional_home_score !== null &&
-      match.provisional_home_score !== undefined &&
-      match.provisional_away_score !== null &&
-      match.provisional_away_score !== undefined)
-  );
-}
-
 function provisionalCanOpen(match: Match) {
   if (isKnockoutStage(match.stage)) return false;
   if (match.home_score !== null && match.away_score !== null) return false;
@@ -48,7 +38,9 @@ export default async function AdminPage() {
   const matches = (matchesData ?? []) as Match[];
 
   if (!user.is_admin) {
-    const firstOpenUnenteredMatchId = matches.find((match) => provisionalCanOpen(match) && !hasAnyVisibleResult(match))?.id ?? null;
+    const latestOpenMatchId = [...matches]
+      .reverse()
+      .find((match) => provisionalCanOpen(match))?.id ?? null;
 
     return (
       <>
@@ -61,7 +53,7 @@ export default async function AdminPage() {
               <ResultSubmitterCard
                 key={match.id}
                 match={match}
-                current={match.id === firstOpenUnenteredMatchId}
+                current={match.id === latestOpenMatchId}
               />
             ))}
           </div>
