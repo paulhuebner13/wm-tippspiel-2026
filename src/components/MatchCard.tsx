@@ -315,7 +315,7 @@ export function MatchCard({
         </div>
 
         <div className="countdownBox">
-          {match.is_finished ? <span className="badge finished">Beendet</span> : <Countdown kickoffTime={match.kickoff_time} />}
+          {hasVisibleResult(match) ? <span className="badge finished">Beendet</span> : <Countdown kickoffTime={match.kickoff_time} />}
         </div>
       </div>
 
