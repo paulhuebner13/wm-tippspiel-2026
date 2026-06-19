@@ -39,6 +39,7 @@ export type Match = {
   provisional_home_score?: number | null;
   provisional_away_score?: number | null;
   provisional_winner_team_id?: string | null;
+  provisional_submitted_by_name?: string | null;
   provisional_updated_at?: string | null;
   is_finished: boolean;
   is_open_for_predictions: boolean;

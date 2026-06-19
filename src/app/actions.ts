@@ -376,6 +376,7 @@ export async function saveResultAction(formData: FormData) {
       provisional_home_score: null,
       provisional_away_score: null,
       provisional_winner_team_id: null,
+      provisional_submitted_by_name: null,
       provisional_updated_at: null,
       is_finished: true,
       updated_at: new Date().toISOString(),
@@ -467,6 +468,7 @@ export async function saveResultInlineAction(input: {
       provisional_home_score: isFinished ? null : undefined,
       provisional_away_score: isFinished ? null : undefined,
       provisional_winner_team_id: isFinished ? null : undefined,
+      provisional_submitted_by_name: isFinished ? null : undefined,
       provisional_updated_at: isFinished ? null : undefined,
       is_finished: isFinished,
       updated_at: new Date().toISOString(),
@@ -547,6 +549,7 @@ export async function saveProvisionalResultInlineAction(input: {
       provisional_home_score: homeScore,
       provisional_away_score: awayScore,
       provisional_winner_team_id: knockout ? storedWinnerTeamId : null,
+      provisional_submitted_by_name: user.username,
       provisional_updated_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })

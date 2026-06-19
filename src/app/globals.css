@@ -4538,6 +4538,19 @@ html[data-theme='dark'] .adminResultSubmitterOpenBlue {
   opacity: 0.7;
 }
 
+.provisionalResultAttribution {
+  margin-top: -2px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.provisionalResultAttribution strong {
+  color: var(--text);
+  font-weight: 850;
+}
+
 .resultSubmitterCard input:disabled {
   opacity: 0.72;
   cursor: default;
