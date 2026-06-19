@@ -16,6 +16,11 @@ function provisionalCanOpen(match: Match) {
   return Date.now() >= openAt;
 }
 
+function provisionalCanOpenLater(match: Match) {
+  if (isKnockoutStage(match.stage)) return false;
+  return match.home_score === null || match.away_score === null;
+}
+
 function hasCompleteResult(match: Match) {
   if (match.home_score === null || match.away_score === null) return false;
   if (!isKnockoutStage(match.stage)) return true;
@@ -38,9 +43,15 @@ export default async function AdminPage() {
   const matches = (matchesData ?? []) as Match[];
 
   if (!user.is_admin) {
-    const latestOpenMatchId = [...matches]
+    const latestOpenMatch = [...matches]
       .reverse()
-      .find((match) => provisionalCanOpen(match))?.id ?? null;
+      .find((match) => provisionalCanOpen(match));
+    const nextFutureMatch = matches.find((match) => {
+      if (!provisionalCanOpenLater(match)) return false;
+      const openAt = new Date(match.kickoff_time).getTime() + 105 * 60 * 1000;
+      return !Number.isNaN(openAt) && Date.now() < openAt;
+    });
+    const scrollTargetMatchId = latestOpenMatch?.id ?? nextFutureMatch?.id ?? null;
 
     return (
       <>
@@ -53,7 +64,7 @@ export default async function AdminPage() {
               <ResultSubmitterCard
                 key={match.id}
                 match={match}
-                current={match.id === latestOpenMatchId}
+                current={match.id === scrollTargetMatchId}
               />
             ))}
           </div>
