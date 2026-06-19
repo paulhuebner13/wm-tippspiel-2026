@@ -2,11 +2,11 @@ import { Nav } from '@/components/Nav';
 import { Flag } from '@/components/Flag';
 import { ResultsAutoScroll } from '@/components/ResultsAutoScroll';
 import { ResultsComparePicker } from '@/components/ResultsComparePicker';
+import { LocalDateTime } from '@/components/LocalDateTime';
 import { requireUser } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getVisibleProfilesForUser } from '@/lib/visibility';
 import { calculateTotalPoints, getStageLabel } from '@/lib/scoring';
-import { formatKickoff } from '@/lib/time';
 import type { Match, Prediction, Profile } from '@/lib/types';
 
 type ResultsPageProps = {
@@ -182,7 +182,7 @@ export default async function ResultsPage({ searchParams }: ResultsPageProps) {
                     <div className="matchTitleLine resultTitleLine">
                       <span>Spiel {match.match_number}</span>
                       <span>{match.stage === 'group' && match.group_name ? `Gruppe ${match.group_name}` : getStageLabel(match.stage)}</span>
-                      <span>{formatKickoff(match.kickoff_time)}</span>
+                      <span><LocalDateTime value={match.kickoff_time} /></span>
                     </div>
                   </div>
                 </div>

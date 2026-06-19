@@ -4,10 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { savePredictionInlineAction } from '@/app/actions';
 import { Flag } from './Flag';
 import { Countdown } from './Countdown';
+import { LocalDateTime } from './LocalDateTime';
 import { calculateTotalPoints, getStageLabel, isKnockoutStage } from '@/lib/scoring';
 import { getTeamColor } from '@/lib/teamColors';
 import { getFifaRanking } from '@/lib/fifaRankings';
-import { formatKickoff, isPredictionLocked } from '@/lib/time';
+import { isPredictionLocked } from '@/lib/time';
 import type { Match, Prediction, Profile } from '@/lib/types';
 
 type MatchWithPredictions = Match & {
@@ -310,7 +311,7 @@ export function MatchCard({
             <span>Spiel {displayMatchNumber ?? match.match_number}</span>
             <span>{groupOrStage(match)}</span>
           </div>
-          <div className="kickoffLine">Spielbeginn: {formatKickoff(match.kickoff_time)}</div>
+          <div className="kickoffLine">Spielbeginn: <LocalDateTime value={match.kickoff_time} /></div>
         </div>
 
         <div className="countdownBox">

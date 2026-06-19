@@ -1,9 +1,9 @@
 import { overridePredictionAction } from '@/app/actions';
 import { Flag } from '@/components/Flag';
 import { Nav } from '@/components/Nav';
+import { LocalDateTime } from '@/components/LocalDateTime';
 import { requireAdmin } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { formatKickoff } from '@/lib/time';
 import { getStageLabel, isKnockoutStage } from '@/lib/scoring';
 import type { Match, Profile } from '@/lib/types';
 
@@ -85,7 +85,7 @@ export default async function ChangesPage({ searchParams }: ChangesPageProps) {
             <div className="matchMeta">
               <span>Spiel {match.match_number}</span>
               <span>{getStageLabel(match.stage)}</span>
-              <span>{formatKickoff(match.kickoff_time)}</span>
+              <span><LocalDateTime value={match.kickoff_time} /></span>
             </div>
 
             <div className="teamsRow">

@@ -1,10 +1,10 @@
 import { BracketAutoScroll } from '@/components/BracketAutoScroll';
 import { Flag } from '@/components/Flag';
 import { Nav } from '@/components/Nav';
+import { LocalDateTime } from '@/components/LocalDateTime';
 import { getStageLabel } from '@/lib/scoring';
 import { requireUser } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { formatKickoff } from '@/lib/time';
 import type { Match, Stage, Team } from '@/lib/types';
 
 type MatchWithTeams = Match & {
@@ -139,7 +139,7 @@ function BracketMatch({ match, displayNumber }: { match: MatchWithTeams; display
     <article className={`bracketMatch ${hasResult(match) ? 'bracketMatchDone' : ''}`}>
       <div className="bracketMatchMeta">
         <span>Spiel {displayNumber}</span>
-        <span>{formatKickoff(match.kickoff_time)}</span>
+        <span><LocalDateTime value={match.kickoff_time} /></span>
       </div>
       <BracketTeam match={match} side="home" />
       <BracketTeam match={match} side="away" />

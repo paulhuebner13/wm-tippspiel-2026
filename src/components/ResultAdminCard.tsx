@@ -6,7 +6,7 @@ import {
   saveResultInlineAction,
 } from "@/app/actions";
 import { Flag } from "@/components/Flag";
-import { formatKickoff } from "@/lib/time";
+import { LocalDateTime } from "@/components/LocalDateTime";
 import { getStageLabel, isKnockoutStage } from "@/lib/scoring";
 import type { Match, Team } from "@/lib/types";
 
@@ -62,26 +62,6 @@ function isExpectedFinished(kickoffTime: string) {
   const kickoff = new Date(kickoffTime).getTime();
   if (Number.isNaN(kickoff)) return false;
   return Date.now() >= kickoff + 110 * 60 * 1000;
-}
-
-function formatProvisionalSubmissionTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-
-  const datePart = new Intl.DateTimeFormat("de-AT", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: "Europe/Vienna",
-  }).format(date);
-  const timePart = new Intl.DateTimeFormat("de-AT", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Europe/Vienna",
-  }).format(date);
-
-  return `${datePart} um ${timePart}`;
 }
 
 function hasValidFinalResult(
@@ -182,9 +162,6 @@ export function ResultAdminCard({
     match.provisional_home_score !== undefined &&
     match.provisional_away_score !== null &&
     match.provisional_away_score !== undefined;
-  const provisionalSubmissionTime = match.provisional_updated_at
-    ? formatProvisionalSubmissionTime(match.provisional_updated_at)
-    : null;
 
   const visualStatus: ResultSaveStatus =
     completeAndValid && matchesSaved
@@ -345,7 +322,7 @@ export function ResultAdminCard({
             </span>
           </div>
           <div className="kickoffLine">
-            Spielbeginn: {formatKickoff(match.kickoff_time)}
+            Spielbeginn: <LocalDateTime value={match.kickoff_time} />
           </div>
         </div>
       </div>
@@ -393,9 +370,10 @@ export function ResultAdminCard({
 
         {hasProvisionalResult &&
           match.provisional_submitted_by_name &&
-          provisionalSubmissionTime && (
+          match.provisional_updated_at && (
             <div className="provisionalResultAttribution">
-              Eingetragen von <strong>{match.provisional_submitted_by_name}</strong> am {provisionalSubmissionTime}
+              Eingetragen von <strong>{match.provisional_submitted_by_name}</strong> am{' '}
+              <LocalDateTime value={match.provisional_updated_at} variant="dateTime" />
             </div>
           )}
 

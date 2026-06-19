@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { saveProvisionalResultInlineAction } from '@/app/actions';
 import { Flag } from '@/components/Flag';
-import { formatKickoff } from '@/lib/time';
+import { LocalDateTime } from '@/components/LocalDateTime';
 import { getStageLabel, isKnockoutStage } from '@/lib/scoring';
 import type { Match } from '@/lib/types';
 
@@ -128,7 +128,7 @@ export function ResultSubmitterCard({ match, current = false }: { match: Match; 
             <span>{match.stage === 'group' && match.group_name ? `Gruppe ${match.group_name}` : getStageLabel(match.stage)}</span>
           </div>
           <div className="kickoffLine">
-            Spielbeginn: {formatKickoff(match.kickoff_time)}
+            Spielbeginn: <LocalDateTime value={match.kickoff_time} />
           </div>
         </div>
       </div>
