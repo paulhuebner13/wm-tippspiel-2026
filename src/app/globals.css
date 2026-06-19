@@ -4472,8 +4472,9 @@ html[data-theme='dark'] .predictionOverviewRowSelf > span:first-child {
 
 .predictionOverviewTipFlag .flagImage {
   width: auto;
-  height: 24px;
+  height: auto;
   max-width: 38px;
+  max-height: 24px;
   object-fit: contain;
 }
 
@@ -4492,6 +4493,10 @@ html[data-theme='dark'] .predictionOverviewRowSelf > span:first-child {
   grid-column: 3;
   justify-self: end;
   white-space: nowrap;
+}
+
+.predictionOverviewRowSelf > span:first-child {
+  font-weight: 400;
 }
 
 @media (max-width: 520px) {
