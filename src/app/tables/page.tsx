@@ -41,6 +41,16 @@ type SimulatedScore = { home: number; away: number };
 type SimulatedScoreMap = Map<string, SimulatedScore>;
 type FixedGroupPlacementMap = Map<string, Team>;
 
+type ScenarioStanding = {
+  rows: StandingRow[];
+  ranksByTeamId: Map<string, number>;
+};
+
+type TeamScenarioPlacement = {
+  rank: number;
+  row: StandingRow;
+};
+
 const BRACKET_STAGES: Stage[] = [
   "round_of_32",
   "round_of_16",
@@ -164,6 +174,21 @@ function applyMatchToRows(
 
 function fifaRankValue(team: Team) {
   return getFifaRanking(team.name)?.rank ?? 999;
+}
+
+function compareThirdPlaceRows(a: StandingRow, b: StandingRow) {
+  if (b.points !== a.points) return b.points - a.points;
+  if (b.goalDifference !== a.goalDifference)
+    return b.goalDifference - a.goalDifference;
+  if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
+  const rankA = fifaRankValue(a.team);
+  const rankB = fifaRankValue(b.team);
+  if (rankA !== rankB) return rankA - rankB;
+  return a.team.name.localeCompare(b.team.name, "de-AT");
+}
+
+function thirdPlaceRowBeats(candidate: StandingRow, target: StandingRow) {
+  return compareThirdPlaceRows(candidate, target) < 0;
 }
 
 function fixedGroupPlacementKey(groupName: string, rank: number) {
@@ -305,22 +330,122 @@ function buildExtremeScoreScenarios(groupMatches: MatchWithTeams[]) {
   );
 }
 
-function calculatePossibleRanks(teams: Team[], groupMatches: MatchWithTeams[]) {
+function buildScenarioStandings(
+  teams: Team[],
+  groupMatches: MatchWithTeams[],
+): ScenarioStanding[] {
+  const scenarios = buildExtremeScoreScenarios(groupMatches);
+
+  return scenarios.map((scenario) => {
+    const scenarioRows = buildRowsForGroup(teams, groupMatches, scenario);
+    const sortedRows = sortStandingRows(scenarioRows, groupMatches, scenario);
+    const ranksByTeamId = new Map<string, number>();
+
+    sortedRows.forEach((row, index) => {
+      ranksByTeamId.set(row.team.id, index + 1);
+    });
+
+    return { rows: sortedRows, ranksByTeamId };
+  });
+}
+
+function calculatePossibleRanksFromScenarios(
+  teams: Team[],
+  scenarioStandings: ScenarioStanding[],
+) {
   const possibleRanks = new Map(
     teams.map((team) => [team.id, new Set<number>()]),
   );
-  const scenarios = buildExtremeScoreScenarios(groupMatches);
 
-  for (const scenario of scenarios) {
-    const scenarioRows = buildRowsForGroup(teams, groupMatches, scenario);
-    const sortedRows = sortStandingRows(scenarioRows, groupMatches, scenario);
-
-    sortedRows.forEach((row, index) => {
+  for (const scenario of scenarioStandings) {
+    scenario.rows.forEach((row, index) => {
       possibleRanks.get(row.team.id)?.add(index + 1);
     });
   }
 
   return possibleRanks;
+}
+
+function calculatePossibleRanks(teams: Team[], groupMatches: MatchWithTeams[]) {
+  return calculatePossibleRanksFromScenarios(
+    teams,
+    buildScenarioStandings(teams, groupMatches),
+  );
+}
+
+function buildGroupScenarioMap(teams: Team[], matches: MatchWithTeams[]) {
+  const teamsByGroup = new Map<string, Team[]>();
+
+  for (const team of teams) {
+    if (!team.group_name) continue;
+    if (!teamsByGroup.has(team.group_name))
+      teamsByGroup.set(team.group_name, []);
+    teamsByGroup.get(team.group_name)?.push(team);
+  }
+
+  const scenariosByGroup = new Map<string, ScenarioStanding[]>();
+
+  for (const [groupName, groupTeams] of teamsByGroup.entries()) {
+    const groupMatches = matches.filter(
+      (match) => match.stage === "group" && match.group_name === groupName,
+    );
+    scenariosByGroup.set(
+      groupName,
+      buildScenarioStandings(groupTeams, groupMatches),
+    );
+  }
+
+  return scenariosByGroup;
+}
+
+function collectTeamPlacements(
+  team: Team,
+  groupScenarios: ScenarioStanding[],
+): TeamScenarioPlacement[] {
+  return groupScenarios
+    .map((scenario) => {
+      const row = scenario.rows.find((item) => item.team.id === team.id);
+      const rank = scenario.ranksByTeamId.get(team.id);
+      if (!row || !rank) return null;
+      return { rank, row };
+    })
+    .filter(
+      (placement): placement is TeamScenarioPlacement => placement !== null,
+    );
+}
+
+function guaranteedAsBestThirdPlacedTeam(
+  team: Team,
+  ownGroupScenarios: ScenarioStanding[],
+  scenariosByGroup: Map<string, ScenarioStanding[]>,
+) {
+  if (!team.group_name) return false;
+
+  const ownPlacements = collectTeamPlacements(team, ownGroupScenarios);
+  if (ownPlacements.length === 0) return false;
+
+  for (const placement of ownPlacements) {
+    if (placement.rank <= 2) continue;
+    if (placement.rank > 3) return false;
+
+    let groupsThatCanBeatThisThirdPlace = 0;
+
+    for (const [groupName, groupScenarios] of scenariosByGroup.entries()) {
+      if (groupName === team.group_name) continue;
+
+      const groupCanBeat = groupScenarios.some((scenario) => {
+        const thirdPlaceRow = scenario.rows[2];
+        return Boolean(
+          thirdPlaceRow && thirdPlaceRowBeats(thirdPlaceRow, placement.row),
+        );
+      });
+
+      if (groupCanBeat) groupsThatCanBeatThisThirdPlace += 1;
+      if (groupsThatCanBeatThisThirdPlace >= 8) return false;
+    }
+  }
+
+  return true;
 }
 
 function calculateFixedTopTwoPlacements(
@@ -360,9 +485,16 @@ function calculateFixedTopTwoPlacements(
 function markStandingStatuses(
   rows: StandingRow[],
   groupMatches: MatchWithTeams[],
+  scenariosByGroup: Map<string, ScenarioStanding[]>,
 ) {
   const teams = rows.map((row) => row.team);
-  const possibleRanks = calculatePossibleRanks(teams, groupMatches);
+  const groupName = teams.find((team) => team.group_name)?.group_name ?? null;
+  const ownGroupScenarios = groupName
+    ? scenariosByGroup.get(groupName)
+    : undefined;
+  const possibleRanks = ownGroupScenarios
+    ? calculatePossibleRanksFromScenarios(teams, ownGroupScenarios)
+    : calculatePossibleRanks(teams, groupMatches);
 
   return rows.map((row) => {
     const ranks = possibleRanks.get(row.team.id);
@@ -372,17 +504,27 @@ function markStandingStatuses(
     const rankValues = Array.from(ranks);
     const minRank = Math.min(...rankValues);
     const maxRank = Math.max(...rankValues);
+    const exactRankIsFixed = rankValues.length === 1;
+    const guaranteedTopTwo = maxRank <= 2;
+    const guaranteedThroughThirdPlace = ownGroupScenarios
+      ? guaranteedAsBestThirdPlacedTeam(
+          row.team,
+          ownGroupScenarios,
+          scenariosByGroup,
+        )
+      : false;
 
-    if (rankValues.length === 1 && maxRank <= 2) {
-      return { ...row, status: "qualifiedFixed" as StandingStatus };
+    if (guaranteedTopTwo || guaranteedThroughThirdPlace) {
+      return {
+        ...row,
+        status: exactRankIsFixed
+          ? ("qualifiedFixed" as StandingStatus)
+          : ("qualified" as StandingStatus),
+      };
     }
 
-    if (rankValues.length === 1 && minRank >= 4) {
+    if (exactRankIsFixed && minRank >= 4) {
       return { ...row, status: "eliminatedFixed" as StandingStatus };
-    }
-
-    if (maxRank <= 2) {
-      return { ...row, status: "qualified" as StandingStatus };
     }
 
     if (minRank >= 4) {
@@ -402,7 +544,11 @@ function standingStatusClass(status: StandingStatus) {
   if (status === "eliminated") return "standingEliminated";
   return undefined;
 }
-function buildStandings(teams: Team[], matches: MatchWithTeams[]) {
+function buildStandings(
+  teams: Team[],
+  matches: MatchWithTeams[],
+  scenariosByGroup: Map<string, ScenarioStanding[]>,
+) {
   const groups = new Map<string, Map<string, StandingRow>>();
 
   for (const team of teams) {
@@ -447,7 +593,7 @@ function buildStandings(teams: Team[], matches: MatchWithTeams[]) {
 
       return {
         groupName,
-        rows: markStandingStatuses(sortedRows, groupMatches),
+        rows: markStandingStatuses(sortedRows, groupMatches, scenariosByGroup),
       };
     });
 }
@@ -567,7 +713,8 @@ export default async function TablesPage() {
   const teams = (teamsData ?? []) as Team[];
   const matches = (matchesData ?? []) as MatchWithTeams[];
   const specialEffectActive = await getUserSpecialEffectActive(user.id);
-  const standings = buildStandings(teams, matches);
+  const scenariosByGroup = buildGroupScenarioMap(teams, matches);
+  const standings = buildStandings(teams, matches, scenariosByGroup);
   const fixedTopTwoPlacements = calculateFixedTopTwoPlacements(teams, matches);
   const currentStage = getCurrentStage(matches);
   const thirdPlaceMatch = matches.find(
@@ -612,30 +759,33 @@ export default async function TablesPage() {
                   <tbody>
                     {group.rows.map((row) => {
                       const displayTeam =
-                        applySpecialEffectToTeam(row.team, specialEffectActive) ?? row.team;
+                        applySpecialEffectToTeam(
+                          row.team,
+                          specialEffectActive,
+                        ) ?? row.team;
 
                       return (
-                      <tr
-                        className={standingStatusClass(row.status)}
-                        key={row.team.id}
-                      >
-                        <td>
-                          <span className="standingTeam">
-                            <Flag team={displayTeam} />
-                            <span>{displayTeam.name}</span>
-                          </span>
-                        </td>
-                        <td>{row.played}</td>
-                        <td>{row.won}</td>
-                        <td>{row.drawn}</td>
-                        <td>{row.lost}</td>
-                        <td className="standingsPoints">{row.points}</td>
-                        <td>
-                          {row.goalDifference > 0
-                            ? `+${row.goalDifference}`
-                            : row.goalDifference}
-                        </td>
-                      </tr>
+                        <tr
+                          className={standingStatusClass(row.status)}
+                          key={row.team.id}
+                        >
+                          <td>
+                            <span className="standingTeam">
+                              <Flag team={displayTeam} />
+                              <span>{displayTeam.name}</span>
+                            </span>
+                          </td>
+                          <td>{row.played}</td>
+                          <td>{row.won}</td>
+                          <td>{row.drawn}</td>
+                          <td>{row.lost}</td>
+                          <td className="standingsPoints">{row.points}</td>
+                          <td>
+                            {row.goalDifference > 0
+                              ? `+${row.goalDifference}`
+                              : row.goalDifference}
+                          </td>
+                        </tr>
                       );
                     })}
                   </tbody>
