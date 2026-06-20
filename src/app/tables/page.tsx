@@ -13,7 +13,7 @@ type MatchWithTeams = Match & {
   away_team?: Team | null;
 };
 
-type StandingStatus = 'qualified' | 'eliminated' | 'open';
+type StandingStatus = 'qualified' | 'qualifiedFixed' | 'eliminated' | 'eliminatedFixed' | 'open';
 
 type StandingRow = {
   team: Team;
@@ -249,6 +249,14 @@ function markStandingStatuses(rows: StandingRow[], groupMatches: MatchWithTeams[
     const minRank = Math.min(...rankValues);
     const maxRank = Math.max(...rankValues);
 
+    if (rankValues.length === 1 && maxRank <= 2) {
+      return { ...row, status: 'qualifiedFixed' as StandingStatus };
+    }
+
+    if (rankValues.length === 1 && minRank >= 4) {
+      return { ...row, status: 'eliminatedFixed' as StandingStatus };
+    }
+
     if (maxRank <= 2) {
       return { ...row, status: 'qualified' as StandingStatus };
     }
@@ -261,6 +269,14 @@ function markStandingStatuses(rows: StandingRow[], groupMatches: MatchWithTeams[
   });
 }
 
+
+function standingStatusClass(status: StandingStatus) {
+  if (status === 'qualifiedFixed') return 'standingQualified standingFixedPosition';
+  if (status === 'eliminatedFixed') return 'standingEliminated standingFixedPosition';
+  if (status === 'qualified') return 'standingQualified';
+  if (status === 'eliminated') return 'standingEliminated';
+  return undefined;
+}
 function buildStandings(teams: Team[], matches: MatchWithTeams[]) {
   const groups = new Map<string, Map<string, StandingRow>>();
 
@@ -382,7 +398,7 @@ export default async function TablesPage() {
                   <tbody>
                     {group.rows.map((row) => (
                       <tr
-                        className={row.status === 'qualified' ? 'standingQualified' : row.status === 'eliminated' ? 'standingEliminated' : undefined}
+                        className={standingStatusClass(row.status)}
                         key={row.team.id}
                       >
                         <td>

@@ -4588,3 +4588,18 @@ html[data-theme='dark'] .standingsTable tr.standingQualified td {
 html[data-theme='dark'] .standingsTable tr.standingEliminated td {
   background: color-mix(in srgb, #ef4444 12%, var(--card));
 }
+
+
+/* v85: status background for qualification, stripe only for exact fixed rank */
+.standingsTable tr.standingQualified td:first-child,
+.standingsTable tr.standingEliminated td:first-child {
+  border-left: 0;
+}
+
+.standingsTable tr.standingFixedPosition.standingQualified td:first-child {
+  border-left: 4px solid #16a34a;
+}
+
+.standingsTable tr.standingFixedPosition.standingEliminated td:first-child {
+  border-left: 4px solid #dc2626;
+}
