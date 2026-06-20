@@ -4735,3 +4735,18 @@ html[data-theme='dark'] .standingsTable tr.standingEliminated td {
     line-height: 1;
   }
 }
+
+.provisionalResultAttribution {
+  margin-top: -3px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.2;
+  font-weight: 650;
+  opacity: 0.82;
+}
+
+.provisionalResultAttribution strong {
+  color: inherit;
+  font-weight: 800;
+}
