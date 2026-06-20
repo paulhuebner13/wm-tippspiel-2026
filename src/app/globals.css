@@ -4636,3 +4636,102 @@ html[data-theme='dark'] .standingsTable tr.standingEliminated td {
 .standingsTable tr.standingFixedPosition.standingEliminated td:first-child {
   border-left: 4px solid #dc2626;
 }
+
+/* v92: restore full-size all-tips flags and keep evaluated missing tips in one row. */
+.predictionOverviewTipCenter {
+  min-width: 104px;
+  gap: 7px;
+}
+
+.predictionOverviewTipFlag {
+  width: 46px;
+  min-width: 46px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 46px;
+}
+
+.predictionOverviewTipFlag .flagFrame,
+.predictionOverviewTipFlag .flagPlaceholder {
+  width: 42px;
+  min-width: 42px;
+  height: 26px;
+  flex: 0 0 42px;
+}
+
+.predictionOverviewTipFlag .flagImage,
+.predictionOverviewTipFlag img {
+  width: auto;
+  height: auto;
+  max-width: 42px;
+  max-height: 26px;
+  object-fit: contain;
+  border-radius: 2px;
+}
+
+.predictionOverviewTipFlag .drawFlagMini {
+  width: 42px;
+  min-width: 42px;
+  height: 26px;
+  flex: 0 0 42px;
+  aspect-ratio: 21 / 13;
+  border-radius: 2px;
+  font-size: 8px;
+}
+
+.predictionOverviewRowUnlocked > .predictionStatusNoTipUnlocked,
+.predictionOverviewRowUnlocked .predictionStatusNoTipUnlocked {
+  grid-column: 2;
+  justify-self: center;
+  text-align: center;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.predictionOverviewRowUnlocked > .otherPredictionPoints,
+.predictionOverviewRowUnlocked .otherPredictionPoints {
+  grid-column: 3;
+  justify-self: end;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .predictionOverviewRowUnlocked {
+    grid-template-columns: minmax(0, 1fr) minmax(106px, 124px) minmax(68px, 84px) !important;
+  }
+
+  .predictionOverviewTipCenter {
+    min-width: 92px;
+    gap: 5px;
+  }
+
+  .predictionOverviewTipFlag {
+    width: 42px;
+    min-width: 42px;
+    flex-basis: 42px;
+  }
+
+  .predictionOverviewTipFlag .flagFrame,
+  .predictionOverviewTipFlag .flagPlaceholder,
+  .predictionOverviewTipFlag .drawFlagMini {
+    width: 38px;
+    min-width: 38px;
+    height: 24px;
+    flex-basis: 38px;
+  }
+
+  .predictionOverviewTipFlag .flagImage,
+  .predictionOverviewTipFlag img {
+    max-width: 38px;
+    max-height: 24px;
+  }
+
+  .predictionOverviewRowUnlocked > .predictionStatusNoTipUnlocked,
+  .predictionOverviewRowUnlocked .predictionStatusNoTipUnlocked {
+    font-size: 10px;
+    padding: 5px 6px;
+    line-height: 1;
+  }
+}
