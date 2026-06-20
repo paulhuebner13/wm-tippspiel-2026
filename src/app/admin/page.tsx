@@ -1,12 +1,22 @@
-import { Nav } from '@/components/Nav';
-import { AutoScrollToCurrent } from '@/components/AutoScrollToCurrent';
-import { ResultAdminCard } from '@/components/ResultAdminCard';
-import { ResultSubmitterCard } from '@/components/ResultSubmitterCard';
-import { requireResultEditor } from '@/lib/session';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { isKnockoutStage } from '@/lib/scoring';
-import type { Match, Team } from '@/lib/types';
+import { Nav } from "@/components/Nav";
+import { AutoScrollToCurrent } from "@/components/AutoScrollToCurrent";
+import { ResultAdminCard } from "@/components/ResultAdminCard";
+import { ResultSubmitterCard } from "@/components/ResultSubmitterCard";
+import { requireResultEditor } from "@/lib/session";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { isKnockoutStage } from "@/lib/scoring";
+import { applyFixedTopTwoToMatches } from "@/lib/fixedGroupPlacements";
+import type { Match, Team } from "@/lib/types";
 
+function hasAnyVisibleResult(match: Match) {
+  return (
+    (match.home_score !== null && match.away_score !== null) ||
+    (match.provisional_home_score !== null &&
+      match.provisional_home_score !== undefined &&
+      match.provisional_away_score !== null &&
+      match.provisional_away_score !== undefined)
+  );
+}
 
 function provisionalCanOpen(match: Match) {
   if (isKnockoutStage(match.stage)) return false;
@@ -14,11 +24,6 @@ function provisionalCanOpen(match: Match) {
   const openAt = new Date(match.kickoff_time).getTime() + 105 * 60 * 1000;
   if (Number.isNaN(openAt)) return false;
   return Date.now() >= openAt;
-}
-
-function provisionalCanOpenLater(match: Match) {
-  if (isKnockoutStage(match.stage)) return false;
-  return match.home_score === null || match.away_score === null;
 }
 
 function hasCompleteResult(match: Match) {
@@ -32,26 +37,32 @@ export default async function AdminPage() {
   const user = await requireResultEditor();
 
   const { data: matchesData } = await supabaseAdmin
-    .from('matches')
-    .select(`
+    .from("matches")
+    .select(
+      `
       *,
       home_team:teams!matches_home_team_id_fkey(*),
       away_team:teams!matches_away_team_id_fkey(*)
-    `)
-    .order('kickoff_time', { ascending: true });
+    `,
+    )
+    .order("kickoff_time", { ascending: true });
 
-  const matches = (matchesData ?? []) as Match[];
+  const { data: teamsData } = await supabaseAdmin
+    .from("teams")
+    .select("*")
+    .order("name", { ascending: true });
+
+  const teams = (teamsData ?? []) as Team[];
+  const matches = applyFixedTopTwoToMatches(
+    (matchesData ?? []) as Match[],
+    teams,
+  );
 
   if (!user.is_admin) {
-    const latestOpenMatch = [...matches]
-      .reverse()
-      .find((match) => provisionalCanOpen(match));
-    const nextFutureMatch = matches.find((match) => {
-      if (!provisionalCanOpenLater(match)) return false;
-      const openAt = new Date(match.kickoff_time).getTime() + 105 * 60 * 1000;
-      return !Number.isNaN(openAt) && Date.now() < openAt;
-    });
-    const scrollTargetMatchId = latestOpenMatch?.id ?? nextFutureMatch?.id ?? null;
+    const firstOpenUnenteredMatchId =
+      matches.find(
+        (match) => provisionalCanOpen(match) && !hasAnyVisibleResult(match),
+      )?.id ?? null;
 
     return (
       <>
@@ -64,7 +75,7 @@ export default async function AdminPage() {
               <ResultSubmitterCard
                 key={match.id}
                 match={match}
-                current={match.id === scrollTargetMatchId}
+                current={match.id === firstOpenUnenteredMatchId}
               />
             ))}
           </div>
@@ -73,20 +84,17 @@ export default async function AdminPage() {
     );
   }
 
-  const { data: teamsData } = await supabaseAdmin
-    .from('teams')
-    .select('*')
-    .order('name', { ascending: true });
-
-  const teams = (teamsData ?? []) as Team[];
-  const firstUnenteredMatchId = matches.find((match) => !hasCompleteResult(match))?.id ?? null;
+  const firstUnenteredMatchId =
+    matches.find((match) => !hasCompleteResult(match))?.id ?? null;
 
   return (
     <>
       <Nav user={user} />
       <main className="page">
         <h1>Resultate</h1>
-        <p className="subtle">Hier trägst du Spielergebnisse ein und öffnest K.-o.-Spiele für Tipps.</p>
+        <p className="subtle">
+          Hier trägst du Spielergebnisse ein und öffnest K.-o.-Spiele für Tipps.
+        </p>
         <AutoScrollToCurrent />
 
         <div className="list">

@@ -13,6 +13,69 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { isKnockoutStage } from "@/lib/scoring";
 import { isPredictionLocked } from "@/lib/time";
 import { getBracketTargetsForSource, getLoserTeamId } from "@/lib/bracket";
+import {
+  calculateFixedTopTwoPlacements,
+  getInferredBracketTeam,
+  type MatchWithTeams,
+} from "@/lib/fixedGroupPlacements";
+import type { Team } from "@/lib/types";
+
+type MatchTeamResolutionInput = {
+  id: string;
+  stage: string;
+  home_team_id: string | null;
+  away_team_id: string | null;
+};
+
+async function getEffectiveRoundOf32TeamIds(match: MatchTeamResolutionInput) {
+  if (
+    match.stage !== "round_of_32" ||
+    (match.home_team_id && match.away_team_id)
+  ) {
+    return {
+      homeTeamId: match.home_team_id,
+      awayTeamId: match.away_team_id,
+    };
+  }
+
+  const [{ data: teamsData }, { data: matchesData }] = await Promise.all([
+    supabaseAdmin.from("teams").select("*"),
+    supabaseAdmin.from("matches").select(
+      `
+        *,
+        home_team:teams!matches_home_team_id_fkey(*),
+        away_team:teams!matches_away_team_id_fkey(*)
+      `,
+    ),
+  ]);
+
+  const teams = (teamsData ?? []) as Team[];
+  const matches = (matchesData ?? []) as MatchWithTeams[];
+  const currentMatch = matches.find((item) => item.id === match.id);
+  if (!currentMatch) {
+    return {
+      homeTeamId: match.home_team_id,
+      awayTeamId: match.away_team_id,
+    };
+  }
+
+  const fixedTopTwoPlacements = calculateFixedTopTwoPlacements(teams, matches);
+  const inferredHomeTeam = getInferredBracketTeam(
+    currentMatch,
+    "home",
+    fixedTopTwoPlacements,
+  );
+  const inferredAwayTeam = getInferredBracketTeam(
+    currentMatch,
+    "away",
+    fixedTopTwoPlacements,
+  );
+
+  return {
+    homeTeamId: match.home_team_id ?? inferredHomeTeam?.id ?? null,
+    awayTeamId: match.away_team_id ?? inferredAwayTeam?.id ?? null,
+  };
+}
 
 function readNumber(value: FormDataEntryValue | null): number | null {
   if (typeof value !== "string" || value.trim() === "") return null;
@@ -190,12 +253,16 @@ export async function savePredictionAction(formData: FormData) {
     .eq("id", matchId)
     .single();
 
-  if (
-    !match ||
-    match.is_finished ||
-    !match.is_open_for_predictions ||
-    isPredictionLocked(match.kickoff_time)
-  ) {
+  if (!match || match.is_finished || isPredictionLocked(match.kickoff_time)) {
+    redirect("/matches?error=locked");
+  }
+
+  const effectiveTeams = await getEffectiveRoundOf32TeamIds(match);
+  const isOpenForPredictions =
+    match.is_open_for_predictions ||
+    Boolean(effectiveTeams.homeTeamId && effectiveTeams.awayTeamId);
+
+  if (!isOpenForPredictions) {
     redirect("/matches?error=locked");
   }
 
@@ -204,8 +271,8 @@ export async function savePredictionAction(formData: FormData) {
     predictedHomeScore === predictedAwayScore
   ) {
     const validAdvanceTeam =
-      advanceTeamId === match.home_team_id ||
-      advanceTeamId === match.away_team_id;
+      advanceTeamId === effectiveTeams.homeTeamId ||
+      advanceTeamId === effectiveTeams.awayTeamId;
     if (!validAdvanceTeam) {
       redirect("/matches?error=missing_advance_team");
     }
@@ -259,12 +326,16 @@ export async function savePredictionInlineAction(input: {
     .eq("id", matchId)
     .single();
 
-  if (
-    !match ||
-    match.is_finished ||
-    !match.is_open_for_predictions ||
-    isPredictionLocked(match.kickoff_time)
-  ) {
+  if (!match || match.is_finished || isPredictionLocked(match.kickoff_time)) {
+    return { ok: false, error: "locked" };
+  }
+
+  const effectiveTeams = await getEffectiveRoundOf32TeamIds(match);
+  const isOpenForPredictions =
+    match.is_open_for_predictions ||
+    Boolean(effectiveTeams.homeTeamId && effectiveTeams.awayTeamId);
+
+  if (!isOpenForPredictions) {
     return { ok: false, error: "locked" };
   }
 
@@ -295,8 +366,8 @@ export async function savePredictionInlineAction(input: {
     isKnockoutStage(match.stage) &&
     predictedHomeScore === predictedAwayScore;
   const validAdvanceTeam =
-    advanceTeamId === match.home_team_id ||
-    advanceTeamId === match.away_team_id;
+    advanceTeamId === effectiveTeams.homeTeamId ||
+    advanceTeamId === effectiveTeams.awayTeamId;
 
   // Incomplete tips and knockout draws without selected advancing team are intentionally saved.
   // They stay yellow in the UI and do not count for points until they become complete.
@@ -344,39 +415,54 @@ export async function saveResultAction(formData: FormData) {
 
   const { data: match } = await supabaseAdmin
     .from("matches")
-    .select("match_number, stage, home_team_id, away_team_id")
+    .select("id, match_number, stage, home_team_id, away_team_id")
     .eq("id", matchId)
     .single();
 
   if (!match) redirect("/admin?error=match_not_found");
 
+  const effectiveTeams = await getEffectiveRoundOf32TeamIds(match);
+  const effectiveHomeTeamId = effectiveTeams.homeTeamId;
+  const effectiveAwayTeamId = effectiveTeams.awayTeamId;
   const knockout = isKnockoutStage(match.stage);
   const isDraw = homeScore === awayScore;
 
   if (knockout && isDraw) {
     const validWinner =
-      winnerTeamId === match.home_team_id ||
-      winnerTeamId === match.away_team_id;
+      winnerTeamId === effectiveHomeTeamId ||
+      winnerTeamId === effectiveAwayTeamId;
     if (!validWinner) redirect("/admin?error=missing_winner");
   }
 
   const automaticWinner =
     homeScore > awayScore
-      ? match.home_team_id
+      ? effectiveHomeTeamId
       : homeScore < awayScore
-        ? match.away_team_id
+        ? effectiveAwayTeamId
         : winnerTeamId;
+
+  const shouldPersistInferredTeams =
+    match.stage === "round_of_32" &&
+    Boolean(effectiveHomeTeamId && effectiveAwayTeamId);
 
   await supabaseAdmin
     .from("matches")
     .update({
+      home_team_id: shouldPersistInferredTeams
+        ? (match.home_team_id ?? effectiveHomeTeamId)
+        : undefined,
+      away_team_id: shouldPersistInferredTeams
+        ? (match.away_team_id ?? effectiveAwayTeamId)
+        : undefined,
+      home_placeholder: shouldPersistInferredTeams ? null : undefined,
+      away_placeholder: shouldPersistInferredTeams ? null : undefined,
+      is_open_for_predictions: shouldPersistInferredTeams ? true : undefined,
       home_score: homeScore,
       away_score: awayScore,
       winner_team_id: knockout ? automaticWinner : null,
       provisional_home_score: null,
       provisional_away_score: null,
       provisional_winner_team_id: null,
-      provisional_submitted_by_name: null,
       provisional_updated_at: null,
       is_finished: true,
       updated_at: new Date().toISOString(),
@@ -386,8 +472,8 @@ export async function saveResultAction(formData: FormData) {
   if (knockout) {
     await propagateKnockoutTeams({
       sourceMatchNumber: match.match_number,
-      homeTeamId: match.home_team_id,
-      awayTeamId: match.away_team_id,
+      homeTeamId: effectiveHomeTeamId,
+      awayTeamId: effectiveAwayTeamId,
       winnerTeamId: automaticWinner,
     });
   }
@@ -427,6 +513,10 @@ export async function saveResultInlineAction(input: {
     return { ok: false, error: "match_not_found" };
   }
 
+  const effectiveTeams = await getEffectiveRoundOf32TeamIds(match);
+  const effectiveHomeTeamId = effectiveTeams.homeTeamId;
+  const effectiveAwayTeamId = effectiveTeams.awayTeamId;
+
   const hasBothScores = homeScore !== null && awayScore !== null;
   const knockout = isKnockoutStage(match.stage);
   const isDraw = hasBothScores && homeScore === awayScore;
@@ -436,15 +526,15 @@ export async function saveResultInlineAction(input: {
   if (hasBothScores) {
     if (knockout) {
       if (homeScore > awayScore) {
-        storedWinnerTeamId = match.home_team_id;
+        storedWinnerTeamId = effectiveHomeTeamId;
         isFinished = true;
       } else if (homeScore < awayScore) {
-        storedWinnerTeamId = match.away_team_id;
+        storedWinnerTeamId = effectiveAwayTeamId;
         isFinished = true;
       } else if (isDraw) {
         const validWinner =
-          winnerTeamId === match.home_team_id ||
-          winnerTeamId === match.away_team_id;
+          winnerTeamId === effectiveHomeTeamId ||
+          winnerTeamId === effectiveAwayTeamId;
         if (validWinner) {
           storedWinnerTeamId = winnerTeamId;
           isFinished = true;
@@ -459,16 +549,28 @@ export async function saveResultInlineAction(input: {
     }
   }
 
+  const shouldPersistInferredTeams =
+    match.stage === "round_of_32" &&
+    Boolean(effectiveHomeTeamId && effectiveAwayTeamId);
+
   const { error } = await supabaseAdmin
     .from("matches")
     .update({
+      home_team_id: shouldPersistInferredTeams
+        ? (match.home_team_id ?? effectiveHomeTeamId)
+        : undefined,
+      away_team_id: shouldPersistInferredTeams
+        ? (match.away_team_id ?? effectiveAwayTeamId)
+        : undefined,
+      home_placeholder: shouldPersistInferredTeams ? null : undefined,
+      away_placeholder: shouldPersistInferredTeams ? null : undefined,
+      is_open_for_predictions: shouldPersistInferredTeams ? true : undefined,
       home_score: homeScore,
       away_score: awayScore,
       winner_team_id: knockout ? storedWinnerTeamId : null,
       provisional_home_score: isFinished ? null : undefined,
       provisional_away_score: isFinished ? null : undefined,
       provisional_winner_team_id: isFinished ? null : undefined,
-      provisional_submitted_by_name: isFinished ? null : undefined,
       provisional_updated_at: isFinished ? null : undefined,
       is_finished: isFinished,
       updated_at: new Date().toISOString(),
@@ -482,8 +584,8 @@ export async function saveResultInlineAction(input: {
   if (knockout) {
     await propagateKnockoutTeams({
       sourceMatchNumber: match.match_number,
-      homeTeamId: match.home_team_id,
-      awayTeamId: match.away_team_id,
+      homeTeamId: effectiveHomeTeamId,
+      awayTeamId: effectiveAwayTeamId,
       winnerTeamId: isFinished ? storedWinnerTeamId : null,
     });
   }
@@ -495,13 +597,14 @@ export async function saveResultInlineAction(input: {
   return { ok: true, winnerTeamId: storedWinnerTeamId };
 }
 
-
 export async function saveProvisionalResultInlineAction(input: {
   matchId: string;
   homeScore: number | null;
   awayScore: number | null;
   winnerTeamId?: string | null;
-}): Promise<{ ok: true; winnerTeamId?: string | null } | { ok: false; error: string }> {
+}): Promise<
+  { ok: true; winnerTeamId?: string | null } | { ok: false; error: string }
+> {
   const user = await requireUser();
 
   if (!user.is_admin && !user.can_submit_results) {
@@ -510,7 +613,8 @@ export async function saveProvisionalResultInlineAction(input: {
 
   const { matchId, homeScore, awayScore } = input;
   const winnerTeamId = input.winnerTeamId ?? null;
-  const scoreIsValid = (score: number | null) => score === null || (Number.isInteger(score) && score >= 0);
+  const scoreIsValid = (score: number | null) =>
+    score === null || (Number.isInteger(score) && score >= 0);
 
   if (!matchId || !scoreIsValid(homeScore) || !scoreIsValid(awayScore)) {
     return { ok: false, error: "invalid_result" };
@@ -518,7 +622,9 @@ export async function saveProvisionalResultInlineAction(input: {
 
   const { data: match } = await supabaseAdmin
     .from("matches")
-    .select("id, kickoff_time, stage, home_team_id, away_team_id, home_score, away_score, winner_team_id")
+    .select(
+      "id, kickoff_time, stage, home_team_id, away_team_id, home_score, away_score, winner_team_id",
+    )
     .eq("id", matchId)
     .single();
 
@@ -526,11 +632,18 @@ export async function saveProvisionalResultInlineAction(input: {
     return { ok: false, error: "match_not_found" };
   }
 
-  const hasOfficialResult = match.home_score !== null && match.away_score !== null;
+  const hasOfficialResult =
+    match.home_score !== null && match.away_score !== null;
   const knockout = isKnockoutStage(match.stage);
-  const provisionalOpenAt = new Date(new Date(match.kickoff_time).getTime() + 105 * 60 * 1000);
+  const provisionalOpenAt = new Date(
+    new Date(match.kickoff_time).getTime() + 105 * 60 * 1000,
+  );
 
-  if (hasOfficialResult || knockout || Date.now() < provisionalOpenAt.getTime()) {
+  if (
+    hasOfficialResult ||
+    knockout ||
+    Date.now() < provisionalOpenAt.getTime()
+  ) {
     return { ok: false, error: "locked" };
   }
 
@@ -540,7 +653,11 @@ export async function saveProvisionalResultInlineAction(input: {
   if (hasBothScores && knockout) {
     if (homeScore > awayScore) storedWinnerTeamId = match.home_team_id;
     else if (homeScore < awayScore) storedWinnerTeamId = match.away_team_id;
-    else if (winnerTeamId === match.home_team_id || winnerTeamId === match.away_team_id) storedWinnerTeamId = winnerTeamId;
+    else if (
+      winnerTeamId === match.home_team_id ||
+      winnerTeamId === match.away_team_id
+    )
+      storedWinnerTeamId = winnerTeamId;
   }
 
   const { error } = await supabaseAdmin
@@ -549,7 +666,6 @@ export async function saveProvisionalResultInlineAction(input: {
       provisional_home_score: homeScore,
       provisional_away_score: awayScore,
       provisional_winner_team_id: knockout ? storedWinnerTeamId : null,
-      provisional_submitted_by_name: user.username,
       provisional_updated_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
@@ -588,24 +704,25 @@ export async function updateKnockoutTeamsAction(formData: FormData) {
   redirect("/admin?saved=1");
 }
 
-const ROUND_OF_32_PLACEHOLDERS: Record<number, { home: string; away: string }> = {
-  73: { home: "Zweiter Gruppe A", away: "Zweiter Gruppe B" },
-  74: { home: "Erster Gruppe E", away: "Dritter Gruppe A/B/C/D/F" },
-  75: { home: "Erster Gruppe F", away: "Zweiter Gruppe C" },
-  76: { home: "Erster Gruppe C", away: "Zweiter Gruppe F" },
-  77: { home: "Erster Gruppe I", away: "Dritter Gruppe C/D/F/G/H" },
-  78: { home: "Zweiter Gruppe E", away: "Zweiter Gruppe I" },
-  79: { home: "Erster Gruppe A", away: "Dritter Gruppe C/E/F/H/I" },
-  80: { home: "Erster Gruppe L", away: "Dritter Gruppe E/H/I/J/K" },
-  81: { home: "Erster Gruppe D", away: "Dritter Gruppe B/E/F/I/J" },
-  82: { home: "Erster Gruppe G", away: "Dritter Gruppe A/E/H/I/J" },
-  83: { home: "Zweiter Gruppe K", away: "Zweiter Gruppe L" },
-  84: { home: "Erster Gruppe H", away: "Zweiter Gruppe J" },
-  85: { home: "Erster Gruppe B", away: "Dritter Gruppe E/F/G/I/J" },
-  86: { home: "Erster Gruppe J", away: "Zweiter Gruppe H" },
-  87: { home: "Erster Gruppe K", away: "Dritter Gruppe D/E/I/J/L" },
-  88: { home: "Zweiter Gruppe D", away: "Zweiter Gruppe G" },
-};
+const ROUND_OF_32_PLACEHOLDERS: Record<number, { home: string; away: string }> =
+  {
+    73: { home: "Zweiter Gruppe A", away: "Zweiter Gruppe B" },
+    74: { home: "Erster Gruppe E", away: "Dritter Gruppe A/B/C/D/F" },
+    75: { home: "Erster Gruppe F", away: "Zweiter Gruppe C" },
+    76: { home: "Erster Gruppe C", away: "Zweiter Gruppe F" },
+    77: { home: "Erster Gruppe I", away: "Dritter Gruppe C/D/F/G/H" },
+    78: { home: "Zweiter Gruppe E", away: "Zweiter Gruppe I" },
+    79: { home: "Erster Gruppe A", away: "Dritter Gruppe C/E/F/H/I" },
+    80: { home: "Erster Gruppe L", away: "Dritter Gruppe E/H/I/J/K" },
+    81: { home: "Erster Gruppe D", away: "Dritter Gruppe B/E/F/I/J" },
+    82: { home: "Erster Gruppe G", away: "Dritter Gruppe A/E/H/I/J" },
+    83: { home: "Zweiter Gruppe K", away: "Zweiter Gruppe L" },
+    84: { home: "Erster Gruppe H", away: "Zweiter Gruppe J" },
+    85: { home: "Erster Gruppe B", away: "Dritter Gruppe E/F/G/I/J" },
+    86: { home: "Erster Gruppe J", away: "Zweiter Gruppe H" },
+    87: { home: "Erster Gruppe K", away: "Dritter Gruppe D/E/I/J/L" },
+    88: { home: "Zweiter Gruppe D", away: "Zweiter Gruppe G" },
+  };
 
 function getRoundOf32Placeholder(matchNumber: number, side: "home" | "away") {
   const placeholders = ROUND_OF_32_PLACEHOLDERS[matchNumber];
@@ -735,7 +852,6 @@ export async function deleteProfileAction(formData: FormData) {
   revalidatePath("/ranking");
   redirect("/players?user_deleted=1");
 }
-
 
 export async function toggleResultSubmitterAction(formData: FormData) {
   await requireAdmin();
@@ -897,36 +1013,38 @@ export async function saveOptimizerOddsInlineAction(input: {
   await requireAdmin();
 
   if (!input.matchId) {
-    return { ok: false, error: 'missing_match' };
+    return { ok: false, error: "missing_match" };
   }
 
-  const { error } = await supabaseAdmin.from('tip_optimizer_inputs').upsert(
+  const { error } = await supabaseAdmin.from("tip_optimizer_inputs").upsert(
     {
       match_id: input.matchId,
       odds_text: input.oddsText,
-      probabilities_text: input.probabilitiesText ?? '',
+      probabilities_text: input.probabilitiesText ?? "",
       max_goals: input.maxGoals ?? 7,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: 'match_id' },
+    { onConflict: "match_id" },
   );
 
   if (error) {
-    return { ok: false, error: 'optimizer_save_failed' };
+    return { ok: false, error: "optimizer_save_failed" };
   }
 
   const sourceBlendWeight = input.sourceBlendWeight ?? 0.5;
-  const { error: settingsError } = await supabaseAdmin.from('tip_optimizer_settings').upsert(
-    {
-      id: 1,
-      source_blend_weight: Math.max(0, Math.min(1, sourceBlendWeight)),
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'id' },
-  );
+  const { error: settingsError } = await supabaseAdmin
+    .from("tip_optimizer_settings")
+    .upsert(
+      {
+        id: 1,
+        source_blend_weight: Math.max(0, Math.min(1, sourceBlendWeight)),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" },
+    );
 
   if (settingsError) {
-    return { ok: false, error: 'optimizer_settings_save_failed' };
+    return { ok: false, error: "optimizer_settings_save_failed" };
   }
 
   return { ok: true };
