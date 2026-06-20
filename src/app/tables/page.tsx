@@ -28,6 +28,9 @@ type StandingRow = {
   status: StandingStatus;
 };
 
+type SimulatedScore = { home: number; away: number };
+type SimulatedScoreMap = Map<string, SimulatedScore>;
+
 const BRACKET_STAGES: Stage[] = ['round_of_32', 'round_of_16', 'quarter_final', 'semi_final', 'final'];
 
 function teamName(match: MatchWithTeams, side: 'home' | 'away') {
@@ -35,11 +38,15 @@ function teamName(match: MatchWithTeams, side: 'home' | 'away') {
   return match.away_team?.name ?? match.away_placeholder ?? 'Offen';
 }
 
-function resultHomeScore(match: MatchWithTeams): number | null {
+function resultHomeScore(match: MatchWithTeams, simulatedScores?: SimulatedScoreMap): number | null {
+  const simulatedScore = simulatedScores?.get(match.id);
+  if (simulatedScore) return simulatedScore.home;
   return match.home_score ?? match.provisional_home_score ?? null;
 }
 
-function resultAwayScore(match: MatchWithTeams): number | null {
+function resultAwayScore(match: MatchWithTeams, simulatedScores?: SimulatedScoreMap): number | null {
+  const simulatedScore = simulatedScores?.get(match.id);
+  if (simulatedScore) return simulatedScore.away;
   return match.away_score ?? match.provisional_away_score ?? null;
 }
 
@@ -47,8 +54,8 @@ function resultWinnerTeamId(match: MatchWithTeams): string | null {
   return match.winner_team_id ?? match.provisional_winner_team_id ?? null;
 }
 
-function hasResult(match: MatchWithTeams) {
-  return resultHomeScore(match) !== null && resultAwayScore(match) !== null;
+function hasResult(match: MatchWithTeams, simulatedScores?: SimulatedScoreMap) {
+  return resultHomeScore(match, simulatedScores) !== null && resultAwayScore(match, simulatedScores) !== null;
 }
 
 function matchIsFinishedForTables(match: MatchWithTeams) {
@@ -82,11 +89,7 @@ function emptyStanding(team: Team): StandingRow {
   };
 }
 
-function applyMatchToRows(match: MatchWithTeams, home: StandingRow, away: StandingRow) {
-  const homeScore = resultHomeScore(match);
-  const awayScore = resultAwayScore(match);
-  if (homeScore === null || awayScore === null) return;
-
+function applyScoreToRows(home: StandingRow, away: StandingRow, homeScore: number, awayScore: number) {
   home.played += 1;
   away.played += 1;
   home.goalsFor += homeScore;
@@ -113,28 +116,41 @@ function applyMatchToRows(match: MatchWithTeams, home: StandingRow, away: Standi
   away.goalDifference = away.goalsFor - away.goalsAgainst;
 }
 
+function applyMatchToRows(
+  match: MatchWithTeams,
+  home: StandingRow,
+  away: StandingRow,
+  simulatedScores?: SimulatedScoreMap,
+) {
+  const homeScore = resultHomeScore(match, simulatedScores);
+  const awayScore = resultAwayScore(match, simulatedScores);
+  if (homeScore === null || awayScore === null) return;
+
+  applyScoreToRows(home, away, homeScore, awayScore);
+}
+
 function fifaRankValue(team: Team) {
   return getFifaRanking(team.name)?.rank ?? 999;
 }
 
-function buildMiniTable(rows: StandingRow[], matches: MatchWithTeams[]) {
+function buildMiniTable(rows: StandingRow[], matches: MatchWithTeams[], simulatedScores?: SimulatedScoreMap) {
   const tiedIds = new Set(rows.map((row) => row.team.id));
   const miniRows = new Map(rows.map((row) => [row.team.id, emptyStanding(row.team)]));
 
   for (const match of matches) {
-    if (!match.home_team || !match.away_team || !hasResult(match)) continue;
+    if (!match.home_team || !match.away_team || !hasResult(match, simulatedScores)) continue;
     if (!tiedIds.has(match.home_team.id) || !tiedIds.has(match.away_team.id)) continue;
 
     const home = miniRows.get(match.home_team.id);
     const away = miniRows.get(match.away_team.id);
     if (!home || !away) continue;
-    applyMatchToRows(match, home, away);
+    applyMatchToRows(match, home, away, simulatedScores);
   }
 
   return miniRows;
 }
 
-function sortStandingRows(rows: StandingRow[], groupMatches: MatchWithTeams[]) {
+function sortStandingRows(rows: StandingRow[], groupMatches: MatchWithTeams[], simulatedScores?: SimulatedScoreMap) {
   const pointBuckets = new Map<number, StandingRow[]>();
   for (const row of rows) {
     if (!pointBuckets.has(row.points)) pointBuckets.set(row.points, []);
@@ -144,7 +160,7 @@ function sortStandingRows(rows: StandingRow[], groupMatches: MatchWithTeams[]) {
   return Array.from(pointBuckets.entries())
     .sort(([pointsA], [pointsB]) => pointsB - pointsA)
     .flatMap(([, bucket]) => {
-      const miniTable = bucket.length > 1 ? buildMiniTable(bucket, groupMatches) : null;
+      const miniTable = bucket.length > 1 ? buildMiniTable(bucket, groupMatches, simulatedScores) : null;
 
       return [...bucket].sort((a, b) => {
         if (miniTable) {
@@ -167,40 +183,77 @@ function sortStandingRows(rows: StandingRow[], groupMatches: MatchWithTeams[]) {
     });
 }
 
-function remainingMatchesForTeam(teamId: string, groupMatches: MatchWithTeams[]) {
-  return groupMatches.filter(
-    (match) =>
-      !hasResult(match) &&
-      (match.home_team_id === teamId || match.away_team_id === teamId),
-  ).length;
+function buildRowsForGroup(teams: Team[], groupMatches: MatchWithTeams[], simulatedScores?: SimulatedScoreMap) {
+  const rows = new Map(teams.map((team) => [team.id, emptyStanding(team)]));
+
+  for (const match of groupMatches) {
+    if (!match.home_team || !match.away_team || !hasResult(match, simulatedScores)) continue;
+
+    const home = rows.get(match.home_team.id);
+    const away = rows.get(match.away_team.id);
+    if (!home || !away) continue;
+
+    applyMatchToRows(match, home, away, simulatedScores);
+  }
+
+  return Array.from(rows.values());
+}
+
+function buildExtremeScoreScenarios(groupMatches: MatchWithTeams[]) {
+  const openMatches = groupMatches.filter(
+    (match) => !hasResult(match) && match.home_team_id && match.away_team_id,
+  );
+
+  return openMatches.reduce<SimulatedScoreMap[]>((scenarios, match) => {
+    const nextScenarios: SimulatedScoreMap[] = [];
+
+    for (const scenario of scenarios) {
+      const homeWins = new Map(scenario);
+      homeWins.set(match.id, { home: 100, away: 0 });
+      nextScenarios.push(homeWins);
+
+      const awayWins = new Map(scenario);
+      awayWins.set(match.id, { home: 0, away: 100 });
+      nextScenarios.push(awayWins);
+    }
+
+    return nextScenarios;
+  }, [new Map<string, SimulatedScore>()]);
+}
+
+function calculatePossibleRanks(teams: Team[], groupMatches: MatchWithTeams[]) {
+  const possibleRanks = new Map(teams.map((team) => [team.id, new Set<number>()]));
+  const scenarios = buildExtremeScoreScenarios(groupMatches);
+
+  for (const scenario of scenarios) {
+    const scenarioRows = buildRowsForGroup(teams, groupMatches, scenario);
+    const sortedRows = sortStandingRows(scenarioRows, groupMatches, scenario);
+
+    sortedRows.forEach((row, index) => {
+      possibleRanks.get(row.team.id)?.add(index + 1);
+    });
+  }
+
+  return possibleRanks;
 }
 
 function markStandingStatuses(rows: StandingRow[], groupMatches: MatchWithTeams[]) {
-  const totalMatches = groupMatches.length;
-  const finishedMatches = groupMatches.filter(hasResult).length;
-  const groupComplete = totalMatches > 0 && finishedMatches === totalMatches;
-
-  if (groupComplete) {
-    return rows.map((row, index) => ({
-      ...row,
-      status: index < 2 ? 'qualified' : index === rows.length - 1 ? 'eliminated' : 'open',
-    }));
-  }
+  const teams = rows.map((row) => row.team);
+  const possibleRanks = calculatePossibleRanks(teams, groupMatches);
 
   return rows.map((row) => {
-    const maxPoints = row.points + 3 * remainingMatchesForTeam(row.team.id, groupMatches);
-    const teamsThatCanStillReachThisTeam = rows.filter(
-      (other) => other.team.id !== row.team.id && other.points + 3 * remainingMatchesForTeam(other.team.id, groupMatches) >= row.points,
-    ).length;
-    const teamsAlreadyOutOfReach = rows.filter(
-      (other) => other.team.id !== row.team.id && other.points > maxPoints,
-    ).length;
+    const ranks = possibleRanks.get(row.team.id);
+    if (!ranks || ranks.size === 0) return { ...row, status: 'open' as StandingStatus };
 
-    if (teamsThatCanStillReachThisTeam <= 1) {
+    const rankValues = Array.from(ranks);
+    const minRank = Math.min(...rankValues);
+    const maxRank = Math.max(...rankValues);
+
+    if (maxRank <= 2) {
       return { ...row, status: 'qualified' as StandingStatus };
     }
 
-    if (teamsAlreadyOutOfReach >= 3) {
+    if (minRank >= 4) {
       return { ...row, status: 'eliminated' as StandingStatus };
     }
 
