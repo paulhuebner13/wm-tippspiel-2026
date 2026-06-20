@@ -1,16 +1,19 @@
 import { BracketAutoScroll } from '@/components/BracketAutoScroll';
 import { Flag } from '@/components/Flag';
 import { Nav } from '@/components/Nav';
-import { LocalDateTime } from '@/components/LocalDateTime';
 import { getStageLabel } from '@/lib/scoring';
+import { getFifaRanking } from '@/lib/fifaRankings';
 import { requireUser } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { formatKickoff } from '@/lib/time';
 import type { Match, Stage, Team } from '@/lib/types';
 
 type MatchWithTeams = Match & {
   home_team?: Team | null;
   away_team?: Team | null;
 };
+
+type StandingStatus = 'qualified' | 'eliminated' | 'open';
 
 type StandingRow = {
   team: Team;
@@ -22,6 +25,7 @@ type StandingRow = {
   goalsFor: number;
   goalsAgainst: number;
   goalDifference: number;
+  status: StandingStatus;
 };
 
 const BRACKET_STAGES: Stage[] = ['round_of_32', 'round_of_16', 'quarter_final', 'semi_final', 'final'];
@@ -31,17 +35,33 @@ function teamName(match: MatchWithTeams, side: 'home' | 'away') {
   return match.away_team?.name ?? match.away_placeholder ?? 'Offen';
 }
 
+function resultHomeScore(match: MatchWithTeams): number | null {
+  return match.home_score ?? match.provisional_home_score ?? null;
+}
+
+function resultAwayScore(match: MatchWithTeams): number | null {
+  return match.away_score ?? match.provisional_away_score ?? null;
+}
+
+function resultWinnerTeamId(match: MatchWithTeams): string | null {
+  return match.winner_team_id ?? match.provisional_winner_team_id ?? null;
+}
+
 function hasResult(match: MatchWithTeams) {
-  return match.home_score !== null && match.away_score !== null && match.is_finished;
+  return resultHomeScore(match) !== null && resultAwayScore(match) !== null;
+}
+
+function matchIsFinishedForTables(match: MatchWithTeams) {
+  return match.is_finished || hasResult(match);
 }
 
 function getCurrentStage(matches: MatchWithTeams[]): Stage | 'group' {
   const groupMatches = matches.filter((match) => match.stage === 'group');
-  if (groupMatches.some((match) => !match.is_finished)) return 'group';
+  if (groupMatches.some((match) => !matchIsFinishedForTables(match))) return 'group';
 
   for (const stage of BRACKET_STAGES) {
     const stageMatches = matches.filter((match) => match.stage === stage);
-    if (stageMatches.some((match) => !match.is_finished)) return stage;
+    if (stageMatches.some((match) => !matchIsFinishedForTables(match))) return stage;
   }
 
   return 'final';
@@ -58,7 +78,134 @@ function emptyStanding(team: Team): StandingRow {
     goalsFor: 0,
     goalsAgainst: 0,
     goalDifference: 0,
+    status: 'open',
   };
+}
+
+function applyMatchToRows(match: MatchWithTeams, home: StandingRow, away: StandingRow) {
+  const homeScore = resultHomeScore(match);
+  const awayScore = resultAwayScore(match);
+  if (homeScore === null || awayScore === null) return;
+
+  home.played += 1;
+  away.played += 1;
+  home.goalsFor += homeScore;
+  home.goalsAgainst += awayScore;
+  away.goalsFor += awayScore;
+  away.goalsAgainst += homeScore;
+
+  if (homeScore > awayScore) {
+    home.won += 1;
+    away.lost += 1;
+    home.points += 3;
+  } else if (homeScore < awayScore) {
+    away.won += 1;
+    home.lost += 1;
+    away.points += 3;
+  } else {
+    home.drawn += 1;
+    away.drawn += 1;
+    home.points += 1;
+    away.points += 1;
+  }
+
+  home.goalDifference = home.goalsFor - home.goalsAgainst;
+  away.goalDifference = away.goalsFor - away.goalsAgainst;
+}
+
+function fifaRankValue(team: Team) {
+  return getFifaRanking(team.name)?.rank ?? 999;
+}
+
+function buildMiniTable(rows: StandingRow[], matches: MatchWithTeams[]) {
+  const tiedIds = new Set(rows.map((row) => row.team.id));
+  const miniRows = new Map(rows.map((row) => [row.team.id, emptyStanding(row.team)]));
+
+  for (const match of matches) {
+    if (!match.home_team || !match.away_team || !hasResult(match)) continue;
+    if (!tiedIds.has(match.home_team.id) || !tiedIds.has(match.away_team.id)) continue;
+
+    const home = miniRows.get(match.home_team.id);
+    const away = miniRows.get(match.away_team.id);
+    if (!home || !away) continue;
+    applyMatchToRows(match, home, away);
+  }
+
+  return miniRows;
+}
+
+function sortStandingRows(rows: StandingRow[], groupMatches: MatchWithTeams[]) {
+  const pointBuckets = new Map<number, StandingRow[]>();
+  for (const row of rows) {
+    if (!pointBuckets.has(row.points)) pointBuckets.set(row.points, []);
+    pointBuckets.get(row.points)?.push(row);
+  }
+
+  return Array.from(pointBuckets.entries())
+    .sort(([pointsA], [pointsB]) => pointsB - pointsA)
+    .flatMap(([, bucket]) => {
+      const miniTable = bucket.length > 1 ? buildMiniTable(bucket, groupMatches) : null;
+
+      return [...bucket].sort((a, b) => {
+        if (miniTable) {
+          const miniA = miniTable.get(a.team.id);
+          const miniB = miniTable.get(b.team.id);
+          if (miniA && miniB) {
+            if (miniB.points !== miniA.points) return miniB.points - miniA.points;
+            if (miniB.goalDifference !== miniA.goalDifference) return miniB.goalDifference - miniA.goalDifference;
+            if (miniB.goalsFor !== miniA.goalsFor) return miniB.goalsFor - miniA.goalsFor;
+          }
+        }
+
+        if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
+        if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
+        const rankA = fifaRankValue(a.team);
+        const rankB = fifaRankValue(b.team);
+        if (rankA !== rankB) return rankA - rankB;
+        return a.team.name.localeCompare(b.team.name, 'de-AT');
+      });
+    });
+}
+
+function remainingMatchesForTeam(teamId: string, groupMatches: MatchWithTeams[]) {
+  return groupMatches.filter(
+    (match) =>
+      !hasResult(match) &&
+      (match.home_team_id === teamId || match.away_team_id === teamId),
+  ).length;
+}
+
+function markStandingStatuses(rows: StandingRow[], groupMatches: MatchWithTeams[]) {
+  const totalMatches = groupMatches.length;
+  const finishedMatches = groupMatches.filter(hasResult).length;
+  const groupComplete = totalMatches > 0 && finishedMatches === totalMatches;
+
+  if (groupComplete) {
+    return rows.map((row, index) => ({
+      ...row,
+      status: index < 2 ? 'qualified' : index === rows.length - 1 ? 'eliminated' : 'open',
+    }));
+  }
+
+  return rows.map((row) => {
+    const maxPoints = row.points + 3 * remainingMatchesForTeam(row.team.id, groupMatches);
+    const teamsThatCanStillReachThisTeam = rows.filter(
+      (other) => other.team.id !== row.team.id && other.points + 3 * remainingMatchesForTeam(other.team.id, groupMatches) >= row.points,
+    ).length;
+    const teamsAlreadyOutOfReach = rows.filter(
+      (other) => other.team.id !== row.team.id && other.points > maxPoints,
+    ).length;
+
+    if (teamsThatCanStillReachThisTeam <= 1) {
+      return { ...row, status: 'qualified' as StandingStatus };
+    }
+
+    if (teamsAlreadyOutOfReach >= 3) {
+      return { ...row, status: 'eliminated' as StandingStatus };
+    }
+
+    return { ...row, status: 'open' as StandingStatus };
+  });
 }
 
 function buildStandings(teams: Team[], matches: MatchWithTeams[]) {
@@ -79,51 +226,28 @@ function buildStandings(teams: Team[], matches: MatchWithTeams[]) {
     const group = groups.get(groupName);
     const home = group?.get(match.home_team.id);
     const away = group?.get(match.away_team.id);
-    if (!home || !away || match.home_score === null || match.away_score === null) continue;
+    if (!home || !away) continue;
 
-    home.played += 1;
-    away.played += 1;
-    home.goalsFor += match.home_score;
-    home.goalsAgainst += match.away_score;
-    away.goalsFor += match.away_score;
-    away.goalsAgainst += match.home_score;
-
-    if (match.home_score > match.away_score) {
-      home.won += 1;
-      away.lost += 1;
-      home.points += 3;
-    } else if (match.home_score < match.away_score) {
-      away.won += 1;
-      home.lost += 1;
-      away.points += 3;
-    } else {
-      home.drawn += 1;
-      away.drawn += 1;
-      home.points += 1;
-      away.points += 1;
-    }
-
-    home.goalDifference = home.goalsFor - home.goalsAgainst;
-    away.goalDifference = away.goalsFor - away.goalsAgainst;
+    applyMatchToRows(match, home, away);
   }
 
   return Array.from(groups.entries())
     .sort(([a], [b]) => a.localeCompare(b, 'de-AT'))
-    .map(([groupName, rows]) => ({
-      groupName,
-      rows: Array.from(rows.values()).sort((a, b) => {
-        if (b.points !== a.points) return b.points - a.points;
-        if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
-        if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
-        return a.team.name.localeCompare(b.team.name, 'de-AT');
-      }),
-    }));
+    .map(([groupName, rows]) => {
+      const groupMatches = matches.filter((match) => match.stage === 'group' && match.group_name === groupName);
+      const sortedRows = sortStandingRows(Array.from(rows.values()), groupMatches);
+
+      return {
+        groupName,
+        rows: markStandingStatuses(sortedRows, groupMatches),
+      };
+    });
 }
 
 function BracketTeam({ match, side }: { match: MatchWithTeams; side: 'home' | 'away' }) {
   const team = side === 'home' ? match.home_team : match.away_team;
-  const score = side === 'home' ? match.home_score : match.away_score;
-  const won = match.winner_team_id && team?.id === match.winner_team_id;
+  const score = side === 'home' ? resultHomeScore(match) : resultAwayScore(match);
+  const won = resultWinnerTeamId(match) && team?.id === resultWinnerTeamId(match);
 
   return (
     <div className={`bracketTeam ${won ? 'bracketTeamWinner' : ''}`}>
@@ -139,7 +263,7 @@ function BracketMatch({ match, displayNumber }: { match: MatchWithTeams; display
     <article className={`bracketMatch ${hasResult(match) ? 'bracketMatchDone' : ''}`}>
       <div className="bracketMatchMeta">
         <span>Spiel {displayNumber}</span>
-        <span><LocalDateTime value={match.kickoff_time} /></span>
+        <span>{formatKickoff(match.kickoff_time)}</span>
       </div>
       <BracketTeam match={match} side="home" />
       <BracketTeam match={match} side="away" />
@@ -204,7 +328,10 @@ export default async function TablesPage() {
                   </thead>
                   <tbody>
                     {group.rows.map((row) => (
-                      <tr key={row.team.id}>
+                      <tr
+                        className={row.status === 'qualified' ? 'standingQualified' : row.status === 'eliminated' ? 'standingEliminated' : undefined}
+                        key={row.team.id}
+                      >
                         <td>
                           <span className="standingTeam">
                             <Flag team={row.team} />

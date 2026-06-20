@@ -4458,57 +4458,26 @@ html[data-theme='dark'] .predictionOverviewRowSelf > span:first-child {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  min-width: 42px;
+  width: 26px;
+  min-width: 26px;
 }
 
-.predictionOverviewTipFlag .flagFrame,
-.predictionOverviewTipFlag .flagPlaceholder {
-  width: 38px;
-  min-width: 38px;
-  height: 24px;
-  flex: 0 0 38px;
-}
-
-.predictionOverviewTipFlag .flagImage {
-  width: auto;
-  height: auto;
-  max-width: 38px;
-  max-height: 24px;
-  object-fit: contain;
-}
-
-.predictionOverviewTipFlag .drawFlagMini {
-  flex: 0 0 38px;
+.predictionOverviewTipFlag .flag,
+.predictionOverviewTipFlag img {
+  width: 24px;
+  height: 18px;
+  object-fit: cover;
 }
 
 .predictionOverviewRowUnlocked .predictionStatusNoTipUnlocked {
-  grid-column: 2;
   justify-self: center;
   text-align: center;
   white-space: nowrap;
 }
 
 .predictionOverviewRowUnlocked .otherPredictionPoints {
-  grid-column: 3;
   justify-self: end;
   white-space: nowrap;
-}
-
-.predictionOverviewRowSelf > span:first-child {
-  font-weight: 400;
-}
-
-@media (max-width: 520px) {
-  .predictionOverviewRowUnlocked {
-    grid-template-columns: minmax(0, 1fr) minmax(108px, 120px) minmax(66px, 82px) !important;
-  }
-
-  .predictionOverviewRowUnlocked .predictionStatusNoTipUnlocked {
-    font-size: 10px;
-    padding: 5px 6px;
-    line-height: 1;
-  }
 }
 
 .adminResultProvisionalPurple {
@@ -4517,38 +4486,9 @@ html[data-theme='dark'] .predictionOverviewRowSelf > span:first-child {
   background: color-mix(in srgb, #a855f7 6%, var(--card));
 }
 
-.adminResultSubmitterOpenBlue {
-  border-color: #2563eb !important;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.16), var(--shadow);
-  background: color-mix(in srgb, #2563eb 5%, var(--card));
-}
-
-html[data-theme='dark'] .adminResultSubmitterOpenBlue {
-  border-color: #60a5fa !important;
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2), var(--shadow);
-  background: color-mix(in srgb, #60a5fa 8%, var(--card));
-}
-
-.adminResultCard[data-current-match='true'].adminResultSubmitterOpenBlue {
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.18), var(--shadow);
-}
-
 .adminResultProvisionalPurple input::placeholder {
   color: color-mix(in srgb, #a855f7 72%, var(--muted-foreground));
   opacity: 0.7;
-}
-
-.provisionalResultAttribution {
-  margin-top: -2px;
-  text-align: center;
-  color: var(--muted);
-  font-size: 0.78rem;
-  line-height: 1.35;
-}
-
-.provisionalResultAttribution strong {
-  color: var(--text);
-  font-weight: 850;
 }
 
 .resultSubmitterCard input:disabled {
@@ -4622,4 +4562,29 @@ html[data-theme='dark'] .adminResultSubmitterOpenBlue {
   .resultSubmitterCard .predictionTeam .teamName {
     font-size: 0.9rem;
   }
+}
+
+/* v83: provisional table results and simple qualification status */
+.standingsTable tr.standingQualified td {
+  background: color-mix(in srgb, #16a34a 10%, var(--card));
+}
+
+.standingsTable tr.standingEliminated td {
+  background: color-mix(in srgb, #dc2626 9%, var(--card));
+}
+
+.standingsTable tr.standingQualified td:first-child {
+  border-left: 4px solid #16a34a;
+}
+
+.standingsTable tr.standingEliminated td:first-child {
+  border-left: 4px solid #dc2626;
+}
+
+html[data-theme='dark'] .standingsTable tr.standingQualified td {
+  background: color-mix(in srgb, #22c55e 13%, var(--card));
+}
+
+html[data-theme='dark'] .standingsTable tr.standingEliminated td {
+  background: color-mix(in srgb, #ef4444 12%, var(--card));
 }
