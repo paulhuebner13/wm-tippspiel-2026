@@ -178,6 +178,7 @@ export async function loginAction(formData: FormData) {
     id: profile.id,
     username: profile.username,
     is_admin: profile.is_admin,
+    can_submit_results: profile.can_submit_results,
   });
   redirect("/matches");
 }
@@ -224,6 +225,7 @@ export async function registerAction(formData: FormData) {
     id: profile.id,
     username: profile.username,
     is_admin: profile.is_admin,
+    can_submit_results: profile.can_submit_results,
   });
   redirect("/matches");
 }
@@ -571,6 +573,7 @@ export async function saveResultInlineAction(input: {
       provisional_home_score: isFinished ? null : undefined,
       provisional_away_score: isFinished ? null : undefined,
       provisional_winner_team_id: isFinished ? null : undefined,
+      provisional_submitted_by_name: isFinished ? null : undefined,
       provisional_updated_at: isFinished ? null : undefined,
       is_finished: isFinished,
       updated_at: new Date().toISOString(),
@@ -666,7 +669,8 @@ export async function saveProvisionalResultInlineAction(input: {
       provisional_home_score: homeScore,
       provisional_away_score: awayScore,
       provisional_winner_team_id: knockout ? storedWinnerTeamId : null,
-      provisional_updated_at: new Date().toISOString(),
+      provisional_submitted_by_name: hasBothScores ? user.username : null,
+      provisional_updated_at: hasBothScores ? new Date().toISOString() : null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", matchId);
