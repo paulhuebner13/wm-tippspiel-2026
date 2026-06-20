@@ -23,12 +23,26 @@ function hasAnyVisibleResult(match: Match) {
   );
 }
 
+function provisionalOpenAt(match: Match) {
+  const kickoff = new Date(match.kickoff_time).getTime();
+  if (Number.isNaN(kickoff)) return null;
+  return kickoff + 105 * 60 * 1000;
+}
+
 function provisionalCanOpen(match: Match) {
   if (isKnockoutStage(match.stage)) return false;
   if (match.home_score !== null && match.away_score !== null) return false;
-  const openAt = new Date(match.kickoff_time).getTime() + 105 * 60 * 1000;
-  if (Number.isNaN(openAt)) return false;
+  const openAt = provisionalOpenAt(match);
+  if (openAt === null) return false;
   return Date.now() >= openAt;
+}
+
+function provisionalWillOpenInFuture(match: Match) {
+  if (isKnockoutStage(match.stage)) return false;
+  if (match.home_score !== null && match.away_score !== null) return false;
+  const openAt = provisionalOpenAt(match);
+  if (openAt === null) return false;
+  return Date.now() < openAt;
 }
 
 function hasCompleteResult(match: Match) {
@@ -70,10 +84,11 @@ export default async function AdminPage() {
   );
 
   if (!user.is_admin) {
-    const firstOpenUnenteredMatchId =
-      matches.find(
-        (match) => provisionalCanOpen(match) && !hasAnyVisibleResult(match),
-      )?.id ?? null;
+    const firstEditableMatchId =
+      matches.find((match) => provisionalCanOpen(match))?.id ?? null;
+    const firstFutureEditableMatchId =
+      matches.find((match) => provisionalWillOpenInFuture(match))?.id ?? null;
+    const scrollTargetMatchId = firstEditableMatchId ?? firstFutureEditableMatchId;
 
     return (
       <>
@@ -86,7 +101,7 @@ export default async function AdminPage() {
               <ResultSubmitterCard
                 key={match.id}
                 match={match}
-                current={match.id === firstOpenUnenteredMatchId}
+                current={match.id === scrollTargetMatchId}
               />
             ))}
           </div>
