@@ -8,7 +8,7 @@ import { getVisibleProfilesForUser } from '@/lib/visibility';
 import { calculateTotalPoints, getStageLabel } from '@/lib/scoring';
 import { formatKickoff } from '@/lib/time';
 import { applyFixedTopTwoToMatches } from '@/lib/fixedGroupPlacements';
-import { applySpecialEffectsToMatches, getActiveSpecialEffectGroups } from '@/lib/specialEffects';
+import { applySpecialEffectsToMatches, getUserSpecialEffectActive } from '@/lib/specialEffects';
 import type { Match, Prediction, Profile, Team } from '@/lib/types';
 
 type ResultsPageProps = {
@@ -158,9 +158,9 @@ export default async function ResultsPage({ searchParams }: ResultsPageProps) {
   ]);
 
   const teams = (teamsData ?? []) as Team[];
-  const activeSpecialEffectGroups = await getActiveSpecialEffectGroups();
+  const specialEffectActive = await getUserSpecialEffectActive(user.id);
   const matchesWithFixedTeams = applyFixedTopTwoToMatches((matchesData ?? []) as Match[], teams);
-  const matches = applySpecialEffectsToMatches(matchesWithFixedTeams, activeSpecialEffectGroups);
+  const matches = applySpecialEffectsToMatches(matchesWithFixedTeams, specialEffectActive);
   const predictions = (predictionsData ?? []) as Prediction[];
   const predictionsByKey = new Map(predictions.map((prediction) => [`${prediction.user_id}:${prediction.match_id}`, prediction]));
 

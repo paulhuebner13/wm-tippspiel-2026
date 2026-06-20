@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import type { Match, Team } from "@/lib/types";
 
-export const SPECIAL_EFFECT_TURKEY_FLAG_PATH = '/flags/toeoerken.svg';
+export const SPECIAL_EFFECT_TURKEY_FLAG_PATH = "/flags/toeoerken.svg";
 
 export type MatchWithTeamsForSpecialEffects = Match & {
   home_team?: Team | null;
@@ -23,30 +23,37 @@ function isTurkeyTeam(team: Team | null | undefined) {
   );
 }
 
-export async function getActiveSpecialEffectGroups() {
-  const { data, error } = await supabaseAdmin
-    .from("special_effect_groups")
-    .select("group_name")
-    .eq("active", true);
+export async function getUserSpecialEffectActive(userId: string) {
+  const { data: memberships, error: membershipError } = await supabaseAdmin
+    .from("group_members")
+    .select("group_id")
+    .eq("profile_id", userId);
 
   // The app should still work before the SQL migration has been run.
-  if (error) return new Set<string>();
+  if (membershipError) return false;
 
-  return new Set((data ?? []).map((row) => String(row.group_name)));
-}
+  const groupIds = (memberships ?? [])
+    .map((membership) => String(membership.group_id))
+    .filter(Boolean);
 
-export function hasSpecialEffectForTeam(
-  team: Team | null | undefined,
-  activeGroups: Set<string>,
-) {
-  return Boolean(team?.group_name && activeGroups.has(team.group_name) && isTurkeyTeam(team));
+  if (groupIds.length === 0) return false;
+
+  const { data: activeGroups, error: groupError } = await supabaseAdmin
+    .from("player_groups")
+    .select("id")
+    .in("id", groupIds)
+    .eq("special_effect_active", true)
+    .limit(1);
+
+  if (groupError) return false;
+  return (activeGroups ?? []).length > 0;
 }
 
 export function applySpecialEffectToTeam(
   team: Team | null | undefined,
-  activeGroups: Set<string>,
+  specialEffectActive: boolean,
 ): Team | null | undefined {
-  if (!team || !hasSpecialEffectForTeam(team, activeGroups)) return team;
+  if (!team || !specialEffectActive || !isTurkeyTeam(team)) return team;
 
   return {
     ...team,
@@ -58,18 +65,18 @@ export function applySpecialEffectToTeam(
 
 export function applySpecialEffectsToTeams(
   teams: Team[],
-  activeGroups: Set<string>,
+  specialEffectActive: boolean,
 ) {
-  return teams.map((team) => applySpecialEffectToTeam(team, activeGroups) ?? team);
+  return teams.map((team) => applySpecialEffectToTeam(team, specialEffectActive) ?? team);
 }
 
 export function applySpecialEffectsToMatches<T extends MatchWithTeamsForSpecialEffects>(
   matches: T[],
-  activeGroups: Set<string>,
+  specialEffectActive: boolean,
 ): T[] {
   return matches.map((match) => ({
     ...match,
-    home_team: applySpecialEffectToTeam(match.home_team, activeGroups) ?? null,
-    away_team: applySpecialEffectToTeam(match.away_team, activeGroups) ?? null,
+    home_team: applySpecialEffectToTeam(match.home_team, specialEffectActive) ?? null,
+    away_team: applySpecialEffectToTeam(match.away_team, specialEffectActive) ?? null,
   }));
 }

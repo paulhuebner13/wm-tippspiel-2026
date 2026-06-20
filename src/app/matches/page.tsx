@@ -12,7 +12,7 @@ import { runTipOptimizer } from "@/lib/optimizer";
 import { applyFixedTopTwoToMatches } from "@/lib/fixedGroupPlacements";
 import {
   applySpecialEffectsToMatches,
-  getActiveSpecialEffectGroups,
+  getUserSpecialEffectActive,
 } from "@/lib/specialEffects";
 import type { Match, Prediction, Profile, Team } from "@/lib/types";
 import type {
@@ -222,14 +222,14 @@ export default async function MatchesPage() {
     `);
 
   const teams = (teamsData ?? []) as Team[];
-  const activeSpecialEffectGroups = await getActiveSpecialEffectGroups();
+  const specialEffectActive = await getUserSpecialEffectActive(user.id);
   const matchesWithFixedTeams = applyFixedTopTwoToMatches(
     (matchesData ?? []) as Match[],
     teams,
   );
   const matches = applySpecialEffectsToMatches(
     matchesWithFixedTeams,
-    activeSpecialEffectGroups,
+    specialEffectActive,
   );
   const predictions = ((predictionsData ?? []) as Prediction[]).filter(
     (prediction) =>

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { createGroupAction, updateGroupMembersAction } from '@/app/actions';
+import { createGroupAction, togglePlayerGroupSpecialEffectAction, updateGroupMembersAction } from '@/app/actions';
 import { DeleteGroupForm } from '@/components/DeleteGroupForm';
 import { Nav } from '@/components/Nav';
 import { requireAdmin } from '@/lib/session';
@@ -74,7 +74,23 @@ export default async function GroupsPage({ searchParams }: GroupsPageProps) {
                     <h2>{selectedGroup.name}</h2>
                     <p className="subtle smallSubtle">Alle ausgewählten Spieler sehen sich gegenseitig in Ranking, Ergebnissen und Tipps, sobald diese sichtbar sind.</p>
                   </div>
-                  <DeleteGroupForm groupId={selectedGroup.id} groupName={selectedGroup.name} />
+                  <div className="groupHeaderActions">
+                    <form action={togglePlayerGroupSpecialEffectAction}>
+                      <input type="hidden" name="groupId" value={selectedGroup.id} />
+                      <input
+                        type="hidden"
+                        name="active"
+                        value={selectedGroup.special_effect_active ? 'false' : 'true'}
+                      />
+                      <button
+                        className={`specialEffectButton ${selectedGroup.special_effect_active ? 'specialEffectButtonActive' : ''}`}
+                        type="submit"
+                      >
+                        Special Effect
+                      </button>
+                    </form>
+                    <DeleteGroupForm groupId={selectedGroup.id} groupName={selectedGroup.name} />
+                  </div>
                 </div>
 
                 <form key={selectedGroup.id} action={updateGroupMembersAction} className="groupMembersForm">

@@ -4593,3 +4593,16 @@ html[data-theme='dark'] .predictionOverviewRowSelf > span:first-child {
   background: color-mix(in srgb, #9333ea 12%, var(--card));
   color: #6b21a8;
 }
+
+/* v89: Special effects are controlled on player groups, not World Cup groups. */
+.groupHeaderActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.groupHeaderActions form {
+  margin: 0;
+}

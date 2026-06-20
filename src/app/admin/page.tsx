@@ -9,7 +9,7 @@ import { applyFixedTopTwoToMatches } from "@/lib/fixedGroupPlacements";
 import {
   applySpecialEffectsToMatches,
   applySpecialEffectsToTeams,
-  getActiveSpecialEffectGroups,
+  getUserSpecialEffectActive,
 } from "@/lib/specialEffects";
 import type { Match, Team } from "@/lib/types";
 
@@ -58,15 +58,15 @@ export default async function AdminPage() {
     .order("name", { ascending: true });
 
   const rawTeams = (teamsData ?? []) as Team[];
-  const activeSpecialEffectGroups = await getActiveSpecialEffectGroups();
-  const teams = applySpecialEffectsToTeams(rawTeams, activeSpecialEffectGroups);
+  const specialEffectActive = await getUserSpecialEffectActive(user.id);
+  const teams = applySpecialEffectsToTeams(rawTeams, specialEffectActive);
   const matchesWithFixedTeams = applyFixedTopTwoToMatches(
     (matchesData ?? []) as Match[],
     rawTeams,
   );
   const matches = applySpecialEffectsToMatches(
     matchesWithFixedTeams,
-    activeSpecialEffectGroups,
+    specialEffectActive,
   );
 
   if (!user.is_admin) {

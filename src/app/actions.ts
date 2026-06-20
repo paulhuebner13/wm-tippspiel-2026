@@ -1050,25 +1050,26 @@ export async function saveOptimizerOddsInlineAction(input: {
   return { ok: true };
 }
 
-export async function toggleSpecialEffectGroupAction(formData: FormData) {
+export async function togglePlayerGroupSpecialEffectAction(formData: FormData) {
   await requireAdmin();
 
-  const groupName = String(formData.get("groupName") ?? "").trim();
+  const groupId = String(formData.get("groupId") ?? "").trim();
   const active = String(formData.get("active") ?? "false") === "true";
 
-  if (!/^[A-L]$/.test(groupName)) {
-    revalidatePath("/tables");
+  if (!groupId) {
+    revalidatePath("/groups");
     return;
   }
 
-  await supabaseAdmin.from("special_effect_groups").upsert({
-    group_name: groupName,
-    active,
-    updated_at: new Date().toISOString(),
-  });
+  await supabaseAdmin
+    .from("player_groups")
+    .update({ special_effect_active: active })
+    .eq("id", groupId);
 
+  revalidatePath("/groups");
   revalidatePath("/tables");
   revalidatePath("/matches");
   revalidatePath("/admin");
   revalidatePath("/results");
 }
+
