@@ -4606,3 +4606,33 @@ html[data-theme='dark'] .predictionOverviewRowSelf > span:first-child {
 .groupHeaderActions form {
   margin: 0;
 }
+
+/* v91: restore qualification status colours after player-group special effects patch */
+.standingsTable tr.standingQualified td {
+  background: color-mix(in srgb, #16a34a 10%, var(--card));
+}
+
+.standingsTable tr.standingEliminated td {
+  background: color-mix(in srgb, #dc2626 9%, var(--card));
+}
+
+html[data-theme='dark'] .standingsTable tr.standingQualified td {
+  background: color-mix(in srgb, #22c55e 13%, var(--card));
+}
+
+html[data-theme='dark'] .standingsTable tr.standingEliminated td {
+  background: color-mix(in srgb, #ef4444 12%, var(--card));
+}
+
+.standingsTable tr.standingQualified td:first-child,
+.standingsTable tr.standingEliminated td:first-child {
+  border-left: 0;
+}
+
+.standingsTable tr.standingFixedPosition.standingQualified td:first-child {
+  border-left: 4px solid #16a34a;
+}
+
+.standingsTable tr.standingFixedPosition.standingEliminated td:first-child {
+  border-left: 4px solid #dc2626;
+}
