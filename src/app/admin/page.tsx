@@ -6,6 +6,11 @@ import { requireResultEditor } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { isKnockoutStage } from "@/lib/scoring";
 import { applyFixedTopTwoToMatches } from "@/lib/fixedGroupPlacements";
+import {
+  applySpecialEffectsToMatches,
+  applySpecialEffectsToTeams,
+  getActiveSpecialEffectGroups,
+} from "@/lib/specialEffects";
 import type { Match, Team } from "@/lib/types";
 
 function hasAnyVisibleResult(match: Match) {
@@ -52,10 +57,16 @@ export default async function AdminPage() {
     .select("*")
     .order("name", { ascending: true });
 
-  const teams = (teamsData ?? []) as Team[];
-  const matches = applyFixedTopTwoToMatches(
+  const rawTeams = (teamsData ?? []) as Team[];
+  const activeSpecialEffectGroups = await getActiveSpecialEffectGroups();
+  const teams = applySpecialEffectsToTeams(rawTeams, activeSpecialEffectGroups);
+  const matchesWithFixedTeams = applyFixedTopTwoToMatches(
     (matchesData ?? []) as Match[],
-    teams,
+    rawTeams,
+  );
+  const matches = applySpecialEffectsToMatches(
+    matchesWithFixedTeams,
+    activeSpecialEffectGroups,
   );
 
   if (!user.is_admin) {

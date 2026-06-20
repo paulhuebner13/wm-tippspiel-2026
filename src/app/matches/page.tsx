@@ -10,6 +10,10 @@ import {
 import { isMatchStillRelevant, isPredictionLocked } from "@/lib/time";
 import { runTipOptimizer } from "@/lib/optimizer";
 import { applyFixedTopTwoToMatches } from "@/lib/fixedGroupPlacements";
+import {
+  applySpecialEffectsToMatches,
+  getActiveSpecialEffectGroups,
+} from "@/lib/specialEffects";
 import type { Match, Prediction, Profile, Team } from "@/lib/types";
 import type {
   MatchHistoryEntry,
@@ -218,9 +222,14 @@ export default async function MatchesPage() {
     `);
 
   const teams = (teamsData ?? []) as Team[];
-  const matches = applyFixedTopTwoToMatches(
+  const activeSpecialEffectGroups = await getActiveSpecialEffectGroups();
+  const matchesWithFixedTeams = applyFixedTopTwoToMatches(
     (matchesData ?? []) as Match[],
     teams,
+  );
+  const matches = applySpecialEffectsToMatches(
+    matchesWithFixedTeams,
+    activeSpecialEffectGroups,
   );
   const predictions = ((predictionsData ?? []) as Prediction[]).filter(
     (prediction) =>

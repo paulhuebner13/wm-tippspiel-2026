@@ -1,3 +1,4 @@
+import { toggleSpecialEffectGroupAction } from "@/app/actions";
 import { BracketAutoScroll } from "@/components/BracketAutoScroll";
 import { Flag } from "@/components/Flag";
 import { Nav } from "@/components/Nav";
@@ -6,6 +7,10 @@ import { getFifaRanking } from "@/lib/fifaRankings";
 import { requireUser } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { formatKickoff } from "@/lib/time";
+import {
+  applySpecialEffectToTeam,
+  getActiveSpecialEffectGroups,
+} from "@/lib/specialEffects";
 import type { Match, Stage, Team } from "@/lib/types";
 
 type MatchWithTeams = Match & {
@@ -475,10 +480,12 @@ function BracketTeam({
   match,
   side,
   fixedTopTwoPlacements,
+  activeSpecialEffectGroups,
 }: {
   match: MatchWithTeams;
   side: "home" | "away";
   fixedTopTwoPlacements: FixedGroupPlacementMap;
+  activeSpecialEffectGroups: Set<string>;
 }) {
   const storedTeam = side === "home" ? match.home_team : match.away_team;
   const inferredTeam = getInferredBracketTeam(
@@ -486,14 +493,13 @@ function BracketTeam({
     side,
     fixedTopTwoPlacements,
   );
-  const team = storedTeam ?? inferredTeam;
+  const rawTeam = storedTeam ?? inferredTeam;
+  const team = applySpecialEffectToTeam(rawTeam, activeSpecialEffectGroups);
   const score =
     side === "home" ? resultHomeScore(match) : resultAwayScore(match);
   const won =
-    resultWinnerTeamId(match) && team?.id === resultWinnerTeamId(match);
-  const name = storedTeam
-    ? teamName(match, side)
-    : (inferredTeam?.name ?? teamName(match, side));
+    resultWinnerTeamId(match) && rawTeam?.id === resultWinnerTeamId(match);
+  const name = team?.name ?? teamName(match, side);
 
   return (
     <div className={`bracketTeam ${won ? "bracketTeamWinner" : ""}`}>
@@ -508,10 +514,12 @@ function BracketMatch({
   match,
   displayNumber,
   fixedTopTwoPlacements,
+  activeSpecialEffectGroups,
 }: {
   match: MatchWithTeams;
   displayNumber: number;
   fixedTopTwoPlacements: FixedGroupPlacementMap;
+  activeSpecialEffectGroups: Set<string>;
 }) {
   return (
     <article
@@ -525,11 +533,13 @@ function BracketMatch({
         match={match}
         side="home"
         fixedTopTwoPlacements={fixedTopTwoPlacements}
+        activeSpecialEffectGroups={activeSpecialEffectGroups}
       />
       <BracketTeam
         match={match}
         side="away"
         fixedTopTwoPlacements={fixedTopTwoPlacements}
+        activeSpecialEffectGroups={activeSpecialEffectGroups}
       />
     </article>
   );
@@ -557,6 +567,7 @@ export default async function TablesPage() {
 
   const teams = (teamsData ?? []) as Team[];
   const matches = (matchesData ?? []) as MatchWithTeams[];
+  const activeSpecialEffectGroups = await getActiveSpecialEffectGroups();
   const standings = buildStandings(teams, matches);
   const fixedTopTwoPlacements = calculateFixedTopTwoPlacements(teams, matches);
   const currentStage = getCurrentStage(matches);
@@ -583,7 +594,29 @@ export default async function TablesPage() {
         <section className="tablesGrid">
           {standings.map((group) => (
             <article className="card groupTableCard" key={group.groupName}>
-              <h2>Gruppe {group.groupName}</h2>
+              <div className="groupTableHeader">
+                <h2>Gruppe {group.groupName}</h2>
+                {user.is_admin && (
+                  <form action={toggleSpecialEffectGroupAction}>
+                    <input type="hidden" name="groupName" value={group.groupName} />
+                    <input
+                      type="hidden"
+                      name="active"
+                      value={activeSpecialEffectGroups.has(group.groupName) ? "false" : "true"}
+                    />
+                    <button
+                      className={`specialEffectButton ${
+                        activeSpecialEffectGroups.has(group.groupName)
+                          ? "specialEffectButtonActive"
+                          : ""
+                      }`}
+                      type="submit"
+                    >
+                      Special Effect
+                    </button>
+                  </form>
+                )}
+              </div>
               <div className="standingsTableWrap">
                 <table className="standingsTable">
                   <thead>
@@ -598,15 +631,19 @@ export default async function TablesPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {group.rows.map((row) => (
+                    {group.rows.map((row) => {
+                      const displayTeam =
+                        applySpecialEffectToTeam(row.team, activeSpecialEffectGroups) ?? row.team;
+
+                      return (
                       <tr
                         className={standingStatusClass(row.status)}
                         key={row.team.id}
                       >
                         <td>
                           <span className="standingTeam">
-                            <Flag team={row.team} />
-                            <span>{row.team.name}</span>
+                            <Flag team={displayTeam} />
+                            <span>{displayTeam.name}</span>
                           </span>
                         </td>
                         <td>{row.played}</td>
@@ -620,7 +657,8 @@ export default async function TablesPage() {
                             : row.goalDifference}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -669,6 +707,7 @@ export default async function TablesPage() {
                             displayNumbers.get(match.id) ?? match.match_number
                           }
                           fixedTopTwoPlacements={fixedTopTwoPlacements}
+                          activeSpecialEffectGroups={activeSpecialEffectGroups}
                         />
                       ))}
                     </div>
@@ -690,6 +729,7 @@ export default async function TablesPage() {
                         thirdPlaceMatch.match_number
                       }
                       fixedTopTwoPlacements={fixedTopTwoPlacements}
+                      activeSpecialEffectGroups={activeSpecialEffectGroups}
                     />
                   </div>
                 </section>

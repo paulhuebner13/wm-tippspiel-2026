@@ -2,12 +2,14 @@ import { Nav } from '@/components/Nav';
 import { Flag } from '@/components/Flag';
 import { ResultsAutoScroll } from '@/components/ResultsAutoScroll';
 import { ResultsComparePicker } from '@/components/ResultsComparePicker';
-import { LocalDateTime } from '@/components/LocalDateTime';
 import { requireUser } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getVisibleProfilesForUser } from '@/lib/visibility';
 import { calculateTotalPoints, getStageLabel } from '@/lib/scoring';
-import type { Match, Prediction, Profile } from '@/lib/types';
+import { formatKickoff } from '@/lib/time';
+import { applyFixedTopTwoToMatches } from '@/lib/fixedGroupPlacements';
+import { applySpecialEffectsToMatches, getActiveSpecialEffectGroups } from '@/lib/specialEffects';
+import type { Match, Prediction, Profile, Team } from '@/lib/types';
 
 type ResultsPageProps = {
   searchParams?: Promise<{ compareUserId?: string; compareUserIds?: string }>;
@@ -138,18 +140,27 @@ export default async function ResultsPage({ searchParams }: ResultsPageProps) {
   const shownProfiles = [user, ...compareProfiles];
   const shownProfileIds = shownProfiles.map((profile) => profile.id);
 
-  const { data: matchesData } = await supabaseAdmin
-    .from('matches')
-    .select(`
-      *,
-      home_team:teams!matches_home_team_id_fkey(*),
-      away_team:teams!matches_away_team_id_fkey(*)
-    `)
-    .order('kickoff_time', { ascending: true });
+  const [
+    { data: matchesData },
+    { data: teamsData },
+    { data: predictionsData },
+  ] = await Promise.all([
+    supabaseAdmin
+      .from('matches')
+      .select(`
+        *,
+        home_team:teams!matches_home_team_id_fkey(*),
+        away_team:teams!matches_away_team_id_fkey(*)
+      `)
+      .order('kickoff_time', { ascending: true }),
+    supabaseAdmin.from('teams').select('*'),
+    supabaseAdmin.from('predictions').select('*').in('user_id', shownProfileIds),
+  ]);
 
-  const { data: predictionsData } = await supabaseAdmin.from('predictions').select('*').in('user_id', shownProfileIds);
-
-  const matches = (matchesData ?? []) as Match[];
+  const teams = (teamsData ?? []) as Team[];
+  const activeSpecialEffectGroups = await getActiveSpecialEffectGroups();
+  const matchesWithFixedTeams = applyFixedTopTwoToMatches((matchesData ?? []) as Match[], teams);
+  const matches = applySpecialEffectsToMatches(matchesWithFixedTeams, activeSpecialEffectGroups);
   const predictions = (predictionsData ?? []) as Prediction[];
   const predictionsByKey = new Map(predictions.map((prediction) => [`${prediction.user_id}:${prediction.match_id}`, prediction]));
 
@@ -182,7 +193,7 @@ export default async function ResultsPage({ searchParams }: ResultsPageProps) {
                     <div className="matchTitleLine resultTitleLine">
                       <span>Spiel {match.match_number}</span>
                       <span>{match.stage === 'group' && match.group_name ? `Gruppe ${match.group_name}` : getStageLabel(match.stage)}</span>
-                      <span><LocalDateTime value={match.kickoff_time} /></span>
+                      <span>{formatKickoff(match.kickoff_time)}</span>
                     </div>
                   </div>
                 </div>
