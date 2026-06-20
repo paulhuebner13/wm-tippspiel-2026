@@ -1,19 +1,24 @@
-import { BracketAutoScroll } from '@/components/BracketAutoScroll';
-import { Flag } from '@/components/Flag';
-import { Nav } from '@/components/Nav';
-import { getStageLabel } from '@/lib/scoring';
-import { getFifaRanking } from '@/lib/fifaRankings';
-import { requireUser } from '@/lib/session';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { formatKickoff } from '@/lib/time';
-import type { Match, Stage, Team } from '@/lib/types';
+import { BracketAutoScroll } from "@/components/BracketAutoScroll";
+import { Flag } from "@/components/Flag";
+import { Nav } from "@/components/Nav";
+import { getStageLabel } from "@/lib/scoring";
+import { getFifaRanking } from "@/lib/fifaRankings";
+import { requireUser } from "@/lib/session";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { formatKickoff } from "@/lib/time";
+import type { Match, Stage, Team } from "@/lib/types";
 
 type MatchWithTeams = Match & {
   home_team?: Team | null;
   away_team?: Team | null;
 };
 
-type StandingStatus = 'qualified' | 'qualifiedFixed' | 'eliminated' | 'eliminatedFixed' | 'open';
+type StandingStatus =
+  | "qualified"
+  | "qualifiedFixed"
+  | "eliminated"
+  | "eliminatedFixed"
+  | "open";
 
 type StandingRow = {
   team: Team;
@@ -30,21 +35,35 @@ type StandingRow = {
 
 type SimulatedScore = { home: number; away: number };
 type SimulatedScoreMap = Map<string, SimulatedScore>;
+type FixedGroupPlacementMap = Map<string, Team>;
 
-const BRACKET_STAGES: Stage[] = ['round_of_32', 'round_of_16', 'quarter_final', 'semi_final', 'final'];
+const BRACKET_STAGES: Stage[] = [
+  "round_of_32",
+  "round_of_16",
+  "quarter_final",
+  "semi_final",
+  "final",
+];
 
-function teamName(match: MatchWithTeams, side: 'home' | 'away') {
-  if (side === 'home') return match.home_team?.name ?? match.home_placeholder ?? 'Offen';
-  return match.away_team?.name ?? match.away_placeholder ?? 'Offen';
+function teamName(match: MatchWithTeams, side: "home" | "away") {
+  if (side === "home")
+    return match.home_team?.name ?? match.home_placeholder ?? "Offen";
+  return match.away_team?.name ?? match.away_placeholder ?? "Offen";
 }
 
-function resultHomeScore(match: MatchWithTeams, simulatedScores?: SimulatedScoreMap): number | null {
+function resultHomeScore(
+  match: MatchWithTeams,
+  simulatedScores?: SimulatedScoreMap,
+): number | null {
   const simulatedScore = simulatedScores?.get(match.id);
   if (simulatedScore) return simulatedScore.home;
   return match.home_score ?? match.provisional_home_score ?? null;
 }
 
-function resultAwayScore(match: MatchWithTeams, simulatedScores?: SimulatedScoreMap): number | null {
+function resultAwayScore(
+  match: MatchWithTeams,
+  simulatedScores?: SimulatedScoreMap,
+): number | null {
   const simulatedScore = simulatedScores?.get(match.id);
   if (simulatedScore) return simulatedScore.away;
   return match.away_score ?? match.provisional_away_score ?? null;
@@ -55,23 +74,28 @@ function resultWinnerTeamId(match: MatchWithTeams): string | null {
 }
 
 function hasResult(match: MatchWithTeams, simulatedScores?: SimulatedScoreMap) {
-  return resultHomeScore(match, simulatedScores) !== null && resultAwayScore(match, simulatedScores) !== null;
+  return (
+    resultHomeScore(match, simulatedScores) !== null &&
+    resultAwayScore(match, simulatedScores) !== null
+  );
 }
 
 function matchIsFinishedForTables(match: MatchWithTeams) {
   return match.is_finished || hasResult(match);
 }
 
-function getCurrentStage(matches: MatchWithTeams[]): Stage | 'group' {
-  const groupMatches = matches.filter((match) => match.stage === 'group');
-  if (groupMatches.some((match) => !matchIsFinishedForTables(match))) return 'group';
+function getCurrentStage(matches: MatchWithTeams[]): Stage | "group" {
+  const groupMatches = matches.filter((match) => match.stage === "group");
+  if (groupMatches.some((match) => !matchIsFinishedForTables(match)))
+    return "group";
 
   for (const stage of BRACKET_STAGES) {
     const stageMatches = matches.filter((match) => match.stage === stage);
-    if (stageMatches.some((match) => !matchIsFinishedForTables(match))) return stage;
+    if (stageMatches.some((match) => !matchIsFinishedForTables(match)))
+      return stage;
   }
 
-  return 'final';
+  return "final";
 }
 
 function emptyStanding(team: Team): StandingRow {
@@ -85,11 +109,16 @@ function emptyStanding(team: Team): StandingRow {
     goalsFor: 0,
     goalsAgainst: 0,
     goalDifference: 0,
-    status: 'open',
+    status: "open",
   };
 }
 
-function applyScoreToRows(home: StandingRow, away: StandingRow, homeScore: number, awayScore: number) {
+function applyScoreToRows(
+  home: StandingRow,
+  away: StandingRow,
+  homeScore: number,
+  awayScore: number,
+) {
   home.played += 1;
   away.played += 1;
   home.goalsFor += homeScore;
@@ -133,13 +162,41 @@ function fifaRankValue(team: Team) {
   return getFifaRanking(team.name)?.rank ?? 999;
 }
 
-function buildMiniTable(rows: StandingRow[], matches: MatchWithTeams[], simulatedScores?: SimulatedScoreMap) {
+function fixedGroupPlacementKey(groupName: string, rank: number) {
+  return `${groupName}:${rank}`;
+}
+
+function parseTopTwoPlaceholder(value: string | null) {
+  if (!value) return null;
+
+  const match = value.match(/^(Erster|Zweiter) Gruppe ([A-L])$/);
+  if (!match) return null;
+
+  return {
+    rank: match[1] === "Erster" ? 1 : 2,
+    groupName: match[2],
+  };
+}
+
+function buildMiniTable(
+  rows: StandingRow[],
+  matches: MatchWithTeams[],
+  simulatedScores?: SimulatedScoreMap,
+) {
   const tiedIds = new Set(rows.map((row) => row.team.id));
-  const miniRows = new Map(rows.map((row) => [row.team.id, emptyStanding(row.team)]));
+  const miniRows = new Map(
+    rows.map((row) => [row.team.id, emptyStanding(row.team)]),
+  );
 
   for (const match of matches) {
-    if (!match.home_team || !match.away_team || !hasResult(match, simulatedScores)) continue;
-    if (!tiedIds.has(match.home_team.id) || !tiedIds.has(match.away_team.id)) continue;
+    if (
+      !match.home_team ||
+      !match.away_team ||
+      !hasResult(match, simulatedScores)
+    )
+      continue;
+    if (!tiedIds.has(match.home_team.id) || !tiedIds.has(match.away_team.id))
+      continue;
 
     const home = miniRows.get(match.home_team.id);
     const away = miniRows.get(match.away_team.id);
@@ -150,7 +207,11 @@ function buildMiniTable(rows: StandingRow[], matches: MatchWithTeams[], simulate
   return miniRows;
 }
 
-function sortStandingRows(rows: StandingRow[], groupMatches: MatchWithTeams[], simulatedScores?: SimulatedScoreMap) {
+function sortStandingRows(
+  rows: StandingRow[],
+  groupMatches: MatchWithTeams[],
+  simulatedScores?: SimulatedScoreMap,
+) {
   const pointBuckets = new Map<number, StandingRow[]>();
   for (const row of rows) {
     if (!pointBuckets.has(row.points)) pointBuckets.set(row.points, []);
@@ -160,34 +221,50 @@ function sortStandingRows(rows: StandingRow[], groupMatches: MatchWithTeams[], s
   return Array.from(pointBuckets.entries())
     .sort(([pointsA], [pointsB]) => pointsB - pointsA)
     .flatMap(([, bucket]) => {
-      const miniTable = bucket.length > 1 ? buildMiniTable(bucket, groupMatches, simulatedScores) : null;
+      const miniTable =
+        bucket.length > 1
+          ? buildMiniTable(bucket, groupMatches, simulatedScores)
+          : null;
 
       return [...bucket].sort((a, b) => {
         if (miniTable) {
           const miniA = miniTable.get(a.team.id);
           const miniB = miniTable.get(b.team.id);
           if (miniA && miniB) {
-            if (miniB.points !== miniA.points) return miniB.points - miniA.points;
-            if (miniB.goalDifference !== miniA.goalDifference) return miniB.goalDifference - miniA.goalDifference;
-            if (miniB.goalsFor !== miniA.goalsFor) return miniB.goalsFor - miniA.goalsFor;
+            if (miniB.points !== miniA.points)
+              return miniB.points - miniA.points;
+            if (miniB.goalDifference !== miniA.goalDifference)
+              return miniB.goalDifference - miniA.goalDifference;
+            if (miniB.goalsFor !== miniA.goalsFor)
+              return miniB.goalsFor - miniA.goalsFor;
           }
         }
 
-        if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
+        if (b.goalDifference !== a.goalDifference)
+          return b.goalDifference - a.goalDifference;
         if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
         const rankA = fifaRankValue(a.team);
         const rankB = fifaRankValue(b.team);
         if (rankA !== rankB) return rankA - rankB;
-        return a.team.name.localeCompare(b.team.name, 'de-AT');
+        return a.team.name.localeCompare(b.team.name, "de-AT");
       });
     });
 }
 
-function buildRowsForGroup(teams: Team[], groupMatches: MatchWithTeams[], simulatedScores?: SimulatedScoreMap) {
+function buildRowsForGroup(
+  teams: Team[],
+  groupMatches: MatchWithTeams[],
+  simulatedScores?: SimulatedScoreMap,
+) {
   const rows = new Map(teams.map((team) => [team.id, emptyStanding(team)]));
 
   for (const match of groupMatches) {
-    if (!match.home_team || !match.away_team || !hasResult(match, simulatedScores)) continue;
+    if (
+      !match.home_team ||
+      !match.away_team ||
+      !hasResult(match, simulatedScores)
+    )
+      continue;
 
     const home = rows.get(match.home_team.id);
     const away = rows.get(match.away_team.id);
@@ -204,25 +281,30 @@ function buildExtremeScoreScenarios(groupMatches: MatchWithTeams[]) {
     (match) => !hasResult(match) && match.home_team_id && match.away_team_id,
   );
 
-  return openMatches.reduce<SimulatedScoreMap[]>((scenarios, match) => {
-    const nextScenarios: SimulatedScoreMap[] = [];
+  return openMatches.reduce<SimulatedScoreMap[]>(
+    (scenarios, match) => {
+      const nextScenarios: SimulatedScoreMap[] = [];
 
-    for (const scenario of scenarios) {
-      const homeWins = new Map(scenario);
-      homeWins.set(match.id, { home: 100, away: 0 });
-      nextScenarios.push(homeWins);
+      for (const scenario of scenarios) {
+        const homeWins = new Map(scenario);
+        homeWins.set(match.id, { home: 100, away: 0 });
+        nextScenarios.push(homeWins);
 
-      const awayWins = new Map(scenario);
-      awayWins.set(match.id, { home: 0, away: 100 });
-      nextScenarios.push(awayWins);
-    }
+        const awayWins = new Map(scenario);
+        awayWins.set(match.id, { home: 0, away: 100 });
+        nextScenarios.push(awayWins);
+      }
 
-    return nextScenarios;
-  }, [new Map<string, SimulatedScore>()]);
+      return nextScenarios;
+    },
+    [new Map<string, SimulatedScore>()],
+  );
 }
 
 function calculatePossibleRanks(teams: Team[], groupMatches: MatchWithTeams[]) {
-  const possibleRanks = new Map(teams.map((team) => [team.id, new Set<number>()]));
+  const possibleRanks = new Map(
+    teams.map((team) => [team.id, new Set<number>()]),
+  );
   const scenarios = buildExtremeScoreScenarios(groupMatches);
 
   for (const scenario of scenarios) {
@@ -237,44 +319,83 @@ function calculatePossibleRanks(teams: Team[], groupMatches: MatchWithTeams[]) {
   return possibleRanks;
 }
 
-function markStandingStatuses(rows: StandingRow[], groupMatches: MatchWithTeams[]) {
+function calculateFixedTopTwoPlacements(
+  teams: Team[],
+  matches: MatchWithTeams[],
+) {
+  const fixedPlacements: FixedGroupPlacementMap = new Map();
+  const teamsByGroup = new Map<string, Team[]>();
+
+  for (const team of teams) {
+    if (!team.group_name) continue;
+    if (!teamsByGroup.has(team.group_name))
+      teamsByGroup.set(team.group_name, []);
+    teamsByGroup.get(team.group_name)?.push(team);
+  }
+
+  for (const [groupName, groupTeams] of teamsByGroup.entries()) {
+    const groupMatches = matches.filter(
+      (match) => match.stage === "group" && match.group_name === groupName,
+    );
+    const possibleRanks = calculatePossibleRanks(groupTeams, groupMatches);
+
+    for (const team of groupTeams) {
+      const ranks = possibleRanks.get(team.id);
+      if (!ranks || ranks.size !== 1) continue;
+
+      const [fixedRank] = Array.from(ranks);
+      if (fixedRank === 1 || fixedRank === 2) {
+        fixedPlacements.set(fixedGroupPlacementKey(groupName, fixedRank), team);
+      }
+    }
+  }
+
+  return fixedPlacements;
+}
+
+function markStandingStatuses(
+  rows: StandingRow[],
+  groupMatches: MatchWithTeams[],
+) {
   const teams = rows.map((row) => row.team);
   const possibleRanks = calculatePossibleRanks(teams, groupMatches);
 
   return rows.map((row) => {
     const ranks = possibleRanks.get(row.team.id);
-    if (!ranks || ranks.size === 0) return { ...row, status: 'open' as StandingStatus };
+    if (!ranks || ranks.size === 0)
+      return { ...row, status: "open" as StandingStatus };
 
     const rankValues = Array.from(ranks);
     const minRank = Math.min(...rankValues);
     const maxRank = Math.max(...rankValues);
 
     if (rankValues.length === 1 && maxRank <= 2) {
-      return { ...row, status: 'qualifiedFixed' as StandingStatus };
+      return { ...row, status: "qualifiedFixed" as StandingStatus };
     }
 
     if (rankValues.length === 1 && minRank >= 4) {
-      return { ...row, status: 'eliminatedFixed' as StandingStatus };
+      return { ...row, status: "eliminatedFixed" as StandingStatus };
     }
 
     if (maxRank <= 2) {
-      return { ...row, status: 'qualified' as StandingStatus };
+      return { ...row, status: "qualified" as StandingStatus };
     }
 
     if (minRank >= 4) {
-      return { ...row, status: 'eliminated' as StandingStatus };
+      return { ...row, status: "eliminated" as StandingStatus };
     }
 
-    return { ...row, status: 'open' as StandingStatus };
+    return { ...row, status: "open" as StandingStatus };
   });
 }
 
-
 function standingStatusClass(status: StandingStatus) {
-  if (status === 'qualifiedFixed') return 'standingQualified standingFixedPosition';
-  if (status === 'eliminatedFixed') return 'standingEliminated standingFixedPosition';
-  if (status === 'qualified') return 'standingQualified';
-  if (status === 'eliminated') return 'standingEliminated';
+  if (status === "qualifiedFixed")
+    return "standingQualified standingFixedPosition";
+  if (status === "eliminatedFixed")
+    return "standingEliminated standingFixedPosition";
+  if (status === "qualified") return "standingQualified";
+  if (status === "eliminated") return "standingEliminated";
   return undefined;
 }
 function buildStandings(teams: Team[], matches: MatchWithTeams[]) {
@@ -287,9 +408,18 @@ function buildStandings(teams: Team[], matches: MatchWithTeams[]) {
   }
 
   for (const match of matches) {
-    if (match.stage !== 'group' || !hasResult(match) || !match.home_team || !match.away_team) continue;
+    if (
+      match.stage !== "group" ||
+      !hasResult(match) ||
+      !match.home_team ||
+      !match.away_team
+    )
+      continue;
 
-    const groupName = match.group_name ?? match.home_team.group_name ?? match.away_team.group_name;
+    const groupName =
+      match.group_name ??
+      match.home_team.group_name ??
+      match.away_team.group_name;
     if (!groupName) continue;
 
     const group = groups.get(groupName);
@@ -301,10 +431,15 @@ function buildStandings(teams: Team[], matches: MatchWithTeams[]) {
   }
 
   return Array.from(groups.entries())
-    .sort(([a], [b]) => a.localeCompare(b, 'de-AT'))
+    .sort(([a], [b]) => a.localeCompare(b, "de-AT"))
     .map(([groupName, rows]) => {
-      const groupMatches = matches.filter((match) => match.stage === 'group' && match.group_name === groupName);
-      const sortedRows = sortStandingRows(Array.from(rows.values()), groupMatches);
+      const groupMatches = matches.filter(
+        (match) => match.stage === "group" && match.group_name === groupName,
+      );
+      const sortedRows = sortStandingRows(
+        Array.from(rows.values()),
+        groupMatches,
+      );
 
       return {
         groupName,
@@ -313,29 +448,89 @@ function buildStandings(teams: Team[], matches: MatchWithTeams[]) {
     });
 }
 
-function BracketTeam({ match, side }: { match: MatchWithTeams; side: 'home' | 'away' }) {
-  const team = side === 'home' ? match.home_team : match.away_team;
-  const score = side === 'home' ? resultHomeScore(match) : resultAwayScore(match);
-  const won = resultWinnerTeamId(match) && team?.id === resultWinnerTeamId(match);
+function getInferredBracketTeam(
+  match: MatchWithTeams,
+  side: "home" | "away",
+  fixedTopTwoPlacements: FixedGroupPlacementMap,
+) {
+  const storedTeam = side === "home" ? match.home_team : match.away_team;
+  if (storedTeam) return null;
+
+  const placeholder =
+    side === "home" ? match.home_placeholder : match.away_placeholder;
+  const parsedPlaceholder = parseTopTwoPlaceholder(placeholder);
+  if (!parsedPlaceholder) return null;
 
   return (
-    <div className={`bracketTeam ${won ? 'bracketTeamWinner' : ''}`}>
+    fixedTopTwoPlacements.get(
+      fixedGroupPlacementKey(
+        parsedPlaceholder.groupName,
+        parsedPlaceholder.rank,
+      ),
+    ) ?? null
+  );
+}
+
+function BracketTeam({
+  match,
+  side,
+  fixedTopTwoPlacements,
+}: {
+  match: MatchWithTeams;
+  side: "home" | "away";
+  fixedTopTwoPlacements: FixedGroupPlacementMap;
+}) {
+  const storedTeam = side === "home" ? match.home_team : match.away_team;
+  const inferredTeam = getInferredBracketTeam(
+    match,
+    side,
+    fixedTopTwoPlacements,
+  );
+  const team = storedTeam ?? inferredTeam;
+  const score =
+    side === "home" ? resultHomeScore(match) : resultAwayScore(match);
+  const won =
+    resultWinnerTeamId(match) && team?.id === resultWinnerTeamId(match);
+  const name = storedTeam
+    ? teamName(match, side)
+    : (inferredTeam?.name ?? teamName(match, side));
+
+  return (
+    <div className={`bracketTeam ${won ? "bracketTeamWinner" : ""}`}>
       <Flag team={team} />
-      <span>{teamName(match, side)}</span>
-      <strong>{score ?? '-'}</strong>
+      <span>{name}</span>
+      <strong>{score ?? "-"}</strong>
     </div>
   );
 }
 
-function BracketMatch({ match, displayNumber }: { match: MatchWithTeams; displayNumber: number }) {
+function BracketMatch({
+  match,
+  displayNumber,
+  fixedTopTwoPlacements,
+}: {
+  match: MatchWithTeams;
+  displayNumber: number;
+  fixedTopTwoPlacements: FixedGroupPlacementMap;
+}) {
   return (
-    <article className={`bracketMatch ${hasResult(match) ? 'bracketMatchDone' : ''}`}>
+    <article
+      className={`bracketMatch ${hasResult(match) ? "bracketMatchDone" : ""}`}
+    >
       <div className="bracketMatchMeta">
         <span>Spiel {displayNumber}</span>
         <span>{formatKickoff(match.kickoff_time)}</span>
       </div>
-      <BracketTeam match={match} side="home" />
-      <BracketTeam match={match} side="away" />
+      <BracketTeam
+        match={match}
+        side="home"
+        fixedTopTwoPlacements={fixedTopTwoPlacements}
+      />
+      <BracketTeam
+        match={match}
+        side="away"
+        fixedTopTwoPlacements={fixedTopTwoPlacements}
+      />
     </article>
   );
 }
@@ -344,29 +539,36 @@ export default async function TablesPage() {
   const user = await requireUser();
 
   const { data: teamsData } = await supabaseAdmin
-    .from('teams')
-    .select('*')
-    .order('group_name', { ascending: true })
-    .order('name', { ascending: true });
+    .from("teams")
+    .select("*")
+    .order("group_name", { ascending: true })
+    .order("name", { ascending: true });
 
   const { data: matchesData } = await supabaseAdmin
-    .from('matches')
-    .select(`
+    .from("matches")
+    .select(
+      `
       *,
       home_team:teams!matches_home_team_id_fkey(*),
       away_team:teams!matches_away_team_id_fkey(*)
-    `)
-    .order('kickoff_time', { ascending: true });
+    `,
+    )
+    .order("kickoff_time", { ascending: true });
 
   const teams = (teamsData ?? []) as Team[];
   const matches = (matchesData ?? []) as MatchWithTeams[];
   const standings = buildStandings(teams, matches);
+  const fixedTopTwoPlacements = calculateFixedTopTwoPlacements(teams, matches);
   const currentStage = getCurrentStage(matches);
-  const thirdPlaceMatch = matches.find((match) => match.stage === 'third_place');
+  const thirdPlaceMatch = matches.find(
+    (match) => match.stage === "third_place",
+  );
   const displayNumbers = new Map(
     [...matches]
       .sort((a, b) => {
-        const dateDiff = new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime();
+        const dateDiff =
+          new Date(a.kickoff_time).getTime() -
+          new Date(b.kickoff_time).getTime();
         return dateDiff !== 0 ? dateDiff : a.match_number - b.match_number;
       })
       .map((match, index) => [match.id, index + 1]),
@@ -412,7 +614,11 @@ export default async function TablesPage() {
                         <td>{row.drawn}</td>
                         <td>{row.lost}</td>
                         <td className="standingsPoints">{row.points}</td>
-                        <td>{row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}</td>
+                        <td>
+                          {row.goalDifference > 0
+                            ? `+${row.goalDifference}`
+                            : row.goalDifference}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -425,7 +631,11 @@ export default async function TablesPage() {
         <section className="card bracketCard">
           <div className="bracketHeader">
             <h2>Turnierbaum</h2>
-            <span>{currentStage === 'group' ? 'Gruppenphase' : getStageLabel(currentStage)}</span>
+            <span>
+              {currentStage === "group"
+                ? "Gruppenphase"
+                : getStageLabel(currentStage)}
+            </span>
           </div>
 
           <div className="bracketScroll" data-bracket-scroll>
@@ -435,16 +645,31 @@ export default async function TablesPage() {
                 const stageMatches = matches
                   .filter((match) => match.stage === stage)
                   .sort((a, b) => {
-                    const dateDiff = new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime();
-                    return dateDiff !== 0 ? dateDiff : a.match_number - b.match_number;
+                    const dateDiff =
+                      new Date(a.kickoff_time).getTime() -
+                      new Date(b.kickoff_time).getTime();
+                    return dateDiff !== 0
+                      ? dateDiff
+                      : a.match_number - b.match_number;
                   });
 
                 return (
-                  <section className={`bracketColumn bracketColumn-${stage}`} data-bracket-stage={stage} key={stage}>
+                  <section
+                    className={`bracketColumn bracketColumn-${stage}`}
+                    data-bracket-stage={stage}
+                    key={stage}
+                  >
                     <h3>{getStageLabel(stage)}</h3>
                     <div className="bracketColumnMatches">
                       {stageMatches.map((match) => (
-                        <BracketMatch key={match.id} match={match} displayNumber={displayNumbers.get(match.id) ?? match.match_number} />
+                        <BracketMatch
+                          key={match.id}
+                          match={match}
+                          displayNumber={
+                            displayNumbers.get(match.id) ?? match.match_number
+                          }
+                          fixedTopTwoPlacements={fixedTopTwoPlacements}
+                        />
                       ))}
                     </div>
                   </section>
@@ -452,10 +677,20 @@ export default async function TablesPage() {
               })}
 
               {thirdPlaceMatch && (
-                <section className="bracketColumn bracketColumn-third_place" data-bracket-stage="third_place">
+                <section
+                  className="bracketColumn bracketColumn-third_place"
+                  data-bracket-stage="third_place"
+                >
                   <h3>Spiel um Platz 3</h3>
                   <div className="bracketColumnMatches">
-                    <BracketMatch match={thirdPlaceMatch} displayNumber={displayNumbers.get(thirdPlaceMatch.id) ?? thirdPlaceMatch.match_number} />
+                    <BracketMatch
+                      match={thirdPlaceMatch}
+                      displayNumber={
+                        displayNumbers.get(thirdPlaceMatch.id) ??
+                        thirdPlaceMatch.match_number
+                      }
+                      fixedTopTwoPlacements={fixedTopTwoPlacements}
+                    />
                   </div>
                 </section>
               )}
