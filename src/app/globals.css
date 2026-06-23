@@ -4767,8 +4767,11 @@ html[data-theme='dark'] .standingsTable tr.standingEliminated td {
 }
 
 .changePlayerBanner {
+  position: sticky;
+  top: 86px;
+  z-index: 12;
   margin: 12px 0 16px;
-  padding: 14px 16px;
+  padding: 11px 14px;
   border-radius: 18px;
   border: 1px solid var(--line);
   background: linear-gradient(135deg, #111827, #374151);
@@ -4804,13 +4807,13 @@ html[data-theme='dark'] .standingsTable tr.standingEliminated td {
 }
 
 .changeMatchStartedMissing {
-  border-color: #dc2626;
-  background: color-mix(in srgb, #dc2626 7%, var(--card));
+  border-color: #f59e0b;
+  background: color-mix(in srgb, #f59e0b 9%, var(--card));
 }
 
 .changeMatchFutureSubmitted {
-  border-color: #f59e0b;
-  background: color-mix(in srgb, #f59e0b 8%, var(--card));
+  border-color: #dc2626;
+  background: color-mix(in srgb, #dc2626 7%, var(--card));
 }
 
 .changeMatchFutureMissing {
@@ -4844,13 +4847,13 @@ html[data-theme='dark'] .standingsTable tr.standingEliminated td {
 }
 
 .changeMatchStartedMissing .changeMatchStatusBadge {
-  background: #fee2e2;
-  color: #991b1b;
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .changeMatchFutureSubmitted .changeMatchStatusBadge {
-  background: #fef3c7;
-  color: #92400e;
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 .changeMatchFutureMissing .changeMatchStatusBadge {
@@ -4919,4 +4922,10 @@ html[data-theme='dark'] .standingsTable tr.standingEliminated td {
   .changePlayerBanner strong {
     font-size: 21px;
   }
+}
+
+
+/* v98: keep changes tab cleaner after selecting a player. */
+.changePredictionForm .changeSaveButton {
+  display: none;
 }

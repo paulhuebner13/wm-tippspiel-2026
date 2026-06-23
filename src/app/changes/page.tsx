@@ -14,7 +14,7 @@ import { formatKickoff, isPredictionLocked } from '@/lib/time';
 import type { Match, Prediction, Profile, Team } from '@/lib/types';
 
 type ChangesPageProps = {
-  searchParams?: Promise<{ profileId?: string; matchNumber?: string; saved?: string; error?: string }>;
+  searchParams?: Promise<{ profileId?: string; saved?: string; error?: string }>;
 };
 
 type MatchWithTeams = Match & {
@@ -54,23 +54,6 @@ function predictionClass(match: MatchWithTeams, prediction: Prediction | undefin
   return 'changeMatchFutureMissing';
 }
 
-function statusText(match: MatchWithTeams, prediction: Prediction | undefined) {
-  const started = isPredictionLocked(match.kickoff_time);
-  const submitted = hasCompletePrediction(prediction, match);
-
-  if (started && submitted) return 'Begonnen, Tipp sichtbar';
-  if (started && !submitted) return 'Begonnen, kein Tipp abgegeben';
-  if (!started && submitted) return 'Tipp abgegeben, noch versteckt';
-  return 'Noch nicht begonnen, kein Tipp';
-}
-
-function advanceTeamName(match: MatchWithTeams, prediction: Prediction | undefined) {
-  if (!prediction?.advance_team_id) return null;
-  if (prediction.advance_team_id === match.home_team_id) return teamName(match, 'home');
-  if (prediction.advance_team_id === match.away_team_id) return teamName(match, 'away');
-  return null;
-}
-
 export default async function ChangesPage({ searchParams }: ChangesPageProps) {
   const user = await requireAdmin();
   const params = await searchParams;
@@ -84,7 +67,7 @@ export default async function ChangesPage({ searchParams }: ChangesPageProps) {
   const selectedProfileId =
     params?.profileId && profiles.some((profile) => profile.id === params.profileId)
       ? params.profileId
-      : profiles[0]?.id ?? '';
+      : '';
   const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId) ?? null;
 
   const [{ data: matchesData }, { data: teamsData }, { data: predictionsData }] = await Promise.all([
@@ -116,7 +99,7 @@ export default async function ChangesPage({ searchParams }: ChangesPageProps) {
   return (
     <>
       <Nav user={user} />
-      <ChangesAutoScroll />
+      {selectedProfile && <ChangesAutoScroll />}
       <main className="page">
         <h1>Änderungen</h1>
 
@@ -124,7 +107,8 @@ export default async function ChangesPage({ searchParams }: ChangesPageProps) {
           <form className="changePlayerSelectForm" method="get" action="/changes">
             <label>
               Spieler auswählen
-              <select name="profileId" defaultValue={selectedProfileId}>
+              <select name="profileId" defaultValue={selectedProfileId} required>
+                <option value="">Spieler auswählen</option>
                 {profiles.map((profile) => (
                   <option key={profile.id} value={profile.id}>
                     {profile.username}
@@ -146,8 +130,6 @@ export default async function ChangesPage({ searchParams }: ChangesPageProps) {
         {params?.saved === '1' && <p className="changeSavedMessage">Tipp wurde gespeichert.</p>}
         {params?.error && <p className="errorText">Fehler: {params.error}</p>}
 
-        {!selectedProfile && <p className="subtle">Es wurde noch kein Spieler gefunden.</p>}
-
         {selectedProfile && (
           <div className="list">
             {matches.map((match) => {
@@ -156,7 +138,6 @@ export default async function ChangesPage({ searchParams }: ChangesPageProps) {
               const submitted = hasCompletePrediction(prediction, match);
               const hideExistingTip = submitted && !started;
               const knockout = isKnockoutStage(match.stage);
-              const advanceName = advanceTeamName(match, prediction);
               const scrollTarget = match.id === firstMissingMatchId;
               const homeDefault = hideExistingTip ? '' : prediction?.predicted_home_score?.toString() ?? '';
               const awayDefault = hideExistingTip ? '' : prediction?.predicted_away_score?.toString() ?? '';
@@ -188,26 +169,10 @@ export default async function ChangesPage({ searchParams }: ChangesPageProps) {
                     </div>
                   </div>
 
-                  <div className="changeMatchStatusLine">
-                    <span className="changeMatchStatusBadge">{statusText(match, prediction)}</span>
-                    {started && submitted && prediction && (
-                      <span>
-                        Tipp: {prediction.predicted_home_score}:{prediction.predicted_away_score}
-                        {advanceName ? `, weiter: ${advanceName}` : ''}
-                      </span>
-                    )}
-                  </div>
-
                   <form action={overridePredictionAction} className="changePredictionForm">
                     <input type="hidden" name="userId" value={selectedProfile.id} />
                     <input type="hidden" name="matchId" value={match.id} />
                     <input type="hidden" name="matchNumber" value={String(match.match_number)} />
-
-                    {hideExistingTip && (
-                      <p className="changeFutureHiddenNote">
-                        Für dieses noch nicht begonnene Spiel wurde ein Tipp abgegeben. Der Inhalt bleibt verborgen.
-                      </p>
-                    )}
 
                     <input
                       className="scoreLeft"
@@ -239,9 +204,6 @@ export default async function ChangesPage({ searchParams }: ChangesPageProps) {
                       </select>
                     )}
 
-                    <button className="changeSaveButton" type="submit">
-                      Tipp speichern
-                    </button>
                   </form>
                 </section>
               );
