@@ -4750,3 +4750,173 @@ html[data-theme='dark'] .standingsTable tr.standingEliminated td {
   color: inherit;
   font-weight: 800;
 }
+
+
+/* Changes tab redesign */
+.changePlayerSelectBar {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.changePlayerSelectForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.changePlayerBanner {
+  margin: 12px 0 16px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: linear-gradient(135deg, #111827, #374151);
+  color: white;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+.changePlayerBanner span {
+  display: block;
+  font-size: 12px;
+  opacity: 0.75;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.changePlayerBanner strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 24px;
+  line-height: 1.15;
+  font-weight: 950;
+}
+
+.changeMatchCard {
+  border-width: 3px;
+}
+
+.changeMatchStartedSubmitted {
+  border-color: #16a34a;
+  background: color-mix(in srgb, #16a34a 7%, var(--card));
+}
+
+.changeMatchStartedMissing {
+  border-color: #dc2626;
+  background: color-mix(in srgb, #dc2626 7%, var(--card));
+}
+
+.changeMatchFutureSubmitted {
+  border-color: #f59e0b;
+  background: color-mix(in srgb, #f59e0b 8%, var(--card));
+}
+
+.changeMatchFutureMissing {
+  border-color: #d1d5db;
+  background: color-mix(in srgb, #9ca3af 5%, var(--card));
+}
+
+.changeMatchStatusLine {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.changeMatchStatusBadge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 9px;
+  background: #f3f4f6;
+  color: var(--text);
+}
+
+.changeMatchStartedSubmitted .changeMatchStatusBadge {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.changeMatchStartedMissing .changeMatchStatusBadge {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.changeMatchFutureSubmitted .changeMatchStatusBadge {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.changeMatchFutureMissing .changeMatchStatusBadge {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.changePredictionForm {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px auto 58px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.changePredictionForm .scoreLeft {
+  grid-column: 2;
+}
+
+.changePredictionForm .scoreSep {
+  grid-column: 3;
+  text-align: center;
+  font-weight: 950;
+}
+
+.changePredictionForm .scoreRight {
+  grid-column: 4;
+}
+
+.changePredictionForm input {
+  text-align: center;
+  font-weight: 900;
+  font-size: 18px;
+  padding: 10px 6px;
+}
+
+.changeAdvanceSelect,
+.changeSaveButton,
+.changeFutureHiddenNote {
+  grid-column: 1 / -1;
+}
+
+.changeFutureHiddenNote {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  font-weight: 750;
+}
+
+.changeSavedMessage {
+  margin: 0 0 12px;
+  border: 1px solid rgba(22, 163, 74, 0.35);
+  background: color-mix(in srgb, #16a34a 9%, var(--card));
+  color: #166534;
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-weight: 850;
+}
+
+@media (max-width: 560px) {
+  .changePlayerSelectForm {
+    grid-template-columns: 1fr;
+  }
+
+  .changePlayerBanner strong {
+    font-size: 21px;
+  }
+}
