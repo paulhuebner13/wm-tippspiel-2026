@@ -4929,3 +4929,20 @@ html[data-theme='dark'] .standingsTable tr.standingEliminated td {
 .changePredictionForm .changeSaveButton {
   display: none;
 }
+
+.changeAutoSaveState {
+  min-height: 14px;
+  margin-top: 6px;
+  text-align: right;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.changeAutoSaveStatesaved {
+  color: #166534;
+}
+
+.changeAutoSaveStateerror {
+  color: #b91c1c;
+}

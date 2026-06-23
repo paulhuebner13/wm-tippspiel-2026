@@ -1007,6 +1007,97 @@ export async function overridePredictionAction(formData: FormData) {
   redirect(`/changes?profileId=${userId}&matchNumber=${matchNumber}&saved=1`);
 }
 
+export async function overridePredictionInlineAction(input: {
+  userId: string;
+  matchId: string;
+  predictedHomeScore: number | null;
+  predictedAwayScore: number | null;
+  advanceTeamId?: string | null;
+}): Promise<
+  | { ok: true; predictionId?: string; deleted?: boolean }
+  | { ok: false; error: string }
+> {
+  await requireAdmin();
+
+  const userId = input.userId;
+  const matchId = input.matchId;
+  const predictedHomeScore = input.predictedHomeScore;
+  const predictedAwayScore = input.predictedAwayScore;
+  const advanceTeamId = input.advanceTeamId ?? null;
+
+  const scoreIsValid = (score: number | null) =>
+    score === null || (Number.isInteger(score) && score >= 0);
+
+  if (!userId || !matchId || !scoreIsValid(predictedHomeScore) || !scoreIsValid(predictedAwayScore)) {
+    return { ok: false, error: "invalid_prediction" };
+  }
+
+  const { data: match } = await supabaseAdmin
+    .from("matches")
+    .select("id, match_number, stage, home_team_id, away_team_id")
+    .eq("id", matchId)
+    .single();
+
+  if (!match) {
+    return { ok: false, error: "match_not_found" };
+  }
+
+  const isCompletelyEmpty = predictedHomeScore === null && predictedAwayScore === null;
+
+  if (isCompletelyEmpty) {
+    const { error } = await supabaseAdmin
+      .from("predictions")
+      .delete()
+      .eq("user_id", userId)
+      .eq("match_id", matchId);
+
+    if (error) {
+      return { ok: false, error: "delete_failed" };
+    }
+
+    revalidatePath("/changes");
+    revalidatePath("/matches");
+    revalidatePath("/results");
+    revalidatePath("/ranking");
+    return { ok: true, deleted: true };
+  }
+
+  const bothScoresComplete = predictedHomeScore !== null && predictedAwayScore !== null;
+  const isKnockoutDraw =
+    bothScoresComplete &&
+    isKnockoutStage(match.stage) &&
+    predictedHomeScore === predictedAwayScore;
+  const validAdvanceTeam =
+    advanceTeamId === match.home_team_id || advanceTeamId === match.away_team_id;
+  const storedAdvanceTeamId = isKnockoutDraw && validAdvanceTeam ? advanceTeamId : null;
+
+  const { data, error } = await supabaseAdmin
+    .from("predictions")
+    .upsert(
+      {
+        user_id: userId,
+        match_id: matchId,
+        predicted_home_score: predictedHomeScore,
+        predicted_away_score: predictedAwayScore,
+        advance_team_id: storedAdvanceTeamId,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,match_id" },
+    )
+    .select("id")
+    .single();
+
+  if (error) {
+    return { ok: false, error: "save_failed" };
+  }
+
+  revalidatePath("/changes");
+  revalidatePath("/matches");
+  revalidatePath("/results");
+  revalidatePath("/ranking");
+  return { ok: true, predictionId: data?.id };
+}
+
 export async function saveOptimizerOddsInlineAction(input: {
   matchId: string;
   oddsText: string;

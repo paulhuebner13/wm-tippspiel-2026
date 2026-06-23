@@ -1,36 +1,24 @@
-import { overridePredictionAction } from '@/app/actions';
+import { ChangePredictionEditor } from '@/components/ChangePredictionEditor';
 import { ChangesAutoScroll } from '@/components/ChangesAutoScroll';
-import { Flag } from '@/components/Flag';
 import { Nav } from '@/components/Nav';
 import { applyFixedTopTwoToMatches } from '@/lib/fixedGroupPlacements';
-import { getStageLabel, isKnockoutStage } from '@/lib/scoring';
 import { requireAdmin } from '@/lib/session';
 import {
   applySpecialEffectsToMatches,
   getUserSpecialEffectActive,
 } from '@/lib/specialEffects';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { formatKickoff, isPredictionLocked } from '@/lib/time';
+import { isKnockoutStage } from '@/lib/scoring';
 import type { Match, Prediction, Profile, Team } from '@/lib/types';
 
 type ChangesPageProps = {
-  searchParams?: Promise<{ profileId?: string; saved?: string; error?: string }>;
+  searchParams?: Promise<{ profileId?: string; error?: string }>;
 };
 
 type MatchWithTeams = Match & {
   home_team?: Team | null;
   away_team?: Team | null;
 };
-
-function teamName(match: MatchWithTeams, side: 'home' | 'away') {
-  if (side === 'home') return match.home_team?.name ?? match.home_placeholder ?? 'Offen';
-  return match.away_team?.name ?? match.away_placeholder ?? 'Offen';
-}
-
-function scoreText(home: number | null, away: number | null) {
-  if (home === null || away === null) return 'vs';
-  return `${home}:${away}`;
-}
 
 function hasCompletePrediction(prediction: Prediction | undefined, match: MatchWithTeams) {
   if (!prediction || prediction.predicted_home_score === null || prediction.predicted_away_score === null) return false;
@@ -42,16 +30,6 @@ function hasCompletePrediction(prediction: Prediction | undefined, match: MatchW
     return false;
   }
   return true;
-}
-
-function predictionClass(match: MatchWithTeams, prediction: Prediction | undefined) {
-  const started = isPredictionLocked(match.kickoff_time);
-  const submitted = hasCompletePrediction(prediction, match);
-
-  if (started && submitted) return 'changeMatchStartedSubmitted';
-  if (started && !submitted) return 'changeMatchStartedMissing';
-  if (!started && submitted) return 'changeMatchFutureSubmitted';
-  return 'changeMatchFutureMissing';
 }
 
 export default async function ChangesPage({ searchParams }: ChangesPageProps) {
@@ -93,8 +71,9 @@ export default async function ChangesPage({ searchParams }: ChangesPageProps) {
   const matchesWithFixedTeams = applyFixedTopTwoToMatches(rawMatches, teams) as MatchWithTeams[];
   const matches = applySpecialEffectsToMatches(matchesWithFixedTeams, specialEffectActive) as MatchWithTeams[];
 
-  const firstMissingMatchId =
-    matches.find((match) => !hasCompletePrediction(predictionByMatchId.get(match.id), match))?.id ?? null;
+  const firstMissingMatchId = selectedProfile
+    ? matches.find((match) => !hasCompletePrediction(predictionByMatchId.get(match.id), match))?.id ?? null
+    : null;
 
   return (
     <>
@@ -127,85 +106,22 @@ export default async function ChangesPage({ searchParams }: ChangesPageProps) {
           </div>
         )}
 
-        {params?.saved === '1' && <p className="changeSavedMessage">Tipp wurde gespeichert.</p>}
         {params?.error && <p className="errorText">Fehler: {params.error}</p>}
 
         {selectedProfile && (
           <div className="list">
             {matches.map((match) => {
               const prediction = predictionByMatchId.get(match.id);
-              const started = isPredictionLocked(match.kickoff_time);
-              const submitted = hasCompletePrediction(prediction, match);
-              const hideExistingTip = submitted && !started;
-              const knockout = isKnockoutStage(match.stage);
               const scrollTarget = match.id === firstMissingMatchId;
-              const homeDefault = hideExistingTip ? '' : prediction?.predicted_home_score?.toString() ?? '';
-              const awayDefault = hideExistingTip ? '' : prediction?.predicted_away_score?.toString() ?? '';
-              const advanceDefault = hideExistingTip ? '' : prediction?.advance_team_id ?? '';
 
               return (
-                <section
+                <ChangePredictionEditor
                   key={match.id}
-                  className={`card changeMatchCard ${predictionClass(match, prediction)}`}
-                  data-change-scroll-target={scrollTarget ? 'true' : 'false'}
-                >
-                  <div className="matchTitleLine">
-                    <span>Spiel {match.match_number}</span>
-                    <span>{match.stage === 'group' && match.group_name ? `Gruppe ${match.group_name}` : getStageLabel(match.stage)}</span>
-                    <span>{formatKickoff(match.kickoff_time)}</span>
-                  </div>
-
-                  <div className="lockedTeamsRow">
-                    <div className="predictionTeam predictionTeamHome">
-                      <span className="teamName">{teamName(match, 'home')}</span>
-                      <Flag team={match.home_team} />
-                    </div>
-                    <strong className="lockedScoreBox">
-                      {scoreText(match.home_score ?? match.provisional_home_score ?? null, match.away_score ?? match.provisional_away_score ?? null)}
-                    </strong>
-                    <div className="predictionTeam predictionTeamAway">
-                      <Flag team={match.away_team} />
-                      <span className="teamName">{teamName(match, 'away')}</span>
-                    </div>
-                  </div>
-
-                  <form action={overridePredictionAction} className="changePredictionForm">
-                    <input type="hidden" name="userId" value={selectedProfile.id} />
-                    <input type="hidden" name="matchId" value={match.id} />
-                    <input type="hidden" name="matchNumber" value={String(match.match_number)} />
-
-                    <input
-                      className="scoreLeft"
-                      name="predictedHomeScore"
-                      inputMode="numeric"
-                      min="0"
-                      type="number"
-                      placeholder={hideExistingTip ? 'neu' : '0'}
-                      defaultValue={homeDefault}
-                      required
-                    />
-                    <span className="scoreSep">:</span>
-                    <input
-                      className="scoreRight"
-                      name="predictedAwayScore"
-                      inputMode="numeric"
-                      min="0"
-                      type="number"
-                      placeholder={hideExistingTip ? 'neu' : '0'}
-                      defaultValue={awayDefault}
-                      required
-                    />
-
-                    {knockout && match.home_team_id && match.away_team_id && (
-                      <select className="changeAdvanceSelect" name="advanceTeamId" defaultValue={advanceDefault}>
-                        <option value="">Wer kommt weiter? Nur bei Unentschieden nötig</option>
-                        <option value={match.home_team_id}>{teamName(match, 'home')}</option>
-                        <option value={match.away_team_id}>{teamName(match, 'away')}</option>
-                      </select>
-                    )}
-
-                  </form>
-                </section>
+                  match={match}
+                  selectedProfile={selectedProfile}
+                  prediction={prediction}
+                  scrollTarget={scrollTarget}
+                />
               );
             })}
           </div>
