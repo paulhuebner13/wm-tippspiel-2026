@@ -7,6 +7,12 @@ import { requireUser } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { formatKickoff } from "@/lib/time";
 import {
+  getThirdPlaceOpponentGroup,
+  isThirdPlaceWinnerGroup,
+  ROUND_OF_32_THIRD_PLACE_MATCH_NUMBERS,
+  type ThirdPlaceWinnerGroup,
+} from "@/lib/roundOf32Thirds";
+import {
   applySpecialEffectToTeam,
   getUserSpecialEffectActive,
 } from "@/lib/specialEffects";
@@ -205,6 +211,36 @@ function parseTopTwoPlaceholder(value: string | null) {
     rank: match[1] === "Erster" ? 1 : 2,
     groupName: match[2],
   };
+}
+
+function parseThirdPlacePlaceholder(value: string | null) {
+  if (!value) return null;
+
+  const match = value.match(/^Dritter Gruppe ([A-L](?:\/[A-L])*)$/);
+  if (!match) return null;
+
+  return match[1].split("/");
+}
+
+function topSeedGroupForMatch(match: MatchWithTeams) {
+  const knownByMatchNumber = Object.entries(ROUND_OF_32_THIRD_PLACE_MATCH_NUMBERS).find(
+    ([, matchNumber]) => matchNumber === match.match_number,
+  )?.[0];
+
+  if (knownByMatchNumber && isThirdPlaceWinnerGroup(knownByMatchNumber)) {
+    return knownByMatchNumber;
+  }
+
+  const placeholders = [match.home_placeholder, match.away_placeholder];
+  for (const placeholder of placeholders) {
+    const parsed = parseTopTwoPlaceholder(placeholder);
+    if (parsed?.rank === 1) {
+      const key = `1${parsed.groupName}`;
+      if (isThirdPlaceWinnerGroup(key)) return key;
+    }
+  }
+
+  return null;
 }
 
 function buildMiniTable(
@@ -482,6 +518,44 @@ function calculateFixedTopTwoPlacements(
   return fixedPlacements;
 }
 
+function calculateFixedThirdPlacePlacements(
+  teams: Team[],
+  matches: MatchWithTeams[],
+) {
+  const fixedPlacements: FixedGroupPlacementMap = new Map();
+  const teamsByGroup = new Map<string, Team[]>();
+  const thirdPlacedRows: { groupName: string; row: StandingRow }[] = [];
+
+  for (const team of teams) {
+    if (!team.group_name) continue;
+    if (!teamsByGroup.has(team.group_name)) teamsByGroup.set(team.group_name, []);
+    teamsByGroup.get(team.group_name)?.push(team);
+  }
+
+  for (const [groupName, groupTeams] of teamsByGroup.entries()) {
+    const groupMatches = matches.filter(
+      (match) => match.stage === "group" && match.group_name === groupName,
+    );
+
+    if (groupMatches.length === 0 || groupMatches.some((match) => !hasResult(match))) {
+      return fixedPlacements;
+    }
+
+    const rows = buildRowsForGroup(groupTeams, groupMatches);
+    const sortedRows = sortStandingRows(rows, groupMatches);
+    if (sortedRows[2]) thirdPlacedRows.push({ groupName, row: sortedRows[2] });
+  }
+
+  thirdPlacedRows
+    .sort((a, b) => compareThirdPlaceRows(a.row, b.row))
+    .slice(0, 8)
+    .forEach(({ groupName, row }) => {
+      fixedPlacements.set(fixedGroupPlacementKey(groupName, 3), row.team);
+    });
+
+  return fixedPlacements;
+}
+
 function markStandingStatuses(
   rows: StandingRow[],
   groupMatches: MatchWithTeams[],
@@ -602,34 +676,51 @@ function getInferredBracketTeam(
   match: MatchWithTeams,
   side: "home" | "away",
   fixedTopTwoPlacements: FixedGroupPlacementMap,
+  fixedThirdPlacePlacements: FixedGroupPlacementMap,
 ) {
   const storedTeam = side === "home" ? match.home_team : match.away_team;
   if (storedTeam) return null;
 
   const placeholder =
     side === "home" ? match.home_placeholder : match.away_placeholder;
-  const parsedPlaceholder = parseTopTwoPlaceholder(placeholder);
-  if (!parsedPlaceholder) return null;
+  const parsedTopTwoPlaceholder = parseTopTwoPlaceholder(placeholder);
 
-  return (
-    fixedTopTwoPlacements.get(
-      fixedGroupPlacementKey(
-        parsedPlaceholder.groupName,
-        parsedPlaceholder.rank,
-      ),
-    ) ?? null
-  );
+  if (parsedTopTwoPlaceholder) {
+    return (
+      fixedTopTwoPlacements.get(
+        fixedGroupPlacementKey(
+          parsedTopTwoPlaceholder.groupName,
+          parsedTopTwoPlaceholder.rank,
+        ),
+      ) ?? null
+    );
+  }
+
+  const parsedThirdPlacePlaceholder = parseThirdPlacePlaceholder(placeholder);
+  const winnerGroup = topSeedGroupForMatch(match);
+  const thirdPlaceGroups = Array.from(fixedThirdPlacePlacements.keys()).map((key) => key.split(":")[0]);
+
+  if (!parsedThirdPlacePlaceholder || !winnerGroup || thirdPlaceGroups.length !== 8) {
+    return null;
+  }
+
+  const thirdGroup = getThirdPlaceOpponentGroup(thirdPlaceGroups, winnerGroup as ThirdPlaceWinnerGroup);
+  if (!thirdGroup || !parsedThirdPlacePlaceholder.includes(thirdGroup)) return null;
+
+  return fixedThirdPlacePlacements.get(fixedGroupPlacementKey(thirdGroup, 3)) ?? null;
 }
 
 function BracketTeam({
   match,
   side,
   fixedTopTwoPlacements,
+  fixedThirdPlacePlacements,
   specialEffectActive,
 }: {
   match: MatchWithTeams;
   side: "home" | "away";
   fixedTopTwoPlacements: FixedGroupPlacementMap;
+  fixedThirdPlacePlacements: FixedGroupPlacementMap;
   specialEffectActive: boolean;
 }) {
   const storedTeam = side === "home" ? match.home_team : match.away_team;
@@ -637,6 +728,7 @@ function BracketTeam({
     match,
     side,
     fixedTopTwoPlacements,
+    fixedThirdPlacePlacements,
   );
   const rawTeam = storedTeam ?? inferredTeam;
   const team = applySpecialEffectToTeam(rawTeam, specialEffectActive);
@@ -659,11 +751,13 @@ function BracketMatch({
   match,
   displayNumber,
   fixedTopTwoPlacements,
+  fixedThirdPlacePlacements,
   specialEffectActive,
 }: {
   match: MatchWithTeams;
   displayNumber: number;
   fixedTopTwoPlacements: FixedGroupPlacementMap;
+  fixedThirdPlacePlacements: FixedGroupPlacementMap;
   specialEffectActive: boolean;
 }) {
   return (
@@ -678,12 +772,14 @@ function BracketMatch({
         match={match}
         side="home"
         fixedTopTwoPlacements={fixedTopTwoPlacements}
+        fixedThirdPlacePlacements={fixedThirdPlacePlacements}
         specialEffectActive={specialEffectActive}
       />
       <BracketTeam
         match={match}
         side="away"
         fixedTopTwoPlacements={fixedTopTwoPlacements}
+        fixedThirdPlacePlacements={fixedThirdPlacePlacements}
         specialEffectActive={specialEffectActive}
       />
     </article>
@@ -716,6 +812,7 @@ export default async function TablesPage() {
   const scenariosByGroup = buildGroupScenarioMap(teams, matches);
   const standings = buildStandings(teams, matches, scenariosByGroup);
   const fixedTopTwoPlacements = calculateFixedTopTwoPlacements(teams, matches);
+  const fixedThirdPlacePlacements = calculateFixedThirdPlacePlacements(teams, matches);
   const currentStage = getCurrentStage(matches);
   const thirdPlaceMatch = matches.find(
     (match) => match.stage === "third_place",
@@ -836,6 +933,7 @@ export default async function TablesPage() {
                             displayNumbers.get(match.id) ?? match.match_number
                           }
                           fixedTopTwoPlacements={fixedTopTwoPlacements}
+                          fixedThirdPlacePlacements={fixedThirdPlacePlacements}
                           specialEffectActive={specialEffectActive}
                         />
                       ))}
@@ -858,6 +956,7 @@ export default async function TablesPage() {
                         thirdPlaceMatch.match_number
                       }
                       fixedTopTwoPlacements={fixedTopTwoPlacements}
+                      fixedThirdPlacePlacements={fixedThirdPlacePlacements}
                       specialEffectActive={specialEffectActive}
                     />
                   </div>

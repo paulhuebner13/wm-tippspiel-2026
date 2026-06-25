@@ -5093,3 +5093,72 @@ html[data-theme='dark'] .standingsTable tr.standingEliminated td {
 .expectedThirdTable td:nth-child(3) {
   text-align: left;
 }
+
+.targetRoundOf32Card {
+  margin-top: 14px;
+}
+
+.targetRoundOf32Card h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.targetRoundOf32Meta {
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.targetRoundOf32Grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.targetRoundOf32Grid h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.targetRoundOf32Table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.targetRoundOf32Table th,
+.targetRoundOf32Table td {
+  border-bottom: 1px solid var(--line);
+  padding: 6px 5px;
+  text-align: right;
+  vertical-align: middle;
+}
+
+.targetRoundOf32Table th:first-child,
+.targetRoundOf32Table td:first-child,
+.targetRoundOf32Table th:nth-child(2),
+.targetRoundOf32Table td:nth-child(2) {
+  text-align: left;
+}
+
+.targetRoundOf32Table th {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+@media (max-width: 760px) {
+  .targetRoundOf32Grid {
+    grid-template-columns: 1fr;
+  }
+
+  .targetRoundOf32Table {
+    font-size: 10px;
+  }
+
+  .targetRoundOf32Table th,
+  .targetRoundOf32Table td {
+    padding: 5px 4px;
+  }
+}

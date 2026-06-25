@@ -2,6 +2,7 @@ import { Flag } from '@/components/Flag';
 import { Nav } from '@/components/Nav';
 import { getFifaRanking } from '@/lib/fifaRankings';
 import { runTipOptimizer } from '@/lib/optimizer';
+import { getThirdPlaceOpponentGroup, type ThirdPlaceWinnerGroup } from '@/lib/roundOf32Thirds';
 import { requireAdmin } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import {
@@ -56,6 +57,26 @@ type TeamSimulationRow = {
   averageGoalDifference: number;
   thirdAveragePoints: number;
   thirdAverageGoalDifference: number;
+};
+
+type RoundOf32SimulationMatch = {
+  matchNumber: number;
+  venue: string;
+  homeTeam: Team | null;
+  awayTeam: Team | null;
+};
+
+type TargetOpponentSimulationRow = {
+  team: Team;
+  probability: number;
+  conditionalProbability: number;
+};
+
+type TargetMatchSimulationRow = {
+  matchNumber: number;
+  venue: string;
+  probability: number;
+  conditionalProbability: number;
 };
 
 const SIMULATION_RUNS = 10000;
@@ -302,6 +323,55 @@ function formatAverage(value: number) {
   return value.toFixed(1).replace('.', ',');
 }
 
+function findTargetTeam(teams: Team[]) {
+  return (
+    teams.find((team) => team.name === 'Österreich') ??
+    teams.find((team) => team.short_name === 'AUT') ??
+    null
+  );
+}
+
+function getPlacementTeam(standingsByGroup: Map<string, StandingRow[]>, groupName: string, rank: number) {
+  return standingsByGroup.get(groupName)?.[rank - 1]?.team ?? null;
+}
+
+function buildRoundOf32SimulationMatches(
+  standingsByGroup: Map<string, StandingRow[]>,
+  advancedThirdGroups: string[],
+  matches: MatchWithTeams[],
+): RoundOf32SimulationMatch[] {
+  const matchByNumber = new Map(matches.map((match) => [match.match_number, match]));
+
+  const matchInfo = (matchNumber: number) => ({
+    matchNumber,
+    venue: matchByNumber.get(matchNumber)?.venue ?? 'Offen',
+  });
+
+  const thirdTeamForWinner = (winnerGroup: ThirdPlaceWinnerGroup) => {
+    const thirdGroup = getThirdPlaceOpponentGroup(advancedThirdGroups, winnerGroup);
+    return thirdGroup ? getPlacementTeam(standingsByGroup, thirdGroup, 3) : null;
+  };
+
+  return [
+    { ...matchInfo(73), homeTeam: getPlacementTeam(standingsByGroup, 'A', 2), awayTeam: getPlacementTeam(standingsByGroup, 'B', 2) },
+    { ...matchInfo(74), homeTeam: getPlacementTeam(standingsByGroup, 'E', 1), awayTeam: thirdTeamForWinner('1E') },
+    { ...matchInfo(75), homeTeam: getPlacementTeam(standingsByGroup, 'F', 1), awayTeam: getPlacementTeam(standingsByGroup, 'C', 2) },
+    { ...matchInfo(76), homeTeam: getPlacementTeam(standingsByGroup, 'C', 1), awayTeam: getPlacementTeam(standingsByGroup, 'F', 2) },
+    { ...matchInfo(77), homeTeam: getPlacementTeam(standingsByGroup, 'I', 1), awayTeam: thirdTeamForWinner('1I') },
+    { ...matchInfo(78), homeTeam: getPlacementTeam(standingsByGroup, 'E', 2), awayTeam: getPlacementTeam(standingsByGroup, 'I', 2) },
+    { ...matchInfo(79), homeTeam: getPlacementTeam(standingsByGroup, 'A', 1), awayTeam: thirdTeamForWinner('1A') },
+    { ...matchInfo(80), homeTeam: getPlacementTeam(standingsByGroup, 'L', 1), awayTeam: thirdTeamForWinner('1L') },
+    { ...matchInfo(81), homeTeam: getPlacementTeam(standingsByGroup, 'D', 1), awayTeam: thirdTeamForWinner('1D') },
+    { ...matchInfo(82), homeTeam: getPlacementTeam(standingsByGroup, 'G', 1), awayTeam: thirdTeamForWinner('1G') },
+    { ...matchInfo(83), homeTeam: getPlacementTeam(standingsByGroup, 'K', 2), awayTeam: getPlacementTeam(standingsByGroup, 'L', 2) },
+    { ...matchInfo(84), homeTeam: getPlacementTeam(standingsByGroup, 'H', 1), awayTeam: getPlacementTeam(standingsByGroup, 'J', 2) },
+    { ...matchInfo(85), homeTeam: getPlacementTeam(standingsByGroup, 'B', 1), awayTeam: thirdTeamForWinner('1B') },
+    { ...matchInfo(86), homeTeam: getPlacementTeam(standingsByGroup, 'J', 1), awayTeam: getPlacementTeam(standingsByGroup, 'H', 2) },
+    { ...matchInfo(87), homeTeam: getPlacementTeam(standingsByGroup, 'K', 1), awayTeam: thirdTeamForWinner('1K') },
+    { ...matchInfo(88), homeTeam: getPlacementTeam(standingsByGroup, 'D', 2), awayTeam: getPlacementTeam(standingsByGroup, 'G', 2) },
+  ];
+}
+
 function runQualificationSimulation(
   teams: Team[],
   matches: MatchWithTeams[],
@@ -331,6 +401,9 @@ function runQualificationSimulation(
   );
   let matchesWithStoredData = 0;
   let matchesWithFallback = 0;
+  const targetTeam = findTargetTeam(teams);
+  const targetOpponentCounts = new Map<string, { team: Team; count: number }>();
+  const targetMatchCounts = new Map<number, { matchNumber: number; venue: string; count: number }>();
 
   for (const team of teams) {
     if (!team.group_name) continue;
@@ -356,12 +429,14 @@ function runQualificationSimulation(
       simulatedScores.set(matchId, pickScoreFromPool(pool));
     }
 
-    const thirdPlacedRows: StandingRow[] = [];
+    const thirdPlacedRows: { groupName: string; row: StandingRow }[] = [];
+    const standingsByGroup = new Map<string, StandingRow[]>();
 
     for (const [groupName, groupTeams] of teamsByGroup.entries()) {
       const matchesForGroup = groupMatches.filter((match) => match.group_name === groupName);
       const rows = buildRowsForGroup(groupTeams, matchesForGroup, simulatedScores);
       const sortedRows = sortStandingRows(rows, matchesForGroup, simulatedScores);
+      standingsByGroup.set(groupName, sortedRows);
 
       sortedRows.forEach((row, index) => {
         const item = stats.get(row.team.id);
@@ -382,18 +457,49 @@ function runQualificationSimulation(
         if (item) item.advanced += 1;
       }
 
-      if (sortedRows[2]) thirdPlacedRows.push(sortedRows[2]);
+      if (sortedRows[2]) thirdPlacedRows.push({ groupName, row: sortedRows[2] });
     }
 
-    thirdPlacedRows
-      .sort(compareThirdPlaceRows)
-      .slice(0, 8)
-      .forEach((row) => {
-        const item = stats.get(row.team.id);
-        if (!item) return;
-        item.advanced += 1;
-        item.thirdQualified += 1;
-      });
+    const qualifiedThirdPlacedRows = thirdPlacedRows
+      .sort((a, b) => compareThirdPlaceRows(a.row, b.row))
+      .slice(0, 8);
+
+    qualifiedThirdPlacedRows.forEach(({ row }) => {
+      const item = stats.get(row.team.id);
+      if (!item) return;
+      item.advanced += 1;
+      item.thirdQualified += 1;
+    });
+
+    if (targetTeam) {
+      const roundOf32Matches = buildRoundOf32SimulationMatches(
+        standingsByGroup,
+        qualifiedThirdPlacedRows.map((entry) => entry.groupName),
+        matches,
+      );
+      const targetMatch = roundOf32Matches.find(
+        (match) => match.homeTeam?.id === targetTeam.id || match.awayTeam?.id === targetTeam.id,
+      );
+
+      if (targetMatch) {
+        const opponent = targetMatch.homeTeam?.id === targetTeam.id ? targetMatch.awayTeam : targetMatch.homeTeam;
+
+        if (opponent) {
+          const existingOpponent = targetOpponentCounts.get(opponent.id);
+          targetOpponentCounts.set(opponent.id, {
+            team: opponent,
+            count: (existingOpponent?.count ?? 0) + 1,
+          });
+        }
+
+        const existingMatch = targetMatchCounts.get(targetMatch.matchNumber);
+        targetMatchCounts.set(targetMatch.matchNumber, {
+          matchNumber: targetMatch.matchNumber,
+          venue: targetMatch.venue,
+          count: (existingMatch?.count ?? 0) + 1,
+        });
+      }
+    }
   }
 
   const rows: TeamSimulationRow[] = teams
@@ -421,7 +527,34 @@ function runQualificationSimulation(
       return b.advancementProbability - a.advancementProbability;
     });
 
-  return { rows, runs, matchesWithStoredData, matchesWithFallback };
+  const targetQualificationCount = targetTeam ? stats.get(targetTeam.id)?.advanced ?? 0 : 0;
+  const targetOpponentRows: TargetOpponentSimulationRow[] = Array.from(targetOpponentCounts.values())
+    .map((entry) => ({
+      team: entry.team,
+      probability: entry.count / runs,
+      conditionalProbability: targetQualificationCount > 0 ? entry.count / targetQualificationCount : 0,
+    }))
+    .sort((a, b) => b.probability - a.probability);
+
+  const targetMatchRows: TargetMatchSimulationRow[] = Array.from(targetMatchCounts.values())
+    .map((entry) => ({
+      matchNumber: entry.matchNumber,
+      venue: entry.venue,
+      probability: entry.count / runs,
+      conditionalProbability: targetQualificationCount > 0 ? entry.count / targetQualificationCount : 0,
+    }))
+    .sort((a, b) => b.probability - a.probability);
+
+  return {
+    rows,
+    runs,
+    matchesWithStoredData,
+    matchesWithFallback,
+    targetTeam,
+    targetQualificationProbability: targetQualificationCount / runs,
+    targetOpponentRows,
+    targetMatchRows,
+  };
 }
 
 export default async function SimulationPage() {
@@ -531,6 +664,71 @@ export default async function SimulationPage() {
             </article>
           ))}
         </section>
+
+        {simulation.targetTeam && (
+          <section className="card targetRoundOf32Card">
+            <h2>Österreich im Sechzehntelfinale</h2>
+            <div className="targetRoundOf32Meta">
+              Weiterkommen: <strong>{formatProbability(simulation.targetQualificationProbability)}</strong>
+            </div>
+
+            <div className="targetRoundOf32Grid">
+              <div>
+                <h3>Wahrscheinlichste Gegner</h3>
+                <table className="targetRoundOf32Table">
+                  <thead>
+                    <tr>
+                      <th>Gegner</th>
+                      <th>Gesamt</th>
+                      <th>Falls weiter</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {simulation.targetOpponentRows.slice(0, 8).map((row) => {
+                      const displayTeam = applySpecialEffectToTeam(row.team, specialEffectActive) ?? row.team;
+                      return (
+                        <tr key={row.team.id}>
+                          <td>
+                            <span className="simulationTeamCell">
+                              <Flag team={displayTeam} />
+                              <span>{displayTeam.name}</span>
+                            </span>
+                          </td>
+                          <td className="simulationProbabilityStrong">{formatProbability(row.probability)}</td>
+                          <td>{formatProbability(row.conditionalProbability)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div>
+                <h3>Wahrscheinlichste Spiele</h3>
+                <table className="targetRoundOf32Table">
+                  <thead>
+                    <tr>
+                      <th>Spiel</th>
+                      <th>Ort</th>
+                      <th>Gesamt</th>
+                      <th>Falls weiter</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {simulation.targetMatchRows.map((row) => (
+                      <tr key={row.matchNumber}>
+                        <td>Spiel {row.matchNumber}</td>
+                        <td>{row.venue}</td>
+                        <td className="simulationProbabilityStrong">{formatProbability(row.probability)}</td>
+                        <td>{formatProbability(row.conditionalProbability)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        )}
 
         <section className="card expectedThirdCard">
           <h2>Erwartete Drittplatzierte</h2>

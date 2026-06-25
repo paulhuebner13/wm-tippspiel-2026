@@ -14,6 +14,7 @@ import { isKnockoutStage } from "@/lib/scoring";
 import { isPredictionLocked } from "@/lib/time";
 import { getBracketTargetsForSource, getLoserTeamId } from "@/lib/bracket";
 import {
+  calculateFixedThirdPlacePlacements,
   calculateFixedTopTwoPlacements,
   getInferredBracketTeam,
   type MatchWithTeams,
@@ -60,15 +61,18 @@ async function getEffectiveRoundOf32TeamIds(match: MatchTeamResolutionInput) {
   }
 
   const fixedTopTwoPlacements = calculateFixedTopTwoPlacements(teams, matches);
+  const fixedThirdPlacePlacements = calculateFixedThirdPlacePlacements(teams, matches);
   const inferredHomeTeam = getInferredBracketTeam(
     currentMatch,
     "home",
     fixedTopTwoPlacements,
+    fixedThirdPlacePlacements,
   );
   const inferredAwayTeam = getInferredBracketTeam(
     currentMatch,
     "away",
     fixedTopTwoPlacements,
+    fixedThirdPlacePlacements,
   );
 
   return {

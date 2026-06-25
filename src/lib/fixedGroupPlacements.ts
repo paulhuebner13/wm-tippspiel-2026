@@ -1,4 +1,9 @@
 import { getFifaRanking } from "./fifaRankings";
+import {
+  getThirdPlaceOpponentGroup,
+  isThirdPlaceWinnerGroup,
+  ROUND_OF_32_THIRD_PLACE_MATCH_NUMBERS,
+} from "./roundOf32Thirds";
 import type { Match, Team } from "./types";
 
 export type MatchWithTeams = Match & {
@@ -124,6 +129,36 @@ export function parseTopTwoPlaceholder(value: string | null) {
     rank: match[1] === "Erster" ? 1 : 2,
     groupName: match[2],
   };
+}
+
+export function parseThirdPlacePlaceholder(value: string | null) {
+  if (!value) return null;
+
+  const match = value.match(/^Dritter Gruppe ([A-L](?:\/[A-L])*)$/);
+  if (!match) return null;
+
+  return match[1].split("/");
+}
+
+function topSeedGroupForMatch(match: MatchWithTeams) {
+  const knownByMatchNumber = Object.entries(ROUND_OF_32_THIRD_PLACE_MATCH_NUMBERS).find(
+    ([, matchNumber]) => matchNumber === match.match_number,
+  )?.[0];
+
+  if (knownByMatchNumber && isThirdPlaceWinnerGroup(knownByMatchNumber)) {
+    return knownByMatchNumber;
+  }
+
+  const placeholders = [match.home_placeholder, match.away_placeholder];
+  for (const placeholder of placeholders) {
+    const parsed = parseTopTwoPlaceholder(placeholder);
+    if (parsed?.rank === 1) {
+      const key = `1${parsed.groupName}`;
+      if (isThirdPlaceWinnerGroup(key)) return key;
+    }
+  }
+
+  return null;
 }
 
 function buildMiniTable(
@@ -268,6 +303,65 @@ function calculatePossibleRanks(teams: Team[], groupMatches: MatchWithTeams[]) {
   return possibleRanks;
 }
 
+function groupHasAllResults(groupMatches: MatchWithTeams[]) {
+  return groupMatches.length > 0 && groupMatches.every((match) => hasResult(match));
+}
+
+function buildCompletedGroupStandings(teams: Team[], matches: MatchWithTeams[]) {
+  const standingsByGroup = new Map<string, StandingRow[]>();
+  const teamsByGroup = new Map<string, Team[]>();
+
+  for (const team of teams) {
+    if (!team.group_name) continue;
+    if (!teamsByGroup.has(team.group_name)) teamsByGroup.set(team.group_name, []);
+    teamsByGroup.get(team.group_name)?.push(team);
+  }
+
+  for (const [groupName, groupTeams] of teamsByGroup.entries()) {
+    const groupMatches = matches.filter(
+      (match) => match.stage === "group" && match.group_name === groupName,
+    );
+
+    if (!groupHasAllResults(groupMatches)) continue;
+
+    const rows = buildRowsForGroup(groupTeams, groupMatches);
+    standingsByGroup.set(groupName, sortStandingRows(rows, groupMatches));
+  }
+
+  return standingsByGroup;
+}
+
+export function calculateFixedThirdPlacePlacements(
+  teams: Team[],
+  matches: MatchWithTeams[],
+) {
+  const fixedPlacements: FixedGroupPlacementMap = new Map();
+  const completedStandings = buildCompletedGroupStandings(teams, matches);
+
+  if (completedStandings.size < 12) return fixedPlacements;
+
+  const thirdPlacedRows = Array.from(completedStandings.entries())
+    .map(([groupName, rows]) => ({ groupName, row: rows[2] }))
+    .filter((entry): entry is { groupName: string; row: StandingRow } => Boolean(entry.row))
+    .sort((a, b) => compareThirdPlaceRows(a.row, b.row));
+
+  for (const entry of thirdPlacedRows.slice(0, 8)) {
+    fixedPlacements.set(fixedGroupPlacementKey(entry.groupName, 3), entry.row.team);
+  }
+
+  return fixedPlacements;
+}
+
+function compareThirdPlaceRows(a: StandingRow, b: StandingRow) {
+  if (b.points !== a.points) return b.points - a.points;
+  if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
+  if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
+  const rankA = fifaRankValue(a.team);
+  const rankB = fifaRankValue(b.team);
+  if (rankA !== rankB) return rankA - rankB;
+  return a.team.name.localeCompare(b.team.name, "de-AT");
+}
+
 export function calculateFixedTopTwoPlacements(
   teams: Team[],
   matches: MatchWithTeams[],
@@ -306,23 +400,42 @@ export function getInferredBracketTeam(
   match: MatchWithTeams,
   side: "home" | "away",
   fixedTopTwoPlacements: FixedGroupPlacementMap,
+  fixedThirdPlacePlacements?: FixedGroupPlacementMap,
 ) {
   const storedTeam = side === "home" ? match.home_team : match.away_team;
   if (storedTeam) return null;
 
   const placeholder =
     side === "home" ? match.home_placeholder : match.away_placeholder;
-  const parsedPlaceholder = parseTopTwoPlaceholder(placeholder);
-  if (!parsedPlaceholder) return null;
+  const parsedTopTwoPlaceholder = parseTopTwoPlaceholder(placeholder);
 
-  return (
-    fixedTopTwoPlacements.get(
-      fixedGroupPlacementKey(
-        parsedPlaceholder.groupName,
-        parsedPlaceholder.rank,
-      ),
-    ) ?? null
-  );
+  if (parsedTopTwoPlaceholder) {
+    return (
+      fixedTopTwoPlacements.get(
+        fixedGroupPlacementKey(
+          parsedTopTwoPlaceholder.groupName,
+          parsedTopTwoPlaceholder.rank,
+        ),
+      ) ?? null
+    );
+  }
+
+  const thirdPlaceGroups = fixedThirdPlacePlacements
+    ? Array.from(fixedThirdPlacePlacements.keys()).map((key) => key.split(":")[0])
+    : [];
+  const winnerGroup = topSeedGroupForMatch(match);
+  const parsedThirdPlacePlaceholder = parseThirdPlacePlaceholder(placeholder);
+
+  if (!winnerGroup || !parsedThirdPlacePlaceholder || thirdPlaceGroups.length !== 8) {
+    return null;
+  }
+
+  const thirdGroup = getThirdPlaceOpponentGroup(thirdPlaceGroups, winnerGroup);
+  if (!thirdGroup || !parsedThirdPlacePlaceholder.includes(thirdGroup)) {
+    return null;
+  }
+
+  return fixedThirdPlacePlacements?.get(fixedGroupPlacementKey(thirdGroup, 3)) ?? null;
 }
 
 export function applyFixedTopTwoToMatches(
@@ -330,17 +443,20 @@ export function applyFixedTopTwoToMatches(
   teams: Team[],
 ) {
   const fixedTopTwoPlacements = calculateFixedTopTwoPlacements(teams, matches);
+  const fixedThirdPlacePlacements = calculateFixedThirdPlacePlacements(teams, matches);
 
   return matches.map((match) => {
     const inferredHomeTeam = getInferredBracketTeam(
       match,
       "home",
       fixedTopTwoPlacements,
+      fixedThirdPlacePlacements,
     );
     const inferredAwayTeam = getInferredBracketTeam(
       match,
       "away",
       fixedTopTwoPlacements,
+      fixedThirdPlacePlacements,
     );
 
     if (!inferredHomeTeam && !inferredAwayTeam) return match;
