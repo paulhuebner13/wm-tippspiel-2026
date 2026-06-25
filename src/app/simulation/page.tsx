@@ -464,7 +464,19 @@ export default async function SimulationPage() {
         .sort((a, b) => b.thirdTotalProbability - a.thirdTotalProbability)[0];
       return row ? { ...row, groupName } : null;
     })
-    .filter((row): row is TeamSimulationRow => row !== null);
+    .filter((row): row is TeamSimulationRow => row !== null)
+    .sort((a, b) => {
+      if (b.thirdAveragePoints !== a.thirdAveragePoints) {
+        return b.thirdAveragePoints - a.thirdAveragePoints;
+      }
+      if (b.thirdAverageGoalDifference !== a.thirdAverageGoalDifference) {
+        return b.thirdAverageGoalDifference - a.thirdAverageGoalDifference;
+      }
+      if (b.thirdConditionalAdvancementProbability !== a.thirdConditionalAdvancementProbability) {
+        return b.thirdConditionalAdvancementProbability - a.thirdConditionalAdvancementProbability;
+      }
+      return a.team.name.localeCompare(b.team.name, 'de-AT');
+    });
 
   return (
     <>
@@ -526,6 +538,7 @@ export default async function SimulationPage() {
             <table className="expectedThirdTable">
               <thead>
                 <tr>
+                  <th>#</th>
                   <th>Grp</th>
                   <th>Team</th>
                   <th>3.</th>
@@ -535,10 +548,12 @@ export default async function SimulationPage() {
                 </tr>
               </thead>
               <tbody>
-                {expectedThirdRows.map((row) => {
+                {expectedThirdRows.map((row, index) => {
                   const displayTeam = applySpecialEffectToTeam(row.team, specialEffectActive) ?? row.team;
+                  const statusClass = index < 8 ? 'expectedThirdQualified' : 'expectedThirdEliminated';
                   return (
-                    <tr key={row.groupName}>
+                    <tr className={statusClass} key={row.groupName}>
+                      <td>{index + 1}</td>
                       <td>{row.groupName}</td>
                       <td>
                         <span className="simulationTeamCell">

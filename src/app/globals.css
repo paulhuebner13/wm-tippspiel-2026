@@ -5072,3 +5072,24 @@ html[data-theme='dark'] .standingsTable tr.standingEliminated td {
     max-width: 78px;
   }
 }
+
+/* v103: rank and highlight expected third-place teams. */
+.expectedThirdQualified {
+  background: color-mix(in srgb, #22c55e 13%, transparent);
+}
+
+.expectedThirdEliminated {
+  background: color-mix(in srgb, #ef4444 11%, transparent);
+}
+
+.expectedThirdTable th:first-child,
+.expectedThirdTable td:first-child,
+.expectedThirdTable th:nth-child(2),
+.expectedThirdTable td:nth-child(2) {
+  text-align: center;
+}
+
+.expectedThirdTable th:nth-child(3),
+.expectedThirdTable td:nth-child(3) {
+  text-align: left;
+}
