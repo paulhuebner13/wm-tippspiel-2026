@@ -12,7 +12,7 @@ export function ResultPermissionForm({
   return (
     <form action={toggleResultSubmitterAction} className="resultPermissionForm">
       <input type="hidden" name="profileId" value={profileId} />
-      <label className="resultPermissionCheck" title="Resultate">
+      <label className="resultPermissionCheck" title="Resultate und Simulation">
         <input
           name="canSubmitResults"
           type="checkbox"

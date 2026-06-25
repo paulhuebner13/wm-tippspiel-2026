@@ -878,6 +878,7 @@ export async function toggleResultSubmitterAction(formData: FormData) {
 
   revalidatePath("/players");
   revalidatePath("/admin");
+  revalidatePath("/simulation");
   redirect("/players?result_permission_saved=1");
 }
 

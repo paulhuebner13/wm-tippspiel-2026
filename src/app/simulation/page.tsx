@@ -3,7 +3,7 @@ import { Nav } from '@/components/Nav';
 import { getFifaRanking } from '@/lib/fifaRankings';
 import { runTipOptimizer } from '@/lib/optimizer';
 import { getThirdPlaceOpponentGroup, type ThirdPlaceWinnerGroup } from '@/lib/roundOf32Thirds';
-import { requireAdmin } from '@/lib/session';
+import { requireResultEditor } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import {
   applySpecialEffectToTeam,
@@ -558,7 +558,7 @@ function runQualificationSimulation(
 }
 
 export default async function SimulationPage() {
-  const user = await requireAdmin();
+  const user = await requireResultEditor();
 
   const [{ data: teamsData }, { data: matchesData }, { data: optimizerInputsData }, { data: optimizerSettings }] =
     await Promise.all([
