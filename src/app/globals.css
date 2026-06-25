@@ -4947,124 +4947,128 @@ html[data-theme='dark'] .standingsTable tr.standingEliminated td {
   color: #b91c1c;
 }
 
-/* v100: group qualification simulation. */
-.groupSimulationCard {
-  display: grid;
-  gap: 10px;
-  margin: 14px 0 16px;
+/* v102: compact admin-only simulation tab. */
+.simulationPage {
+  max-width: 980px;
 }
 
-.groupSimulationCard h2 {
-  margin: 0 0 6px;
-  font-size: 18px;
-}
-
-.groupSimulationCard p {
-  margin: 0;
-}
-
-.groupSimulationMeta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.groupSimulationMeta span {
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 6px 9px;
-  background: #f9fafb;
+.simulationMetaLine {
+  margin-top: 6px;
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 850;
-}
-
-.qualificationProbability {
-  white-space: nowrap;
-  font-weight: 950;
-  font-variant-numeric: tabular-nums;
-}
-
-
-.simulationPage .subtle {
-  max-width: 720px;
-}
-
-.simulationSummaryCard {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.simulationSummaryCard div {
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 10px;
-  background: color-mix(in srgb, var(--card) 86%, var(--bg));
-  display: grid;
-  gap: 4px;
-  text-align: center;
-}
-
-.simulationSummaryCard span {
-  color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
-}
-
-.simulationSummaryCard strong {
-  font-size: 20px;
-  font-weight: 950;
+  line-height: 1.3;
 }
 
 .simulationGroupsGrid {
   display: grid;
-  gap: 14px;
-  margin-top: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
 }
 
-.simulationGroupCard h2 {
-  margin: 0 0 10px;
+.simulationGroupCard {
+  padding: 10px;
 }
 
-.simulationTableWrap {
+.simulationGroupCard h2,
+.expectedThirdCard h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.simulationTableWrap,
+.expectedThirdTableWrap {
   overflow-x: auto;
 }
 
-.simulationTable {
+.simulationTable,
+.expectedThirdTable {
   width: 100%;
   border-collapse: collapse;
-  min-width: 720px;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.15;
 }
 
 .simulationTable th,
-.simulationTable td {
+.simulationTable td,
+.expectedThirdTable th,
+.expectedThirdTable td {
   border-bottom: 1px solid var(--line);
-  padding: 9px 8px;
+  padding: 5px 4px;
   text-align: right;
   white-space: nowrap;
 }
 
 .simulationTable th:first-child,
-.simulationTable td:first-child {
+.simulationTable td:first-child,
+.expectedThirdTable th:nth-child(2),
+.expectedThirdTable td:nth-child(2) {
   text-align: left;
-  min-width: 170px;
+}
+
+.simulationTable th:first-child,
+.simulationTable td:first-child {
+  min-width: 108px;
 }
 
 .simulationTeamCell {
+  min-width: 0;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
   font-weight: 850;
+}
+
+.simulationTeamCell > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 92px;
 }
 
 .simulationProbabilityStrong {
   font-weight: 950;
 }
 
+.expectedThirdCard {
+  margin-top: 14px;
+}
+
+.expectedThirdTable {
+  min-width: 520px;
+}
+
 @media (max-width: 640px) {
-  .simulationSummaryCard {
+  .simulationPage {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .simulationGroupsGrid {
     grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .simulationGroupCard {
+    padding: 8px;
+  }
+
+  .simulationTable,
+  .expectedThirdTable {
+    font-size: 10.5px;
+  }
+
+  .simulationTable th,
+  .simulationTable td,
+  .expectedThirdTable th,
+  .expectedThirdTable td {
+    padding: 4px 3px;
+  }
+
+  .simulationTeamCell > span:last-child {
+    max-width: 78px;
   }
 }

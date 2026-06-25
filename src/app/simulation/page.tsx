@@ -2,7 +2,7 @@ import { Flag } from '@/components/Flag';
 import { Nav } from '@/components/Nav';
 import { getFifaRanking } from '@/lib/fifaRankings';
 import { runTipOptimizer } from '@/lib/optimizer';
-import { requireUser } from '@/lib/session';
+import { requireAdmin } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import {
   applySpecialEffectToTeam,
@@ -51,8 +51,11 @@ type TeamSimulationRow = {
   secondProbability: number;
   thirdQualifiedProbability: number;
   thirdTotalProbability: number;
+  thirdConditionalAdvancementProbability: number;
   averagePoints: number;
   averageGoalDifference: number;
+  thirdAveragePoints: number;
+  thirdAverageGoalDifference: number;
 };
 
 const SIMULATION_RUNS = 10000;
@@ -290,9 +293,9 @@ function pickScoreFromPool(pool: ScoreOption[]): SimulatedScore {
 }
 
 function formatProbability(value: number) {
-  if (value > 0 && value < 0.001) return '<0,1 %';
-  if (value > 0.999 && value < 1) return '>99,9 %';
-  return `${(value * 100).toFixed(1).replace('.', ',')} %`;
+  if (value > 0 && value < 0.005) return '<1 %';
+  if (value > 0.995 && value < 1) return '>99 %';
+  return `${Math.round(value * 100)} %`;
 }
 
 function formatAverage(value: number) {
@@ -319,6 +322,8 @@ function runQualificationSimulation(
         second: 0,
         thirdQualified: 0,
         thirdTotal: 0,
+        thirdPointsSum: 0,
+        thirdGoalDifferenceSum: 0,
         pointsSum: 0,
         goalDifferenceSum: 0,
       },
@@ -365,7 +370,11 @@ function runQualificationSimulation(
         item.goalDifferenceSum += row.goalDifference;
         if (index === 0) item.first += 1;
         if (index === 1) item.second += 1;
-        if (index === 2) item.thirdTotal += 1;
+        if (index === 2) {
+          item.thirdTotal += 1;
+          item.thirdPointsSum += row.points;
+          item.thirdGoalDifferenceSum += row.goalDifference;
+        }
       });
 
       for (const row of sortedRows.slice(0, 2)) {
@@ -399,8 +408,11 @@ function runQualificationSimulation(
         secondProbability: (item?.second ?? 0) / runs,
         thirdQualifiedProbability: (item?.thirdQualified ?? 0) / runs,
         thirdTotalProbability: (item?.thirdTotal ?? 0) / runs,
+        thirdConditionalAdvancementProbability: (item?.thirdTotal ?? 0) > 0 ? (item?.thirdQualified ?? 0) / (item?.thirdTotal ?? 1) : 0,
         averagePoints: (item?.pointsSum ?? 0) / runs,
         averageGoalDifference: (item?.goalDifferenceSum ?? 0) / runs,
+        thirdAveragePoints: (item?.thirdTotal ?? 0) > 0 ? (item?.thirdPointsSum ?? 0) / (item?.thirdTotal ?? 1) : 0,
+        thirdAverageGoalDifference: (item?.thirdTotal ?? 0) > 0 ? (item?.thirdGoalDifferenceSum ?? 0) / (item?.thirdTotal ?? 1) : 0,
       };
     })
     .sort((a, b) => {
@@ -413,7 +425,7 @@ function runQualificationSimulation(
 }
 
 export default async function SimulationPage() {
-  const user = await requireUser();
+  const user = await requireAdmin();
 
   const [{ data: teamsData }, { data: matchesData }, { data: optimizerInputsData }, { data: optimizerSettings }] =
     await Promise.all([
@@ -445,29 +457,24 @@ export default async function SimulationPage() {
     rowsByGroup.get(row.groupName)?.push(row);
   }
 
+  const expectedThirdRows = Array.from(rowsByGroup.entries())
+    .map(([groupName, rows]) => {
+      const row = [...rows]
+        .filter((item) => item.thirdTotalProbability > 0)
+        .sort((a, b) => b.thirdTotalProbability - a.thirdTotalProbability)[0];
+      return row ? { ...row, groupName } : null;
+    })
+    .filter((row): row is TeamSimulationRow => row !== null);
+
   return (
     <>
       <Nav user={user} />
       <main className="page simulationPage">
         <h1>Simulation</h1>
-        <p className="subtle">
-          Monte-Carlo-Simulation der Gruppenphase auf Basis der gespeicherten Optimierer-Daten. Eingetragene Admin-Resultate und Spieler-Resultate werden fix übernommen.
-        </p>
 
-        <section className="card simulationSummaryCard">
-          <div>
-            <span>Durchläufe</span>
-            <strong>{simulation.runs.toLocaleString('de-AT')}</strong>
-          </div>
-          <div>
-            <span>Spiele mit Daten</span>
-            <strong>{simulation.matchesWithStoredData}</strong>
-          </div>
-          <div>
-            <span>Fallback-Spiele</span>
-            <strong>{simulation.matchesWithFallback}</strong>
-          </div>
-        </section>
+        <div className="simulationMetaLine">
+          {simulation.runs.toLocaleString('de-AT')} Simulationen · {simulation.matchesWithStoredData} Spiele mit Daten · {simulation.matchesWithFallback} Fallback-Spiele
+        </div>
 
         <section className="simulationGroupsGrid">
           {Array.from(rowsByGroup.entries()).map(([groupName, rows]) => (
@@ -481,9 +488,9 @@ export default async function SimulationPage() {
                       <th>Weiter</th>
                       <th>1.</th>
                       <th>2.</th>
-                      <th>3. weiter</th>
-                      <th>Ø Pkt</th>
-                      <th>Ø GD</th>
+                      <th>3W</th>
+                      <th>ØP</th>
+                      <th>ØGD</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -511,6 +518,44 @@ export default async function SimulationPage() {
               </div>
             </article>
           ))}
+        </section>
+
+        <section className="card expectedThirdCard">
+          <h2>Erwartete Drittplatzierte</h2>
+          <div className="expectedThirdTableWrap">
+            <table className="expectedThirdTable">
+              <thead>
+                <tr>
+                  <th>Grp</th>
+                  <th>Team</th>
+                  <th>3.</th>
+                  <th>Weiter</th>
+                  <th>Ø Pkt</th>
+                  <th>Ø GD</th>
+                </tr>
+              </thead>
+              <tbody>
+                {expectedThirdRows.map((row) => {
+                  const displayTeam = applySpecialEffectToTeam(row.team, specialEffectActive) ?? row.team;
+                  return (
+                    <tr key={row.groupName}>
+                      <td>{row.groupName}</td>
+                      <td>
+                        <span className="simulationTeamCell">
+                          <Flag team={displayTeam} />
+                          <span>{displayTeam.name}</span>
+                        </span>
+                      </td>
+                      <td>{formatProbability(row.thirdTotalProbability)}</td>
+                      <td className="simulationProbabilityStrong">{formatProbability(row.thirdConditionalAdvancementProbability)}</td>
+                      <td>{formatAverage(row.thirdAveragePoints)}</td>
+                      <td>{formatAverage(row.thirdAverageGoalDifference)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </section>
       </main>
     </>
