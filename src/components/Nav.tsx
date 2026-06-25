@@ -14,8 +14,9 @@ export function Nav({ user }: { user: Profile }) {
       <nav>
         <Link href="/matches">Tipps</Link>
         <Link href="/results">Ergebnisse</Link>
-        <Link href="/tables">Turnierbaum</Link>
         <Link href="/ranking">Ranking</Link>
+        <Link href="/tables">Turnierbaum</Link>
+        <Link href="/simulation">Simulation</Link>
         <Link href="/rules">Regeln</Link>
         <Link href="/countdown">Countdown</Link>
         {(user.is_admin || user.can_submit_results) && <Link className="adminNavLink" href="/admin">Resultate</Link>}

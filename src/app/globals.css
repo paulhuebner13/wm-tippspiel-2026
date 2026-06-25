@@ -4984,3 +4984,87 @@ html[data-theme='dark'] .standingsTable tr.standingEliminated td {
   font-weight: 950;
   font-variant-numeric: tabular-nums;
 }
+
+
+.simulationPage .subtle {
+  max-width: 720px;
+}
+
+.simulationSummaryCard {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.simulationSummaryCard div {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--card) 86%, var(--bg));
+  display: grid;
+  gap: 4px;
+  text-align: center;
+}
+
+.simulationSummaryCard span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.simulationSummaryCard strong {
+  font-size: 20px;
+  font-weight: 950;
+}
+
+.simulationGroupsGrid {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.simulationGroupCard h2 {
+  margin: 0 0 10px;
+}
+
+.simulationTableWrap {
+  overflow-x: auto;
+}
+
+.simulationTable {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.simulationTable th,
+.simulationTable td {
+  border-bottom: 1px solid var(--line);
+  padding: 9px 8px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.simulationTable th:first-child,
+.simulationTable td:first-child {
+  text-align: left;
+  min-width: 170px;
+}
+
+.simulationTeamCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 850;
+}
+
+.simulationProbabilityStrong {
+  font-weight: 950;
+}
+
+@media (max-width: 640px) {
+  .simulationSummaryCard {
+    grid-template-columns: 1fr;
+  }
+}
