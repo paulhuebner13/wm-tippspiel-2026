@@ -4946,3 +4946,41 @@ html[data-theme='dark'] .standingsTable tr.standingEliminated td {
 .changeAutoSaveStateerror {
   color: #b91c1c;
 }
+
+/* v100: group qualification simulation. */
+.groupSimulationCard {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 16px;
+}
+
+.groupSimulationCard h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.groupSimulationCard p {
+  margin: 0;
+}
+
+.groupSimulationMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.groupSimulationMeta span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 9px;
+  background: #f9fafb;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.qualificationProbability {
+  white-space: nowrap;
+  font-weight: 950;
+  font-variant-numeric: tabular-nums;
+}

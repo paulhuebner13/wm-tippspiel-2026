@@ -6,6 +6,7 @@ import { getFifaRanking } from "@/lib/fifaRankings";
 import { requireUser } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { formatKickoff } from "@/lib/time";
+import { runTipOptimizer } from "@/lib/optimizer";
 import {
   applySpecialEffectToTeam,
   getUserSpecialEffectActive,
@@ -49,6 +50,26 @@ type ScenarioStanding = {
 type TeamScenarioPlacement = {
   rank: number;
   row: StandingRow;
+};
+
+type OptimizerInputRow = {
+  match_id: string;
+  odds_text?: string | null;
+  probabilities_text?: string | null;
+  max_goals?: number | null;
+};
+
+type ScoreOption = {
+  home: number;
+  away: number;
+  probability: number;
+};
+
+type QualificationSimulationResult = {
+  runs: number;
+  probabilities: Map<string, number>;
+  matchesWithStoredData: number;
+  matchesWithFallback: number;
 };
 
 const BRACKET_STAGES: Stage[] = [
@@ -185,6 +206,202 @@ function compareThirdPlaceRows(a: StandingRow, b: StandingRow) {
   const rankB = fifaRankValue(b.team);
   if (rankA !== rankB) return rankA - rankB;
   return a.team.name.localeCompare(b.team.name, "de-AT");
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function normalizeScorePool(pool: ScoreOption[]) {
+  const filtered = pool.filter((score) => score.probability > 0);
+  const total = filtered.reduce((sum, score) => sum + score.probability, 0);
+  if (total <= 0) return [{ home: 1, away: 1, probability: 1 }];
+  return filtered.map((score) => ({
+    ...score,
+    probability: score.probability / total,
+  }));
+}
+
+function hasStoredOptimizerInput(input: OptimizerInputRow | undefined) {
+  return Boolean(
+    input &&
+    ((input.odds_text ?? "").trim() !== "" ||
+      (input.probabilities_text ?? "").trim() !== ""),
+  );
+}
+
+function buildFallbackScorePool(match: MatchWithTeams): ScoreOption[] {
+  const homeRank = match.home_team ? fifaRankValue(match.home_team) : 80;
+  const awayRank = match.away_team ? fifaRankValue(match.away_team) : 80;
+  const rankEdge = clamp((awayRank - homeRank) / 120, -0.22, 0.22);
+  const drawProbability = 0.28;
+  const homeProbability = clamp(0.36 + rankEdge, 0.14, 0.68);
+  const awayProbability = clamp(
+    1 - drawProbability - homeProbability,
+    0.14,
+    0.68,
+  );
+
+  return normalizeScorePool([
+    { home: 1, away: 0, probability: homeProbability * 0.42 },
+    { home: 2, away: 1, probability: homeProbability * 0.3 },
+    { home: 2, away: 0, probability: homeProbability * 0.18 },
+    { home: 3, away: 1, probability: homeProbability * 0.1 },
+    { home: 0, away: 0, probability: drawProbability * 0.35 },
+    { home: 1, away: 1, probability: drawProbability * 0.48 },
+    { home: 2, away: 2, probability: drawProbability * 0.17 },
+    { home: 0, away: 1, probability: awayProbability * 0.42 },
+    { home: 1, away: 2, probability: awayProbability * 0.3 },
+    { home: 0, away: 2, probability: awayProbability * 0.18 },
+    { home: 1, away: 3, probability: awayProbability * 0.1 },
+  ]);
+}
+
+function buildScorePoolFromOptimizer(
+  match: MatchWithTeams,
+  input: OptimizerInputRow | undefined,
+  sourceBlendWeight: number,
+): { pool: ScoreOption[]; usedStoredData: boolean } {
+  if (!hasStoredOptimizerInput(input)) {
+    return { pool: buildFallbackScorePool(match), usedStoredData: false };
+  }
+
+  const result = runTipOptimizer({
+    oddsText: input?.odds_text ?? "",
+    probabilitiesText: input?.probabilities_text ?? "",
+    sourceMode: "odds",
+    match,
+    homeRating: null,
+    awayRating: null,
+    maxGoals: Number(input?.max_goals ?? 7),
+    sourceBlendWeight,
+  });
+
+  const pool = result.possibleResults.map((score) => ({
+    home: score.home,
+    away: score.away,
+    probability: score.probability,
+  }));
+
+  if (pool.length === 0) {
+    return { pool: buildFallbackScorePool(match), usedStoredData: false };
+  }
+
+  return { pool: normalizeScorePool(pool), usedStoredData: true };
+}
+
+function pickScoreFromPool(pool: ScoreOption[]): SimulatedScore {
+  let draw = Math.random();
+
+  for (const score of pool) {
+    draw -= score.probability;
+    if (draw <= 0) return { home: score.home, away: score.away };
+  }
+
+  const fallback = pool[pool.length - 1];
+  return { home: fallback.home, away: fallback.away };
+}
+
+function formatQualificationProbability(value: number | undefined) {
+  if (value === undefined) return "–";
+  if (value > 0 && value < 0.001) return "<0,1 %";
+  if (value > 0.999 && value < 1) return ">99,9 %";
+  return `${(value * 100).toFixed(1).replace(".", ",")} %`;
+}
+
+function runQualificationSimulation(
+  teams: Team[],
+  matches: MatchWithTeams[],
+  optimizerInputs: OptimizerInputRow[],
+  sourceBlendWeight: number,
+  runs = 10000,
+): QualificationSimulationResult {
+  const groupMatches = matches.filter((match) => match.stage === "group");
+  const teamsByGroup = new Map<string, Team[]>();
+  const optimizerInputByMatchId = new Map(
+    optimizerInputs.map((input) => [input.match_id, input]),
+  );
+  const scorePoolsByMatchId = new Map<string, ScoreOption[]>();
+  const advancementCounts = new Map(teams.map((team) => [team.id, 0]));
+  let matchesWithStoredData = 0;
+  let matchesWithFallback = 0;
+
+  for (const team of teams) {
+    if (!team.group_name) continue;
+    if (!teamsByGroup.has(team.group_name))
+      teamsByGroup.set(team.group_name, []);
+    teamsByGroup.get(team.group_name)?.push(team);
+  }
+
+  for (const match of groupMatches) {
+    if (hasResult(match) || !match.home_team || !match.away_team) continue;
+
+    const { pool, usedStoredData } = buildScorePoolFromOptimizer(
+      match,
+      optimizerInputByMatchId.get(match.id),
+      sourceBlendWeight,
+    );
+    scorePoolsByMatchId.set(match.id, pool);
+    if (usedStoredData) matchesWithStoredData += 1;
+    else matchesWithFallback += 1;
+  }
+
+  for (let run = 0; run < runs; run++) {
+    const simulatedScores: SimulatedScoreMap = new Map();
+
+    for (const [matchId, pool] of scorePoolsByMatchId.entries()) {
+      simulatedScores.set(matchId, pickScoreFromPool(pool));
+    }
+
+    const thirdPlacedRows: StandingRow[] = [];
+
+    for (const [groupName, groupTeams] of teamsByGroup.entries()) {
+      const matchesForGroup = groupMatches.filter(
+        (match) => match.group_name === groupName,
+      );
+      const rows = buildRowsForGroup(
+        groupTeams,
+        matchesForGroup,
+        simulatedScores,
+      );
+      const sortedRows = sortStandingRows(
+        rows,
+        matchesForGroup,
+        simulatedScores,
+      );
+
+      for (const row of sortedRows.slice(0, 2)) {
+        advancementCounts.set(
+          row.team.id,
+          (advancementCounts.get(row.team.id) ?? 0) + 1,
+        );
+      }
+
+      if (sortedRows[2]) thirdPlacedRows.push(sortedRows[2]);
+    }
+
+    thirdPlacedRows
+      .sort(compareThirdPlaceRows)
+      .slice(0, 8)
+      .forEach((row) => {
+        advancementCounts.set(
+          row.team.id,
+          (advancementCounts.get(row.team.id) ?? 0) + 1,
+        );
+      });
+  }
+
+  return {
+    runs,
+    probabilities: new Map(
+      Array.from(advancementCounts.entries()).map(([teamId, count]) => [
+        teamId,
+        count / runs,
+      ]),
+    ),
+    matchesWithStoredData,
+    matchesWithFallback,
+  };
 }
 
 function thirdPlaceRowBeats(candidate: StandingRow, target: StandingRow) {
@@ -712,6 +929,34 @@ export default async function TablesPage() {
 
   const teams = (teamsData ?? []) as Team[];
   const matches = (matchesData ?? []) as MatchWithTeams[];
+
+  const [{ data: optimizerInputsData }, { data: optimizerSettings }] =
+    await Promise.all([
+      supabaseAdmin
+        .from("tip_optimizer_inputs")
+        .select("match_id, odds_text, probabilities_text, max_goals")
+        .in(
+          "match_id",
+          matches
+            .filter((match) => match.stage === "group")
+            .map((match) => match.id),
+        ),
+      supabaseAdmin
+        .from("tip_optimizer_settings")
+        .select("source_blend_weight")
+        .eq("id", 1)
+        .maybeSingle(),
+    ]);
+
+  const sourceBlendWeight = Number(
+    optimizerSettings?.source_blend_weight ?? 0.5,
+  );
+  const qualificationSimulation = runQualificationSimulation(
+    teams,
+    matches,
+    (optimizerInputsData ?? []) as OptimizerInputRow[],
+    sourceBlendWeight,
+  );
   const specialEffectActive = await getUserSpecialEffectActive(user.id);
   const scenariosByGroup = buildGroupScenarioMap(teams, matches);
   const standings = buildStandings(teams, matches, scenariosByGroup);
@@ -737,6 +982,27 @@ export default async function TablesPage() {
       <main className="page tablesPage">
         <h1>Turnierbaum</h1>
 
+        <section className="card groupSimulationCard">
+          <div>
+            <h2>Weiterkommens-Simulation</h2>
+            <p className="subtle">
+              {qualificationSimulation.runs.toLocaleString("de-AT")} Läufe auf
+              Basis der gespeicherten Optimierer-Daten. Eingetragene Admin- und
+              Spielerresultate sind fix.
+            </p>
+          </div>
+          <div className="groupSimulationMeta">
+            <span>
+              {qualificationSimulation.matchesWithStoredData} Spiele mit
+              Quoten/CSV
+            </span>
+            <span>
+              {qualificationSimulation.matchesWithFallback} Spiele mit
+              FIFA-Fallback
+            </span>
+          </div>
+        </section>
+
         <section className="tablesGrid">
           {standings.map((group) => (
             <article className="card groupTableCard" key={group.groupName}>
@@ -754,6 +1020,7 @@ export default async function TablesPage() {
                       <th>L</th>
                       <th>Pts</th>
                       <th>GD</th>
+                      <th>Weiter</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -784,6 +1051,13 @@ export default async function TablesPage() {
                             {row.goalDifference > 0
                               ? `+${row.goalDifference}`
                               : row.goalDifference}
+                          </td>
+                          <td className="qualificationProbability">
+                            {formatQualificationProbability(
+                              qualificationSimulation.probabilities.get(
+                                row.team.id,
+                              ),
+                            )}
                           </td>
                         </tr>
                       );
