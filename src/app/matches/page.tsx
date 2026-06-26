@@ -3,10 +3,7 @@ import { MatchCard } from "@/components/MatchCard";
 import { AutoScrollToCurrent } from "@/components/AutoScrollToCurrent";
 import { requireUser } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import {
-  getVisibleProfilesForUser,
-  getVisibleProfileIdSet,
-} from "@/lib/visibility";
+import { getVisibleProfilesForUser } from "@/lib/visibility";
 import { isMatchStillRelevant, isPredictionLocked } from "@/lib/time";
 import { runTipOptimizer } from "@/lib/optimizer";
 import { applyFixedTopTwoToMatches } from "@/lib/fixedGroupPlacements";
@@ -213,11 +210,8 @@ export default async function MatchesPage() {
   if (matchesError) throw new Error(matchesError.message);
 
   const visibleProfiles = await getVisibleProfilesForUser(user);
-  const visibleProfileIds = getVisibleProfileIdSet(visibleProfiles);
-
-  const predictionProfileIds = Array.from(
-    new Set([user.id, ...Array.from(visibleProfileIds)]),
-  );
+  const visibleProfileIds = visibleProfiles.map((profile) => profile.id);
+  const predictionProfileIds = Array.from(new Set([user.id, ...visibleProfileIds]));
 
   const [
     { data: ownPredictionsData, error: ownPredictionsError },
@@ -227,12 +221,7 @@ export default async function MatchesPage() {
     predictionProfileIds.length > 0
       ? supabaseAdmin
           .from("predictions")
-          .select(
-            `
-              *,
-              profile:profiles!predictions_user_id_fkey(id, username, is_admin)
-            `,
-          )
+          .select("*")
           .in("user_id", predictionProfileIds)
       : Promise.resolve({ data: [], error: null }),
   ]);
