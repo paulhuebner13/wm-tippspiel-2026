@@ -185,6 +185,36 @@ function buildOptimizerPreview(
   };
 }
 
+
+const PREDICTION_PAGE_SIZE = 1000;
+
+async function fetchPredictionsForUserIds(userIds: string[]) {
+  if (userIds.length === 0) return [] as Prediction[];
+
+  const allPredictions: Prediction[] = [];
+
+  for (let from = 0; ; from += PREDICTION_PAGE_SIZE) {
+    const to = from + PREDICTION_PAGE_SIZE - 1;
+    const { data, error } = await supabaseAdmin
+      .from("predictions")
+      .select("*")
+      .in("user_id", userIds)
+      .order("updated_at", { ascending: false, nullsFirst: false })
+      .range(from, to);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const page = (data ?? []) as Prediction[];
+    allPredictions.push(...page);
+
+    if (page.length < PREDICTION_PAGE_SIZE) break;
+  }
+
+  return allPredictions;
+}
+
 export default async function MatchesPage() {
   const user = await requireUser();
 
@@ -213,21 +243,7 @@ export default async function MatchesPage() {
   const visibleProfileIds = visibleProfiles.map((profile) => profile.id);
   const predictionProfileIds = Array.from(new Set([user.id, ...visibleProfileIds]));
 
-  const [
-    { data: ownPredictionsData, error: ownPredictionsError },
-    { data: visiblePredictionsData, error: visiblePredictionsError },
-  ] = await Promise.all([
-    supabaseAdmin.from("predictions").select("*").eq("user_id", user.id),
-    predictionProfileIds.length > 0
-      ? supabaseAdmin
-          .from("predictions")
-          .select("*")
-          .in("user_id", predictionProfileIds)
-      : Promise.resolve({ data: [], error: null }),
-  ]);
-
-  if (ownPredictionsError) throw new Error(ownPredictionsError.message);
-  if (visiblePredictionsError) throw new Error(visiblePredictionsError.message);
+  const allVisiblePredictions = await fetchPredictionsForUserIds(predictionProfileIds);
 
   const teams = (teamsData ?? []) as Team[];
   const specialEffectActive = await getUserSpecialEffectActive(user.id);
@@ -239,8 +255,10 @@ export default async function MatchesPage() {
     matchesWithFixedTeams,
     specialEffectActive,
   );
-  const ownPredictions = (ownPredictionsData ?? []) as Prediction[];
-  const visiblePredictions = (visiblePredictionsData ?? []) as Prediction[];
+  const ownPredictions = allVisiblePredictions.filter(
+    (prediction) => prediction.user_id === user.id,
+  );
+  const visiblePredictions = allVisiblePredictions;
   const predictionByCompositeKey = new Map<string, Prediction>();
 
   for (const prediction of visiblePredictions) {
