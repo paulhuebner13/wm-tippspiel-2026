@@ -88,6 +88,65 @@ function readNumber(value: FormDataEntryValue | null): number | null {
   return parsed;
 }
 
+type PersistPredictionInput = {
+  userId: string;
+  matchId: string;
+  predictedHomeScore: number | null;
+  predictedAwayScore: number | null;
+  advanceTeamId: string | null;
+};
+
+async function persistPrediction(input: PersistPredictionInput) {
+  const payload = {
+    user_id: input.userId,
+    match_id: input.matchId,
+    predicted_home_score: input.predictedHomeScore,
+    predicted_away_score: input.predictedAwayScore,
+    advance_team_id: input.advanceTeamId,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data: existingRows, error: findError } = await supabaseAdmin
+    .from("predictions")
+    .select("id")
+    .eq("user_id", input.userId)
+    .eq("match_id", input.matchId)
+    .order("updated_at", { ascending: false, nullsFirst: false })
+    .limit(10);
+
+  if (findError) {
+    return { data: null, error: findError };
+  }
+
+  const existingId = existingRows?.[0]?.id as string | undefined;
+  const result = existingId
+    ? await supabaseAdmin
+        .from("predictions")
+        .update(payload)
+        .eq("id", existingId)
+        .select("id, predicted_home_score, predicted_away_score, advance_team_id")
+        .single()
+    : await supabaseAdmin
+        .from("predictions")
+        .insert(payload)
+        .select("id, predicted_home_score, predicted_away_score, advance_team_id")
+        .single();
+
+  if (result.error || !result.data) {
+    return { data: null, error: result.error ?? new Error("prediction_save_failed") };
+  }
+
+  const duplicateIds = (existingRows ?? [])
+    .map((row) => row.id as string)
+    .filter((id) => id !== result.data.id);
+
+  if (duplicateIds.length > 0) {
+    await supabaseAdmin.from("predictions").delete().in("id", duplicateIds);
+  }
+
+  return { data: result.data, error: null };
+}
+
 async function updatePredictionOpenState(matchId: string) {
   const { data: match } = await supabaseAdmin
     .from("matches")
@@ -284,17 +343,17 @@ export async function savePredictionAction(formData: FormData) {
     }
   }
 
-  await supabaseAdmin.from("predictions").upsert(
-    {
-      user_id: user.id,
-      match_id: matchId,
-      predicted_home_score: predictedHomeScore,
-      predicted_away_score: predictedAwayScore,
-      advance_team_id: advanceTeamId,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id,match_id" },
-  );
+  const { error } = await persistPrediction({
+    userId: user.id,
+    matchId,
+    predictedHomeScore,
+    predictedAwayScore,
+    advanceTeamId,
+  });
+
+  if (error) {
+    redirect("/matches?error=save_failed");
+  }
 
   revalidatePath("/matches");
   redirect("/matches?saved=1");
@@ -387,21 +446,13 @@ export async function savePredictionInlineAction(input: {
   const storedAdvanceTeamId =
     isKnockoutDraw && validAdvanceTeam ? advanceTeamId : null;
 
-  const { data, error } = await supabaseAdmin
-    .from("predictions")
-    .upsert(
-      {
-        user_id: user.id,
-        match_id: matchId,
-        predicted_home_score: predictedHomeScore,
-        predicted_away_score: predictedAwayScore,
-        advance_team_id: storedAdvanceTeamId,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id,match_id" },
-    )
-    .select("id, predicted_home_score, predicted_away_score, advance_team_id")
-    .single();
+  const { data, error } = await persistPrediction({
+    userId: user.id,
+    matchId,
+    predictedHomeScore,
+    predictedAwayScore,
+    advanceTeamId: storedAdvanceTeamId,
+  });
 
   if (error || !data) {
     return { ok: false, error: "save_failed" };

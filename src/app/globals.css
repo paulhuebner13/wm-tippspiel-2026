@@ -5351,3 +5351,49 @@ html[data-theme='dark'] .standingsTable tr.standingEliminated td {
     max-width: 64px;
   }
 }
+
+/* v107: keep total ranking points aligned right and 24h points directly left of them. */
+.rankingDetails summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(38px, auto) minmax(92px, auto) auto;
+  align-items: center;
+  column-gap: 10px;
+}
+
+.rankingDetails summary > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rankingPointsCluster {
+  display: contents;
+}
+
+.rankingRecentPoints {
+  grid-column: 2;
+  justify-self: end;
+}
+
+.rankingDetails summary .rankingPointsCluster strong {
+  grid-column: 3;
+  justify-self: end;
+  margin-left: 0;
+}
+
+.rankingDetails summary::after {
+  grid-column: 4;
+  justify-self: end;
+}
+
+@media (max-width: 520px) {
+  .rankingDetails summary {
+    grid-template-columns: minmax(0, 1fr) minmax(34px, auto) minmax(78px, auto) auto;
+    column-gap: 7px;
+  }
+
+  .rankingRecentPoints {
+    font-size: 10px;
+  }
+}
