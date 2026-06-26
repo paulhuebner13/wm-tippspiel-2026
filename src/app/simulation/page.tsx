@@ -11,6 +11,10 @@ import {
 } from '@/lib/specialEffects';
 import type { Match, Team } from '@/lib/types';
 
+type SimulationPageProps = {
+  searchParams?: Promise<{ teamId?: string }>;
+};
+
 type MatchWithTeams = Match & {
   home_team?: Team | null;
   away_team?: Team | null;
@@ -77,6 +81,12 @@ type TargetMatchSimulationRow = {
   venue: string;
   probability: number;
   conditionalProbability: number;
+};
+
+type QualificationCutoffRow = {
+  points: number;
+  goalDifference: number;
+  probability: number;
 };
 
 const SIMULATION_RUNS = 10000;
@@ -323,7 +333,12 @@ function formatAverage(value: number) {
   return value.toFixed(1).replace('.', ',');
 }
 
-function findTargetTeam(teams: Team[]) {
+function findTargetTeam(teams: Team[], teamId?: string | null) {
+  if (teamId) {
+    const selected = teams.find((team) => team.id === teamId);
+    if (selected) return selected;
+  }
+
   return (
     teams.find((team) => team.name === 'Österreich') ??
     teams.find((team) => team.short_name === 'AUT') ??
@@ -377,6 +392,7 @@ function runQualificationSimulation(
   matches: MatchWithTeams[],
   optimizerInputs: OptimizerInputRow[],
   sourceBlendWeight: number,
+  targetTeamId?: string | null,
   runs = SIMULATION_RUNS,
 ) {
   const groupMatches = matches.filter((match) => match.stage === 'group');
@@ -401,9 +417,10 @@ function runQualificationSimulation(
   );
   let matchesWithStoredData = 0;
   let matchesWithFallback = 0;
-  const targetTeam = findTargetTeam(teams);
+  const targetTeam = findTargetTeam(teams, targetTeamId);
   const targetOpponentCounts = new Map<string, { team: Team; count: number }>();
   const targetMatchCounts = new Map<number, { matchNumber: number; venue: string; count: number }>();
+  const cutoffCounts = new Map<string, { points: number; goalDifference: number; count: number }>();
 
   for (const team of teams) {
     if (!team.group_name) continue;
@@ -460,9 +477,19 @@ function runQualificationSimulation(
       if (sortedRows[2]) thirdPlacedRows.push({ groupName, row: sortedRows[2] });
     }
 
-    const qualifiedThirdPlacedRows = thirdPlacedRows
-      .sort((a, b) => compareThirdPlaceRows(a.row, b.row))
-      .slice(0, 8);
+    const sortedThirdPlacedRows = thirdPlacedRows.sort((a, b) => compareThirdPlaceRows(a.row, b.row));
+    const qualifiedThirdPlacedRows = sortedThirdPlacedRows.slice(0, 8);
+    const cutoffRow = qualifiedThirdPlacedRows[7]?.row;
+
+    if (cutoffRow) {
+      const cutoffKey = `${cutoffRow.points}:${cutoffRow.goalDifference}`;
+      const existingCutoff = cutoffCounts.get(cutoffKey);
+      cutoffCounts.set(cutoffKey, {
+        points: cutoffRow.points,
+        goalDifference: cutoffRow.goalDifference,
+        count: (existingCutoff?.count ?? 0) + 1,
+      });
+    }
 
     qualifiedThirdPlacedRows.forEach(({ row }) => {
       const item = stats.get(row.team.id);
@@ -545,6 +572,14 @@ function runQualificationSimulation(
     }))
     .sort((a, b) => b.probability - a.probability);
 
+  const cutoffRows: QualificationCutoffRow[] = Array.from(cutoffCounts.values())
+    .map((entry) => ({
+      points: entry.points,
+      goalDifference: entry.goalDifference,
+      probability: entry.count / runs,
+    }))
+    .sort((a, b) => b.probability - a.probability || b.points - a.points || b.goalDifference - a.goalDifference);
+
   return {
     rows,
     runs,
@@ -554,11 +589,13 @@ function runQualificationSimulation(
     targetQualificationProbability: targetQualificationCount / runs,
     targetOpponentRows,
     targetMatchRows,
+    cutoffRows,
   };
 }
 
-export default async function SimulationPage() {
+export default async function SimulationPage({ searchParams }: SimulationPageProps) {
   const user = await requireResultEditor();
+  const params = await searchParams;
 
   const [{ data: teamsData }, { data: matchesData }, { data: optimizerInputsData }, { data: optimizerSettings }] =
     await Promise.all([
@@ -582,7 +619,8 @@ export default async function SimulationPage() {
   const optimizerInputs = (optimizerInputsData ?? []) as OptimizerInputRow[];
   const sourceBlendWeight = Number(optimizerSettings?.source_blend_weight ?? 0.5);
   const specialEffectActive = await getUserSpecialEffectActive(user.id);
-  const simulation = runQualificationSimulation(rawTeams, matches, optimizerInputs, sourceBlendWeight);
+  const selectedTeamId = params?.teamId ?? undefined;
+  const simulation = runQualificationSimulation(rawTeams, matches, optimizerInputs, sourceBlendWeight, selectedTeamId);
   const rowsByGroup = new Map<string, TeamSimulationRow[]>();
 
   for (const row of simulation.rows) {
@@ -615,10 +653,31 @@ export default async function SimulationPage() {
     <>
       <Nav user={user} />
       <main className="page simulationPage">
-        <h1>Simulation</h1>
+        <div className="simulationHeaderRow">
+          <div>
+            <h1>Simulation</h1>
+            <div className="simulationMetaLine">
+              {simulation.runs.toLocaleString('de-AT')} Simulationen · {simulation.matchesWithStoredData} Spiele mit Daten · {simulation.matchesWithFallback} Fallback-Spiele
+            </div>
+          </div>
 
-        <div className="simulationMetaLine">
-          {simulation.runs.toLocaleString('de-AT')} Simulationen · {simulation.matchesWithStoredData} Spiele mit Daten · {simulation.matchesWithFallback} Fallback-Spiele
+          <form className="simulationTeamPicker" method="get" action="/simulation">
+            <label htmlFor="simulationTeamId">Team</label>
+            <select id="simulationTeamId" name="teamId" defaultValue={simulation.targetTeam?.id ?? ''}>
+              {rawTeams
+                .filter((team) => Boolean(team.group_name))
+                .sort((a, b) => a.name.localeCompare(b.name, 'de-AT'))
+                .map((team) => {
+                  const displayTeam = applySpecialEffectToTeam(team, specialEffectActive) ?? team;
+                  return (
+                    <option key={team.id} value={team.id}>
+                      {displayTeam.name}
+                    </option>
+                  );
+                })}
+            </select>
+            <button type="submit">Anzeigen</button>
+          </form>
         </div>
 
         <section className="simulationGroupsGrid">
@@ -667,7 +726,7 @@ export default async function SimulationPage() {
 
         {simulation.targetTeam && (
           <section className="card targetRoundOf32Card">
-            <h2>Österreich im Sechzehntelfinale</h2>
+            <h2>{applySpecialEffectToTeam(simulation.targetTeam, specialEffectActive)?.name ?? simulation.targetTeam.name} im Sechzehntelfinale</h2>
             <div className="targetRoundOf32Meta">
               Weiterkommen: <strong>{formatProbability(simulation.targetQualificationProbability)}</strong>
             </div>
@@ -729,6 +788,19 @@ export default async function SimulationPage() {
             </div>
           </section>
         )}
+
+        <section className="card simulationCutoffCard">
+          <h2>Grenzwert für beste Drittplatzierte</h2>
+          <div className="simulationCutoffList">
+            {simulation.cutoffRows.slice(0, 5).map((row) => (
+              <div className="simulationCutoffItem" key={`${row.points}:${row.goalDifference}`}>
+                <strong>{row.points} Punkte</strong>
+                <span>{row.goalDifference === -999 ? 'egal' : `${row.goalDifference > 0 ? '+' : ''}${row.goalDifference} GD`}</span>
+                <em>{formatProbability(row.probability)}</em>
+              </div>
+            ))}
+          </div>
+        </section>
 
         <section className="card expectedThirdCard">
           <h2>Erwartete Drittplatzierte</h2>

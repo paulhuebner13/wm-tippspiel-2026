@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { savePredictionInlineAction } from '@/app/actions';
 import { Flag } from './Flag';
 import { Countdown } from './Countdown';
@@ -165,6 +166,7 @@ export function MatchCard({
   optimizerPreview?: OptimizerMatchPreview;
   previousMatches?: MatchHistoryEntry[];
 }) {
+  const router = useRouter();
   const locked = isPredictionLocked(match.kickoff_time);
   const canPredict = Boolean(match.is_open_for_predictions && !match.is_finished && !locked && match.home_team && match.away_team);
   const knockoutStage = isKnockoutStage(match.stage);
@@ -278,12 +280,13 @@ export function MatchCard({
         } else {
           setSavedPrediction({
             id: result.predictionId ?? savedPrediction?.id ?? 'local',
-            predicted_home_score: requestHomeScore,
-            predicted_away_score: requestAwayScore,
-            advance_team_id: requestAdvanceTeamId,
+            predicted_home_score: result.predictedHomeScore ?? requestHomeScore,
+            predicted_away_score: result.predictedAwayScore ?? requestAwayScore,
+            advance_team_id: result.advanceTeamId ?? null,
           });
         }
         setSaveState('idle');
+        router.refresh();
       } else {
         setSaveState('error');
       }
@@ -300,6 +303,7 @@ export function MatchCard({
     match.id,
     matchesSaved,
     normalizedAdvanceTeamId,
+    router,
     savedPrediction,
   ]);
 
@@ -423,6 +427,10 @@ export function MatchCard({
               <span className="teamName">{teamName(match, 'away')}</span>
             </div>
           </div>        </div>
+      )}
+
+      {saveState === 'error' && (
+        <p className="predictionSaveError">Speichern fehlgeschlagen. Bitte kurz neu laden oder nochmal ändern.</p>
       )}
 
       {(predictionProfiles.length > 0 || hasInsightsControl) && (

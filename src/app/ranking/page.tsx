@@ -8,6 +8,7 @@ import type { Match, Prediction, Profile, Stage } from '@/lib/types';
 type RankingRow = {
   user: Profile;
   total: number;
+  last24HoursTotal: number;
   stageTotals: Record<Stage, number>;
 };
 
@@ -23,6 +24,13 @@ function emptyStageTotals(): Record<Stage, number> {
     third_place: 0,
     final: 0,
   };
+}
+
+function startedInLast24Hours(match: Match, now = Date.now()) {
+  const kickoff = new Date(match.kickoff_time).getTime();
+  if (Number.isNaN(kickoff)) return false;
+  const dayAgo = now - 24 * 60 * 60 * 1000;
+  return kickoff >= dayAgo && kickoff <= now;
 }
 
 export default async function RankingPage() {
@@ -41,27 +49,33 @@ export default async function RankingPage() {
 
   const matches = (matchesData ?? []) as Match[];
   const predictions = ((predictionsData ?? []) as Prediction[]).filter((prediction) => visibleProfileIds.has(prediction.user_id));
+  const now = Date.now();
 
   const ranking: RankingRow[] = profiles
     .map((profile) => {
       const stageTotals = emptyStageTotals();
 
-      const total = predictions
-        .filter((prediction) => prediction.user_id === profile.id)
-        .reduce((sum, prediction) => {
-          const match = matches.find((item) => item.id === prediction.match_id);
+      const profilePredictions = predictions.filter((prediction) => prediction.user_id === profile.id);
+      const total = profilePredictions.reduce((sum, prediction) => {
+        const match = matches.find((item) => item.id === prediction.match_id);
 
-          if (!match) {
-            return sum;
-          }
+        if (!match) {
+          return sum;
+        }
 
-          const points = calculateTotalPoints(match, prediction);
-          stageTotals[match.stage] += points;
+        const points = calculateTotalPoints(match, prediction);
+        stageTotals[match.stage] += points;
 
-          return sum + points;
-        }, 0);
+        return sum + points;
+      }, 0);
 
-      return { user: profile, total, stageTotals };
+      const last24HoursTotal = profilePredictions.reduce((sum, prediction) => {
+        const match = matches.find((item) => item.id === prediction.match_id);
+        if (!match || !startedInLast24Hours(match, now)) return sum;
+        return sum + calculateTotalPoints(match, prediction);
+      }, 0);
+
+      return { user: profile, total, last24HoursTotal, stageTotals };
     })
     .sort((a, b) => b.total - a.total || a.user.username.localeCompare(b.user.username));
 
@@ -81,7 +95,10 @@ export default async function RankingPage() {
                 <details className="rankingDetails">
                   <summary>
                     <span>{index + 1}. {row.user.username}</span>
-                    <strong>{row.total} Punkte</strong>
+                    <span className="rankingPointsCluster">
+                      <span className="rankingRecentPoints">+{row.last24HoursTotal}</span>
+                      <strong>{row.total} Punkte</strong>
+                    </span>
                   </summary>
 
                   <div className="rankingBreakdown">

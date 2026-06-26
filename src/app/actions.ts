@@ -306,7 +306,14 @@ export async function savePredictionInlineAction(input: {
   predictedAwayScore: number | null;
   advanceTeamId?: string | null;
 }): Promise<
-  | { ok: true; predictionId?: string; deleted?: boolean }
+  | {
+      ok: true;
+      predictionId?: string;
+      deleted?: boolean;
+      predictedHomeScore?: number | null;
+      predictedAwayScore?: number | null;
+      advanceTeamId?: string | null;
+    }
   | { ok: false; error: string }
 > {
   const user = await requireUser();
@@ -393,17 +400,32 @@ export async function savePredictionInlineAction(input: {
       },
       { onConflict: "user_id,match_id" },
     )
-    .select("id")
+    .select("id, predicted_home_score, predicted_away_score, advance_team_id")
     .single();
 
-  if (error) {
+  if (error || !data) {
     return { ok: false, error: "save_failed" };
+  }
+
+  const savedMatchesRequest =
+    data.predicted_home_score === predictedHomeScore &&
+    data.predicted_away_score === predictedAwayScore &&
+    (data.advance_team_id ?? null) === storedAdvanceTeamId;
+
+  if (!savedMatchesRequest) {
+    return { ok: false, error: "verify_failed" };
   }
 
   revalidatePath("/matches");
   revalidatePath("/results");
   revalidatePath("/ranking");
-  return { ok: true, predictionId: data?.id };
+  return {
+    ok: true,
+    predictionId: data.id,
+    predictedHomeScore: data.predicted_home_score,
+    predictedAwayScore: data.predicted_away_score,
+    advanceTeamId: data.advance_team_id,
+  };
 }
 
 export async function saveResultAction(formData: FormData) {

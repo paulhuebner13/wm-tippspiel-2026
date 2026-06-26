@@ -5162,3 +5162,192 @@ html[data-theme='dark'] .standingsTable tr.standingEliminated td {
     padding: 5px 4px;
   }
 }
+
+/* v106: robust save hint, ranking 24h points and compact simulation controls. */
+.predictionSaveError {
+  margin: 8px 0 0;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.rankingPointsCluster {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.rankingRecentPoints {
+  color: var(--ok);
+  font-size: 11px;
+  font-weight: 850;
+  opacity: 0.8;
+}
+
+.simulationHeaderRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.simulationHeaderRow h1 {
+  margin-bottom: 2px;
+}
+
+.simulationTeamPicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--card) 86%, var(--bg));
+}
+
+.simulationTeamPicker label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.simulationTeamPicker select {
+  min-height: 32px;
+  max-width: 160px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.simulationTeamPicker button {
+  min-height: 32px;
+  padding: 6px 9px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+
+.simulationCutoffCard {
+  margin-top: 14px;
+}
+
+.simulationCutoffCard h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.simulationCutoffList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 8px;
+}
+
+.simulationCutoffItem {
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px;
+  background: color-mix(in srgb, var(--card) 88%, var(--bg));
+}
+
+.simulationCutoffItem strong {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.simulationCutoffItem span,
+.simulationCutoffItem em {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.expectedThirdTableWrap {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.expectedThirdTable {
+  min-width: 0;
+  table-layout: fixed;
+  font-size: 10.5px;
+}
+
+.expectedThirdTable th,
+.expectedThirdTable td {
+  padding: 4px 3px;
+}
+
+.expectedThirdTable th:nth-child(1),
+.expectedThirdTable td:nth-child(1) {
+  width: 24px;
+}
+
+.expectedThirdTable th:nth-child(2),
+.expectedThirdTable td:nth-child(2) {
+  width: 30px;
+}
+
+.expectedThirdTable th:nth-child(3),
+.expectedThirdTable td:nth-child(3) {
+  width: auto;
+}
+
+.expectedThirdTable th:nth-child(4),
+.expectedThirdTable td:nth-child(4),
+.expectedThirdTable th:nth-child(5),
+.expectedThirdTable td:nth-child(5),
+.expectedThirdTable th:nth-child(6),
+.expectedThirdTable td:nth-child(6),
+.expectedThirdTable th:nth-child(7),
+.expectedThirdTable td:nth-child(7) {
+  width: 44px;
+}
+
+.expectedThirdTable .simulationTeamCell {
+  max-width: 100%;
+}
+
+.expectedThirdTable .simulationTeamCell > span:last-child {
+  max-width: 92px;
+}
+
+@media (max-width: 640px) {
+  .simulationHeaderRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .simulationTeamPicker {
+    width: 100%;
+  }
+
+  .simulationTeamPicker select {
+    flex: 1 1 auto;
+    max-width: none;
+  }
+
+  .expectedThirdTable {
+    font-size: 9.5px;
+  }
+
+  .expectedThirdTable th:nth-child(4),
+  .expectedThirdTable td:nth-child(4),
+  .expectedThirdTable th:nth-child(5),
+  .expectedThirdTable td:nth-child(5),
+  .expectedThirdTable th:nth-child(6),
+  .expectedThirdTable td:nth-child(6),
+  .expectedThirdTable th:nth-child(7),
+  .expectedThirdTable td:nth-child(7) {
+    width: 38px;
+  }
+
+  .expectedThirdTable .simulationTeamCell > span:last-child {
+    max-width: 64px;
+  }
+}
