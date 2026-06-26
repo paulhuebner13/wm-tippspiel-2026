@@ -61,7 +61,10 @@ async function getEffectiveRoundOf32TeamIds(match: MatchTeamResolutionInput) {
   }
 
   const fixedTopTwoPlacements = calculateFixedTopTwoPlacements(teams, matches);
-  const fixedThirdPlacePlacements = calculateFixedThirdPlacePlacements(teams, matches);
+  const fixedThirdPlacePlacements = calculateFixedThirdPlacePlacements(
+    teams,
+    matches,
+  );
   const inferredHomeTeam = getInferredBracketTeam(
     currentMatch,
     "home",
@@ -97,6 +100,13 @@ type PersistPredictionInput = {
 };
 
 async function persistPrediction(input: PersistPredictionInput) {
+  // The database columns predicted_home_score and predicted_away_score are NOT NULL.
+  // Therefore only complete score pairs may be persisted. Empty values are handled
+  // by the caller as a delete operation, never as a partial save.
+  if (input.predictedHomeScore === null || input.predictedAwayScore === null) {
+    return { data: null, error: new Error("incomplete_prediction") };
+  }
+
   const payload = {
     user_id: input.userId,
     match_id: input.matchId,
@@ -124,16 +134,23 @@ async function persistPrediction(input: PersistPredictionInput) {
         .from("predictions")
         .update(payload)
         .eq("id", existingId)
-        .select("id, predicted_home_score, predicted_away_score, advance_team_id")
+        .select(
+          "id, predicted_home_score, predicted_away_score, advance_team_id",
+        )
         .single()
     : await supabaseAdmin
         .from("predictions")
         .insert(payload)
-        .select("id, predicted_home_score, predicted_away_score, advance_team_id")
+        .select(
+          "id, predicted_home_score, predicted_away_score, advance_team_id",
+        )
         .single();
 
   if (result.error || !result.data) {
-    return { data: null, error: result.error ?? new Error("prediction_save_failed") };
+    return {
+      data: null,
+      error: result.error ?? new Error("prediction_save_failed"),
+    };
   }
 
   const duplicateIds = (existingRows ?? [])
@@ -441,8 +458,14 @@ export async function savePredictionInlineAction(input: {
     advanceTeamId === effectiveTeams.homeTeamId ||
     advanceTeamId === effectiveTeams.awayTeamId;
 
-  // Incomplete tips and knockout draws without selected advancing team are intentionally saved.
-  // They stay yellow in the UI and do not count for points until they become complete.
+  if (!bothScoresComplete) {
+    return { ok: false, error: "incomplete_prediction" };
+  }
+
+  if (isKnockoutDraw && !validAdvanceTeam) {
+    return { ok: false, error: "missing_advance_team" };
+  }
+
   const storedAdvanceTeamId =
     isKnockoutDraw && validAdvanceTeam ? advanceTeamId : null;
 
@@ -1092,7 +1115,14 @@ export async function overridePredictionInlineAction(input: {
   predictedAwayScore: number | null;
   advanceTeamId?: string | null;
 }): Promise<
-  | { ok: true; predictionId?: string; deleted?: boolean }
+  | {
+      ok: true;
+      predictionId?: string;
+      deleted?: boolean;
+      predictedHomeScore?: number | null;
+      predictedAwayScore?: number | null;
+      advanceTeamId?: string | null;
+    }
   | { ok: false; error: string }
 > {
   await requireAdmin();
@@ -1106,7 +1136,12 @@ export async function overridePredictionInlineAction(input: {
   const scoreIsValid = (score: number | null) =>
     score === null || (Number.isInteger(score) && score >= 0);
 
-  if (!userId || !matchId || !scoreIsValid(predictedHomeScore) || !scoreIsValid(predictedAwayScore)) {
+  if (
+    !userId ||
+    !matchId ||
+    !scoreIsValid(predictedHomeScore) ||
+    !scoreIsValid(predictedAwayScore)
+  ) {
     return { ok: false, error: "invalid_prediction" };
   }
 
@@ -1120,7 +1155,8 @@ export async function overridePredictionInlineAction(input: {
     return { ok: false, error: "match_not_found" };
   }
 
-  const isCompletelyEmpty = predictedHomeScore === null && predictedAwayScore === null;
+  const isCompletelyEmpty =
+    predictedHomeScore === null && predictedAwayScore === null;
 
   if (isCompletelyEmpty) {
     const { error } = await supabaseAdmin
@@ -1140,32 +1176,36 @@ export async function overridePredictionInlineAction(input: {
     return { ok: true, deleted: true };
   }
 
-  const bothScoresComplete = predictedHomeScore !== null && predictedAwayScore !== null;
+  const bothScoresComplete =
+    predictedHomeScore !== null && predictedAwayScore !== null;
   const isKnockoutDraw =
     bothScoresComplete &&
     isKnockoutStage(match.stage) &&
     predictedHomeScore === predictedAwayScore;
   const validAdvanceTeam =
-    advanceTeamId === match.home_team_id || advanceTeamId === match.away_team_id;
-  const storedAdvanceTeamId = isKnockoutDraw && validAdvanceTeam ? advanceTeamId : null;
+    advanceTeamId === match.home_team_id ||
+    advanceTeamId === match.away_team_id;
 
-  const { data, error } = await supabaseAdmin
-    .from("predictions")
-    .upsert(
-      {
-        user_id: userId,
-        match_id: matchId,
-        predicted_home_score: predictedHomeScore,
-        predicted_away_score: predictedAwayScore,
-        advance_team_id: storedAdvanceTeamId,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id,match_id" },
-    )
-    .select("id")
-    .single();
+  if (!bothScoresComplete) {
+    return { ok: false, error: "incomplete_prediction" };
+  }
 
-  if (error) {
+  if (isKnockoutDraw && !validAdvanceTeam) {
+    return { ok: false, error: "missing_advance_team" };
+  }
+
+  const storedAdvanceTeamId =
+    isKnockoutDraw && validAdvanceTeam ? advanceTeamId : null;
+
+  const { data, error } = await persistPrediction({
+    userId,
+    matchId,
+    predictedHomeScore,
+    predictedAwayScore,
+    advanceTeamId: storedAdvanceTeamId,
+  });
+
+  if (error || !data) {
     return { ok: false, error: "save_failed" };
   }
 
@@ -1173,7 +1213,13 @@ export async function overridePredictionInlineAction(input: {
   revalidatePath("/matches");
   revalidatePath("/results");
   revalidatePath("/ranking");
-  return { ok: true, predictionId: data?.id };
+  return {
+    ok: true,
+    predictionId: data.id,
+    predictedHomeScore: data.predicted_home_score,
+    predictedAwayScore: data.predicted_away_score,
+    advanceTeamId: data.advance_team_id,
+  };
 }
 
 export async function saveOptimizerOddsInlineAction(input: {
@@ -1245,4 +1291,3 @@ export async function togglePlayerGroupSpecialEffectAction(formData: FormData) {
   revalidatePath("/admin");
   revalidatePath("/results");
 }
-
