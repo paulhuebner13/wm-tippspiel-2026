@@ -215,11 +215,30 @@ export default async function MatchesPage() {
   const visibleProfiles = await getVisibleProfilesForUser(user);
   const visibleProfileIds = getVisibleProfileIdSet(visibleProfiles);
 
-  const { data: predictionsData } = await supabaseAdmin.from("predictions")
-    .select(`
-      *,
-      profile:profiles!predictions_user_id_fkey(id, username, is_admin)
-    `);
+  const predictionProfileIds = Array.from(
+    new Set([user.id, ...Array.from(visibleProfileIds)]),
+  );
+
+  const [
+    { data: ownPredictionsData, error: ownPredictionsError },
+    { data: visiblePredictionsData, error: visiblePredictionsError },
+  ] = await Promise.all([
+    supabaseAdmin.from("predictions").select("*").eq("user_id", user.id),
+    predictionProfileIds.length > 0
+      ? supabaseAdmin
+          .from("predictions")
+          .select(
+            `
+              *,
+              profile:profiles!predictions_user_id_fkey(id, username, is_admin)
+            `,
+          )
+          .in("user_id", predictionProfileIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (ownPredictionsError) throw new Error(ownPredictionsError.message);
+  if (visiblePredictionsError) throw new Error(visiblePredictionsError.message);
 
   const teams = (teamsData ?? []) as Team[];
   const specialEffectActive = await getUserSpecialEffectActive(user.id);
@@ -231,10 +250,27 @@ export default async function MatchesPage() {
     matchesWithFixedTeams,
     specialEffectActive,
   );
-  const predictions = ((predictionsData ?? []) as Prediction[]).filter(
-    (prediction) =>
-      prediction.user_id === user.id ||
-      visibleProfileIds.has(prediction.user_id),
+  const ownPredictions = (ownPredictionsData ?? []) as Prediction[];
+  const visiblePredictions = (visiblePredictionsData ?? []) as Prediction[];
+  const predictionByCompositeKey = new Map<string, Prediction>();
+
+  for (const prediction of visiblePredictions) {
+    predictionByCompositeKey.set(
+      `${prediction.user_id}:${prediction.match_id}`,
+      prediction,
+    );
+  }
+
+  for (const prediction of ownPredictions) {
+    predictionByCompositeKey.set(
+      `${prediction.user_id}:${prediction.match_id}`,
+      prediction,
+    );
+  }
+
+  const predictions = Array.from(predictionByCompositeKey.values());
+  const ownPredictionByMatchId = new Map(
+    ownPredictions.map((prediction) => [prediction.match_id, prediction]),
   );
   const optimizerPreviewByMatchId = new Map<string, OptimizerMatchPreview>();
   const previousMatchesByMatchId = new Map(
@@ -305,9 +341,7 @@ export default async function MatchesPage() {
             const matchPredictions = predictions.filter(
               (prediction) => prediction.match_id === match.id,
             );
-            const ownPrediction = matchPredictions.find(
-              (prediction) => prediction.user_id === user.id,
-            );
+            const ownPrediction = ownPredictionByMatchId.get(match.id);
             const showAllPredictions = isPredictionLocked(
               match.kickoff_time,
               now,
