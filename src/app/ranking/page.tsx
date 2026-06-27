@@ -13,6 +13,7 @@ type RankingRow = {
 };
 
 const STAGE_ORDER = Object.keys(STAGE_MULTIPLIERS) as Stage[];
+const PREDICTION_PAGE_SIZE = 1000;
 
 function emptyStageTotals(): Record<Stage, number> {
   return {
@@ -24,6 +25,36 @@ function emptyStageTotals(): Record<Stage, number> {
     third_place: 0,
     final: 0,
   };
+}
+
+
+async function loadVisiblePredictions(visibleProfileIds: Set<string>) {
+  const userIds = Array.from(visibleProfileIds);
+  if (userIds.length === 0) return [] as Prediction[];
+
+  const predictions: Prediction[] = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + PREDICTION_PAGE_SIZE - 1;
+    const { data, error } = await supabaseAdmin
+      .from('predictions')
+      .select('*')
+      .in('user_id', userIds)
+      .range(from, to);
+
+    if (error) {
+      throw new Error(`Could not load ranking predictions: ${error.message}`);
+    }
+
+    const page = (data ?? []) as Prediction[];
+    predictions.push(...page);
+
+    if (page.length < PREDICTION_PAGE_SIZE) break;
+    from += PREDICTION_PAGE_SIZE;
+  }
+
+  return predictions;
 }
 
 function startedInLast24Hours(match: Match, now = Date.now()) {
@@ -43,12 +74,9 @@ export default async function RankingPage() {
     .from('matches')
     .select('*');
 
-  const { data: predictionsData } = await supabaseAdmin
-    .from('predictions')
-    .select('*');
+  const predictions = await loadVisiblePredictions(visibleProfileIds);
 
   const matches = (matchesData ?? []) as Match[];
-  const predictions = ((predictionsData ?? []) as Prediction[]).filter((prediction) => visibleProfileIds.has(prediction.user_id));
   const now = Date.now();
 
   const ranking: RankingRow[] = profiles
