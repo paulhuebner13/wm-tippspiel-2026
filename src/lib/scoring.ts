@@ -6,7 +6,7 @@ export const POINTS = {
   goalDifference: 5,
   outcome: 3,
   knockoutAdvanceWinner: 3,
-  knockoutAdvanceTeam: 2,
+  knockoutAdvanceTeam: 1,
 };
 
 // Change or remove multipliers here.

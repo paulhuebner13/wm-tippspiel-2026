@@ -405,7 +405,7 @@ export function MatchCard({
       <div className="matchHeader">
         <div>
           <div className="matchTitleLine">
-            <span>Spiel {displayMatchNumber ?? match.match_number}</span>
+            <span>Spiel Nr. {match.match_number}</span>
             <span>{groupOrStage(match)}</span>
           </div>
           <div className="kickoffLine">

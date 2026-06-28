@@ -322,17 +322,6 @@ export default async function MatchesPage() {
   const currentMatchId = matches.find((match) =>
     isMatchStillRelevant(match.kickoff_time, now),
   )?.id;
-  const displayNumbers = new Map(
-    [...matches]
-      .sort((a, b) => {
-        const dateDiff =
-          new Date(a.kickoff_time).getTime() -
-          new Date(b.kickoff_time).getTime();
-        return dateDiff !== 0 ? dateDiff : a.match_number - b.match_number;
-      })
-      .map((match, index) => [match.id, index + 1]),
-  );
-
   return (
     <>
       <Nav user={user} />
@@ -363,7 +352,6 @@ export default async function MatchesPage() {
                 currentUserId={user.id}
                 visibleProfiles={visibleProfiles as Profile[]}
                 current={match.id === currentMatchId}
-                displayMatchNumber={displayNumbers.get(match.id)}
                 showOptimizerControl={user.is_admin}
                 optimizerPreview={
                   user.is_admin

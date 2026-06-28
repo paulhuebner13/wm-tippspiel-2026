@@ -41,7 +41,7 @@ export default async function RulesPage() {
               <span>+{POINTS.knockoutAdvanceTeam} Punkte</span>
               <p>
                 Wenn dein ausgewähltes oder durch den Tipp gemeintes Team weiterkommt,
-                aber das Ergebnis nach 90 Minuten anders war.
+                aber das Ergebnis nach 90 Minuten anders war. Dieser Bonus ist nur ein Zusatzpunkt.
               </p>
             </div>
           </div>

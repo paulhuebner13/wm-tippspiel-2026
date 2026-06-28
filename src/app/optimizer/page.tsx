@@ -88,9 +88,9 @@ export default async function OptimizerPage({ searchParams }: { searchParams: Se
         <p className="subtle">Quoten und Modell-Wahrscheinlichkeiten kombinieren, erwartete Punkte berechnen und Eingaben je Spiel speichern. Das ändert keine Tipps.</p>
 
         <form className="searchCard" action="/optimizer">
-          <label className="fieldLabel" htmlFor="matchNumber">Spielnummer</label>
+          <label className="fieldLabel" htmlFor="matchNumber">Spiel Nr.</label>
           <div className="searchRow">
-            <input id="matchNumber" name="matchNumber" type="number" min="1" placeholder="z. B. 31" defaultValue={Number.isInteger(matchNumber) ? matchNumber : ''} />
+            <input id="matchNumber" name="matchNumber" type="number" min="1" placeholder="z. B. 89" defaultValue={Number.isInteger(matchNumber) ? matchNumber : ''} />
             <button type="submit">Suchen</button>
           </div>
         </form>

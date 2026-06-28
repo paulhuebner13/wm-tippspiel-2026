@@ -806,7 +806,7 @@ function BracketMatch({
       className={`bracketMatch ${hasResult(match) ? "bracketMatchDone" : ""}`}
     >
       <div className="bracketMatchMeta">
-        <span>Spiel {displayNumber}</span>
+        <span>Spiel Nr. {match.match_number}</span>
         {BRACKET_SOURCE_MATCHES[match.match_number] && (
           <span className="bracketSourceLabel">aus {BRACKET_SOURCE_MATCHES[match.match_number]}</span>
         )}
