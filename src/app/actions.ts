@@ -1182,9 +1182,10 @@ export async function overridePredictionInlineAction(input: {
     bothScoresComplete &&
     isKnockoutStage(match.stage) &&
     predictedHomeScore === predictedAwayScore;
+  const effectiveTeams = await getEffectiveRoundOf32TeamIds(match);
   const validAdvanceTeam =
-    advanceTeamId === match.home_team_id ||
-    advanceTeamId === match.away_team_id;
+    advanceTeamId === effectiveTeams.homeTeamId ||
+    advanceTeamId === effectiveTeams.awayTeamId;
 
   if (!bothScoresComplete) {
     return { ok: false, error: "incomplete_prediction" };

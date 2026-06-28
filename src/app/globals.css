@@ -4681,6 +4681,52 @@ html[data-theme='dark'] .standingsTable tr.standingEliminated td {
   font-size: 8px;
 }
 
+.predictionOverviewTipFlagStack {
+  position: relative;
+}
+
+.predictionOverviewMainFlag {
+  width: 42px;
+  min-width: 42px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.predictionOverviewAdvanceFlag {
+  position: absolute;
+  right: -9px;
+  bottom: -6px;
+  width: 18px;
+  height: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px;
+  border-radius: 3px;
+  background: var(--card);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.predictionOverviewAdvanceFlag .flagFrame,
+.predictionOverviewAdvanceFlag .flagPlaceholder {
+  width: 16px;
+  min-width: 16px;
+  height: 11px;
+  flex: 0 0 16px;
+}
+
+.predictionOverviewAdvanceFlag .flagImage,
+.predictionOverviewAdvanceFlag img {
+  width: auto;
+  height: auto;
+  max-width: 16px;
+  max-height: 11px;
+  object-fit: contain;
+  border-radius: 1px;
+}
+
 .predictionOverviewRowUnlocked > .predictionStatusNoTipUnlocked,
 .predictionOverviewRowUnlocked .predictionStatusNoTipUnlocked {
   grid-column: 2;

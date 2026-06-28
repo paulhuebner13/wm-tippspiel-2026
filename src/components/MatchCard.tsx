@@ -128,6 +128,17 @@ function predictionFlagTeam(match: Match, prediction: Prediction | undefined) {
     return match.home_team ?? null;
   if (prediction.predicted_home_score < prediction.predicted_away_score)
     return match.away_team ?? null;
+  return null;
+}
+
+function predictionAdvanceTeam(match: Match, prediction: Prediction | undefined) {
+  if (
+    !prediction ||
+    prediction.predicted_home_score === null ||
+    prediction.predicted_away_score === null ||
+    prediction.predicted_home_score !== prediction.predicted_away_score
+  )
+    return null;
   if (prediction.advance_team_id === match.home_team_id)
     return match.home_team ?? null;
   if (prediction.advance_team_id === match.away_team_id)
@@ -578,6 +589,8 @@ export function MatchCard({
                       knockoutStage,
                     );
                     const self = profile.id === currentUserId;
+                    const mainTipTeam = predictionFlagTeam(match, prediction);
+                    const advanceTipTeam = predictionAdvanceTeam(match, prediction);
 
                     return (
                       <li
@@ -591,16 +604,18 @@ export function MatchCard({
                           complete ? (
                             <>
                               <span className="predictionOverviewTipCenter">
-                                <span className="predictionOverviewTipFlag">
-                                  {predictionFlagTeam(match, prediction) ? (
-                                    <Flag
-                                      team={predictionFlagTeam(
-                                        match,
-                                        prediction,
-                                      )}
-                                    />
-                                  ) : (
-                                    <DrawFlag />
+                                <span className="predictionOverviewTipFlag predictionOverviewTipFlagStack">
+                                  <span className="predictionOverviewMainFlag">
+                                    {mainTipTeam ? (
+                                      <Flag team={mainTipTeam} />
+                                    ) : (
+                                      <DrawFlag />
+                                    )}
+                                  </span>
+                                  {advanceTipTeam && (
+                                    <span className="predictionOverviewAdvanceFlag">
+                                      <Flag team={advanceTipTeam} />
+                                    </span>
                                   )}
                                 </span>
                                 {prediction && (
