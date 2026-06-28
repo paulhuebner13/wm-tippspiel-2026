@@ -2,24 +2,42 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import type { Match, Team } from "@/lib/types";
 
 export const SPECIAL_EFFECT_TURKEY_FLAG_PATH = "/flags/toeoerken.svg";
+export const SPECIAL_EFFECT_ALGERIA_FLAG_PATH = "/flags/algerien2.svg";
 
 export type MatchWithTeamsForSpecialEffects = Match & {
   home_team?: Team | null;
   away_team?: Team | null;
 };
 
-function isTurkeyTeam(team: Team | null | undefined) {
-  if (!team) return false;
-  const normalisedName = team.name
+function normaliseTeamName(name: string) {
+  return name
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
+}
+
+function isTurkeyTeam(team: Team | null | undefined) {
+  if (!team) return false;
+  const normalisedName = normaliseTeamName(team.name);
 
   return (
     normalisedName === "turkei" ||
     normalisedName === "turkiye" ||
     normalisedName === "turkey" ||
     team.short_name.toLowerCase() === "tur"
+  );
+}
+
+function isAlgeriaTeam(team: Team | null | undefined) {
+  if (!team) return false;
+  const normalisedName = normaliseTeamName(team.name);
+  const normalisedShortName = normaliseTeamName(team.short_name);
+
+  return (
+    normalisedName === "algerien" ||
+    normalisedName === "algeria" ||
+    normalisedShortName === "alg" ||
+    normalisedShortName === "dza"
   );
 }
 
@@ -53,14 +71,25 @@ export function applySpecialEffectToTeam(
   team: Team | null | undefined,
   specialEffectActive: boolean,
 ): Team | null | undefined {
-  if (!team || !specialEffectActive || !isTurkeyTeam(team)) return team;
+  if (!team || !specialEffectActive) return team;
 
-  return {
-    ...team,
-    name: "Tööörken",
-    short_name: "TÖÖ",
-    flag_path: SPECIAL_EFFECT_TURKEY_FLAG_PATH,
-  };
+  if (isTurkeyTeam(team)) {
+    return {
+      ...team,
+      name: "Tööörken",
+      short_name: "TÖÖ",
+      flag_path: SPECIAL_EFFECT_TURKEY_FLAG_PATH,
+    };
+  }
+
+  if (isAlgeriaTeam(team)) {
+    return {
+      ...team,
+      flag_path: SPECIAL_EFFECT_ALGERIA_FLAG_PATH,
+    };
+  }
+
+  return team;
 }
 
 export function applySpecialEffectsToTeams(

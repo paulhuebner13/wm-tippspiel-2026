@@ -29,11 +29,42 @@ export default async function RulesPage() {
               <p>Der Sieger oder ein Unentschieden wurde richtig getippt.</p>
             </div>
             <div>
-              <strong>K.-o.-Weiterkommer</strong>
+              <strong>K.-o.-Weiterkommer bei Remis</strong>
               <span>+{POINTS.knockoutAdvanceWinner} Punkte</span>
-              <p>Nur wenn du in einem K.-o.-Spiel Unentschieden tippst und den Weiterkommer richtig auswählst.</p>
+              <p>
+                Wenn du in einem K.-o.-Spiel nach 90 Minuten Unentschieden tippst
+                und den richtigen Weiterkommer auswählst.
+              </p>
+            </div>
+            <div>
+              <strong>K.-o.-Weiterkommer trotz anderem 90-Minuten-Ergebnis</strong>
+              <span>+{POINTS.knockoutAdvanceTeam} Punkte</span>
+              <p>
+                Wenn dein ausgewähltes oder durch den Tipp gemeintes Team weiterkommt,
+                aber das Ergebnis nach 90 Minuten anders war.
+              </p>
             </div>
           </div>
+        </section>
+
+        <section className="card rulesCard">
+          <h2>K.-o.-Spiele</h2>
+          <p>
+            Bei K.-o.-Spielen wird immer das <strong>Ergebnis nach 90 Minuten</strong> getippt,
+            also nicht das Ergebnis nach Verlängerung oder Elfmeterschießen.
+          </p>
+          <p>
+            Tippst du nach 90 Minuten ein Unentschieden, musst du zusätzlich auswählen,
+            welches Team weiterkommt. Ist beides richtig, gibt es zusätzlich{' '}
+            <strong>+{POINTS.knockoutAdvanceWinner} Punkte</strong>.
+          </p>
+          <p>
+            Es gibt außerdem <strong>+{POINTS.knockoutAdvanceTeam} Punkte</strong>, wenn dein
+            Weiterkommen-Team richtig ist, aber das 90-Minuten-Ergebnis anders war: zum Beispiel
+            du tippst Remis und wählst ein Team aus, dieses Team gewinnt aber schon nach 90 Minuten;
+            oder du tippst einen Sieger nach 90 Minuten, aber das Spiel endet nach 90 Minuten Remis
+            und dein getipptes Team kommt danach weiter.
+          </p>
         </section>
 
         <section className="card rulesCard">

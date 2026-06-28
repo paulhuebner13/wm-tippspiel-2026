@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800" role="img" aria-label="Algerien-inspirierte Flagge mit Clown in der Mitte">
+  <defs>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#000000" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <!-- Flag background, inspired by Algeria: green left half, white right half -->
+  <rect width="600" height="800" x="0" y="0" fill="#006233"/>
+  <rect width="600" height="800" x="600" y="0" fill="#ffffff"/>
+
+  <!-- Clown emblem replacing the central crescent -->
+  <g transform="translate(600 400)" filter="url(#softShadow)">
+    <!-- hair -->
+    <circle cx="-145" cy="-58" r="72" fill="#e31b23"/>
+    <circle cx="145" cy="-58" r="72" fill="#e31b23"/>
+    <circle cx="-105" cy="-115" r="58" fill="#ff7a00"/>
+    <circle cx="105" cy="-115" r="58" fill="#ff7a00"/>
+
+    <!-- face -->
+    <circle cx="0" cy="0" r="150" fill="#fff7ef" stroke="#d71920" stroke-width="16"/>
+
+    <!-- party hat -->
+    <path d="M -70 -142 L 0 -305 L 70 -142 Z" fill="#f7d21e" stroke="#d71920" stroke-width="12" stroke-linejoin="round"/>
+    <path d="M -42 -205 L 38 -242" stroke="#006233" stroke-width="12" stroke-linecap="round"/>
+    <path d="M -18 -258 L 48 -184" stroke="#006233" stroke-width="12" stroke-linecap="round"/>
+    <circle cx="0" cy="-318" r="26" fill="#d71920"/>
+
+    <!-- eyes -->
+    <ellipse cx="-55" cy="-38" rx="24" ry="34" fill="#ffffff" stroke="#1f1f1f" stroke-width="8"/>
+    <ellipse cx="55" cy="-38" rx="24" ry="34" fill="#ffffff" stroke="#1f1f1f" stroke-width="8"/>
+    <circle cx="-50" cy="-31" r="8" fill="#1f1f1f"/>
+    <circle cx="60" cy="-31" r="8" fill="#1f1f1f"/>
+
+    <!-- eyebrows -->
+    <path d="M -91 -89 Q -55 -112 -20 -88" fill="none" stroke="#1f1f1f" stroke-width="10" stroke-linecap="round"/>
+    <path d="M 20 -88 Q 55 -112 91 -89" fill="none" stroke="#1f1f1f" stroke-width="10" stroke-linecap="round"/>
+
+    <!-- nose -->
+    <circle cx="0" cy="18" r="38" fill="#d71920" stroke="#b10000" stroke-width="8"/>
+    <circle cx="-13" cy="5" r="10" fill="#ff8a8a" opacity="0.8"/>
+
+    <!-- cheeks -->
+    <circle cx="-78" cy="42" r="24" fill="#ff9cb0" opacity="0.75"/>
+    <circle cx="78" cy="42" r="24" fill="#ff9cb0" opacity="0.75"/>
+
+    <!-- smile -->
+    <path d="M -78 76 Q 0 145 78 76" fill="none" stroke="#d71920" stroke-width="17" stroke-linecap="round"/>
+    <path d="M -58 75 Q 0 112 58 75" fill="none" stroke="#1f1f1f" stroke-width="5" stroke-linecap="round" opacity="0.32"/>
+
+    <!-- small green bow tie, Algeria color reference -->
+    <g transform="translate(0 172)">
+      <path d="M -12 0 L -110 -52 Q -136 -66 -136 -30 L -136 30 Q -136 66 -110 52 Z" fill="#006233" stroke="#004b28" stroke-width="8" stroke-linejoin="round"/>
+      <path d="M 12 0 L 110 -52 Q 136 -66 136 -30 L 136 30 Q 136 66 110 52 Z" fill="#006233" stroke="#004b28" stroke-width="8" stroke-linejoin="round"/>
+      <circle cx="0" cy="0" r="28" fill="#d71920" stroke="#9b0000" stroke-width="7"/>
+    </g>
+  </g>
+</svg>
