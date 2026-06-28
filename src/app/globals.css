@@ -4774,6 +4774,28 @@ html[data-theme='dark'] .standingsTable tr.standingEliminated td {
     max-height: 24px;
   }
 
+  .predictionOverviewTipFlag .predictionOverviewAdvanceFlag {
+    right: -6px;
+    bottom: -4px;
+    width: 20px;
+    height: 14px;
+    padding: 1px;
+  }
+
+  .predictionOverviewTipFlag .predictionOverviewAdvanceFlag .flagFrame,
+  .predictionOverviewTipFlag .predictionOverviewAdvanceFlag .flagPlaceholder {
+    width: 18px;
+    min-width: 18px;
+    height: 12px;
+    flex: 0 0 18px;
+  }
+
+  .predictionOverviewTipFlag .predictionOverviewAdvanceFlag .flagImage,
+  .predictionOverviewTipFlag .predictionOverviewAdvanceFlag img {
+    max-width: 18px;
+    max-height: 12px;
+  }
+
   .predictionOverviewRowUnlocked > .predictionStatusNoTipUnlocked,
   .predictionOverviewRowUnlocked .predictionStatusNoTipUnlocked {
     font-size: 10px;
