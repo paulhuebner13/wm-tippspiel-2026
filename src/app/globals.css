@@ -5397,3 +5397,47 @@ html[data-theme='dark'] .standingsTable tr.standingEliminated td {
     font-size: 10px;
   }
 }
+
+/* v113: KO tip hint and clearer tournament bracket connectors. */
+.knockoutTipHint {
+  grid-column: 1 / -1;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+  text-align: center;
+}
+
+.bracketSourceLabel {
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.bracketColumn:not(.bracketColumn-round_of_32) .bracketMatch::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -15px;
+  width: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--muted) 35%, transparent);
+}
+
+.bracketColumn-round_of_16 .bracketMatch:nth-child(odd)::before,
+.bracketColumn-quarter_final .bracketMatch:nth-child(odd)::before,
+.bracketColumn-semi_final .bracketMatch:nth-child(odd)::before {
+  height: 50%;
+  border-left: 1px solid color-mix(in srgb, var(--muted) 26%, transparent);
+  border-top-left-radius: 10px;
+  top: 50%;
+}
+
+.bracketColumn-round_of_16 .bracketMatch:nth-child(even)::before,
+.bracketColumn-quarter_final .bracketMatch:nth-child(even)::before,
+.bracketColumn-semi_final .bracketMatch:nth-child(even)::before {
+  height: 50%;
+  border-left: 1px solid color-mix(in srgb, var(--muted) 26%, transparent);
+  border-bottom-left-radius: 10px;
+  top: 0;
+}

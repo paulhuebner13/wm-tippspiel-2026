@@ -6,17 +6,18 @@ export const POINTS = {
   goalDifference: 5,
   outcome: 3,
   knockoutAdvanceWinner: 3,
+  knockoutAdvanceTeam: 2,
 };
 
 // Change or remove multipliers here.
 export const STAGE_MULTIPLIERS: Record<Stage, number> = {
   group: 1,
   round_of_32: 2,
-  round_of_16: 3,
-  quarter_final: 4,
-  semi_final: 5,
-  third_place: 5,
-  final: 6,
+  round_of_16: 2.5,
+  quarter_final: 3,
+  semi_final: 3.5,
+  third_place: 3,
+  final: 4,
 };
 
 export function getStageLabel(stage: Stage): string {
@@ -37,6 +38,12 @@ function outcome(scoreA: number, scoreB: number): 'home' | 'away' | 'draw' {
   if (scoreA > scoreB) return 'home';
   if (scoreA < scoreB) return 'away';
   return 'draw';
+}
+
+function sideTeamId(match: Match, side: 'home' | 'away' | 'draw') {
+  if (side === 'home') return match.home_team_id;
+  if (side === 'away') return match.away_team_id;
+  return null;
 }
 
 export function isKnockoutStage(stage: Stage): boolean {
@@ -75,22 +82,45 @@ export function calculateBasePoints(match: Match, prediction: Prediction): numbe
   }
 
   let points = 0;
+  const realOutcome = outcome(realHome, realAway);
+  const tipOutcome = outcome(tipHome, tipAway);
 
   if (realHome === tipHome && realAway === tipAway) {
     points = POINTS.exact;
   } else if (realHome - realAway === tipHome - tipAway) {
     points = POINTS.goalDifference;
-  } else if (outcome(realHome, realAway) === outcome(tipHome, tipAway)) {
+  } else if (realOutcome === tipOutcome) {
     points = POINTS.outcome;
   }
 
+  if (!isKnockoutStage(match.stage) || realWinnerTeamId === null) {
+    return points;
+  }
+
+  const tipWinnerTeamId = sideTeamId(match, tipOutcome);
+
   if (
-    isKnockoutStage(match.stage) &&
-    tipHome === tipAway &&
-    realWinnerTeamId !== null &&
+    tipOutcome === 'draw' &&
+    realOutcome === 'draw' &&
     prediction.advance_team_id === realWinnerTeamId
   ) {
     points += POINTS.knockoutAdvanceWinner;
+  }
+
+  if (
+    tipOutcome === 'draw' &&
+    realOutcome !== 'draw' &&
+    prediction.advance_team_id === realWinnerTeamId
+  ) {
+    points += POINTS.knockoutAdvanceTeam;
+  }
+
+  if (
+    tipOutcome !== 'draw' &&
+    realOutcome === 'draw' &&
+    tipWinnerTeamId === realWinnerTeamId
+  ) {
+    points += POINTS.knockoutAdvanceTeam;
   }
 
   return points;

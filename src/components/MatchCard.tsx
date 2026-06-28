@@ -467,6 +467,10 @@ export function MatchCard({
             </div>
           </div>
 
+          {knockoutStage && (
+            <p className="knockoutTipHint">Getippt wird immer das Ergebnis nach 90 Minuten.</p>
+          )}
+
           {showAdvanceChoice && (
             <div className="advanceChoiceBox">
               <div className="advanceChoiceTitle">Wer kommt weiter?</div>

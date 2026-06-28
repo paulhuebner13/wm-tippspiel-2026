@@ -65,6 +65,47 @@ const BRACKET_STAGES: Stage[] = [
   "final",
 ];
 
+const BRACKET_MATCH_ORDER: Partial<Record<Stage, number[]>> = {
+  round_of_32: [73, 75, 74, 77, 83, 84, 81, 82, 76, 78, 79, 80, 86, 88, 85, 87],
+  round_of_16: [89, 90, 93, 94, 91, 92, 95, 96],
+  quarter_final: [97, 98, 99, 100],
+  semi_final: [101, 102],
+  final: [104],
+  third_place: [103],
+};
+
+const BRACKET_SOURCE_MATCHES: Record<number, string> = {
+  89: "W73/W75",
+  90: "W74/W77",
+  91: "W76/W78",
+  92: "W79/W80",
+  93: "W83/W84",
+  94: "W81/W82",
+  95: "W86/W88",
+  96: "W85/W87",
+  97: "W89/W90",
+  98: "W93/W94",
+  99: "W91/W92",
+  100: "W95/W96",
+  101: "W97/W98",
+  102: "W99/W100",
+  103: "RU101/RU102",
+  104: "W101/W102",
+};
+
+function bracketOrderIndex(match: MatchWithTeams) {
+  const order = BRACKET_MATCH_ORDER[match.stage];
+  if (!order) return match.match_number;
+  const index = order.indexOf(match.match_number);
+  return index === -1 ? order.length + match.match_number : index;
+}
+
+function sortBracketMatches(a: MatchWithTeams, b: MatchWithTeams) {
+  const orderDiff = bracketOrderIndex(a) - bracketOrderIndex(b);
+  if (orderDiff !== 0) return orderDiff;
+  return a.match_number - b.match_number;
+}
+
 function teamName(match: MatchWithTeams, side: "home" | "away") {
   if (side === "home")
     return match.home_team?.name ?? match.home_placeholder ?? "Offen";
@@ -766,6 +807,9 @@ function BracketMatch({
     >
       <div className="bracketMatchMeta">
         <span>Spiel {displayNumber}</span>
+        {BRACKET_SOURCE_MATCHES[match.match_number] && (
+          <span className="bracketSourceLabel">aus {BRACKET_SOURCE_MATCHES[match.match_number]}</span>
+        )}
         <span>{formatKickoff(match.kickoff_time)}</span>
       </div>
       <BracketTeam
@@ -817,17 +861,6 @@ export default async function TablesPage() {
   const thirdPlaceMatch = matches.find(
     (match) => match.stage === "third_place",
   );
-  const displayNumbers = new Map(
-    [...matches]
-      .sort((a, b) => {
-        const dateDiff =
-          new Date(a.kickoff_time).getTime() -
-          new Date(b.kickoff_time).getTime();
-        return dateDiff !== 0 ? dateDiff : a.match_number - b.match_number;
-      })
-      .map((match, index) => [match.id, index + 1]),
-  );
-
   return (
     <>
       <Nav user={user} />
@@ -908,14 +941,7 @@ export default async function TablesPage() {
               {BRACKET_STAGES.map((stage) => {
                 const stageMatches = matches
                   .filter((match) => match.stage === stage)
-                  .sort((a, b) => {
-                    const dateDiff =
-                      new Date(a.kickoff_time).getTime() -
-                      new Date(b.kickoff_time).getTime();
-                    return dateDiff !== 0
-                      ? dateDiff
-                      : a.match_number - b.match_number;
-                  });
+                  .sort(sortBracketMatches);
 
                 return (
                   <section
@@ -929,9 +955,7 @@ export default async function TablesPage() {
                         <BracketMatch
                           key={match.id}
                           match={match}
-                          displayNumber={
-                            displayNumbers.get(match.id) ?? match.match_number
-                          }
+                          displayNumber={match.match_number}
                           fixedTopTwoPlacements={fixedTopTwoPlacements}
                           fixedThirdPlacePlacements={fixedThirdPlacePlacements}
                           specialEffectActive={specialEffectActive}
@@ -951,10 +975,7 @@ export default async function TablesPage() {
                   <div className="bracketColumnMatches">
                     <BracketMatch
                       match={thirdPlaceMatch}
-                      displayNumber={
-                        displayNumbers.get(thirdPlaceMatch.id) ??
-                        thirdPlaceMatch.match_number
-                      }
+                      displayNumber={thirdPlaceMatch.match_number}
                       fixedTopTwoPlacements={fixedTopTwoPlacements}
                       fixedThirdPlacePlacements={fixedThirdPlacePlacements}
                       specialEffectActive={specialEffectActive}
