@@ -1,8 +1,13 @@
 import { Nav } from '@/components/Nav';
 import { OddsOptimizerPanel } from '@/components/OddsOptimizerPanel';
+import { applyFixedTopTwoToMatches } from '@/lib/fixedGroupPlacements';
 import { requireAdmin } from '@/lib/session';
+import {
+  applySpecialEffectsToMatches,
+  getUserSpecialEffectActive,
+} from '@/lib/specialEffects';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import type { Match } from '@/lib/types';
+import type { Match, Team } from '@/lib/types';
 
 type SearchParams = Promise<{ matchNumber?: string }>;
 
@@ -11,7 +16,7 @@ export default async function OptimizerPage({ searchParams }: { searchParams: Se
   const params = await searchParams;
   const matchNumber = Number(params.matchNumber ?? '');
 
-  type OptimizerPageMatch = Match & { home_team?: any; away_team?: any };
+  type OptimizerPageMatch = Match & { home_team?: Team | null; away_team?: Team | null };
   let match: OptimizerPageMatch | null = null;
   let oddsText = '';
   let probabilitiesText = '';
@@ -27,17 +32,40 @@ export default async function OptimizerPage({ searchParams }: { searchParams: Se
   sourceBlendWeight = Number(optimizerSettings?.source_blend_weight ?? 0.5);
 
   if (Number.isInteger(matchNumber) && matchNumber > 0) {
-    const { data: matchData } = await supabaseAdmin
-      .from('matches')
-      .select(`
-        *,
-        home_team:teams!matches_home_team_id_fkey(*),
-        away_team:teams!matches_away_team_id_fkey(*)
-      `)
-      .eq('match_number', matchNumber)
-      .single();
+    const [matchesResult, teamsResult] = await Promise.all([
+      supabaseAdmin
+        .from('matches')
+        .select(`
+          *,
+          home_team:teams!matches_home_team_id_fkey(*),
+          away_team:teams!matches_away_team_id_fkey(*)
+        `)
+        .order('kickoff_time', { ascending: true }),
+      supabaseAdmin
+        .from('teams')
+        .select('*')
+        .order('group_name', { ascending: true })
+        .order('name', { ascending: true }),
+    ]);
 
-    match = matchData as OptimizerPageMatch | null;
+    if (matchesResult.error) throw new Error(matchesResult.error.message);
+    if (teamsResult.error) throw new Error(teamsResult.error.message);
+
+    const teams = (teamsResult.data ?? []) as Team[];
+    const matchesWithFixedTeams = applyFixedTopTwoToMatches(
+      (matchesResult.data ?? []) as Match[],
+      teams,
+    );
+    const specialEffectActive = await getUserSpecialEffectActive(user.id);
+    const visibleMatches = applySpecialEffectsToMatches(
+      matchesWithFixedTeams,
+      specialEffectActive,
+    );
+
+    match =
+      (visibleMatches.find(
+        (candidate) => candidate.match_number === matchNumber,
+      ) as OptimizerPageMatch | undefined) ?? null;
 
     if (match) {
       const { data: storedOdds } = await supabaseAdmin
