@@ -1,46 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  saveKnockoutTeamsInlineAction,
-  saveResultInlineAction,
-} from "@/app/actions";
+import { useEffect, useRef, useState } from "react";
+import { saveResultInlineAction } from "@/app/actions";
 import { Flag } from "@/components/Flag";
 import { formatKickoff } from "@/lib/time";
 import { getStageLabel, isKnockoutStage } from "@/lib/scoring";
 import type { Match, Team } from "@/lib/types";
 
-type ResultSaveStatus = "upcoming" | "expectedMissing" | "dirty" | "saved" | "partialTeamSaved";
-type TeamSaveStatus = "idle" | "dirty" | "error";
+type ResultSaveStatus = "upcoming" | "expectedMissing" | "dirty" | "saved";
 
 function teamName(match: Match, side: "home" | "away"): string {
-  if (side === "home")
+  if (side === "home") {
     return match.home_team?.name ?? match.home_placeholder ?? "Offen";
+  }
   return match.away_team?.name ?? match.away_placeholder ?? "Offen";
-}
-
-
-const ROUND_OF_32_PLACEHOLDERS: Record<number, { home: string; away: string }> = {
-  73: { home: "Zweiter Gruppe A", away: "Zweiter Gruppe B" },
-  74: { home: "Erster Gruppe E", away: "Dritter Gruppe A/B/C/D/F" },
-  75: { home: "Erster Gruppe F", away: "Zweiter Gruppe C" },
-  76: { home: "Erster Gruppe C", away: "Zweiter Gruppe F" },
-  77: { home: "Erster Gruppe I", away: "Dritter Gruppe C/D/F/G/H" },
-  78: { home: "Zweiter Gruppe E", away: "Zweiter Gruppe I" },
-  79: { home: "Erster Gruppe A", away: "Dritter Gruppe C/E/F/H/I" },
-  80: { home: "Erster Gruppe L", away: "Dritter Gruppe E/H/I/J/K" },
-  81: { home: "Erster Gruppe D", away: "Dritter Gruppe B/E/F/I/J" },
-  82: { home: "Erster Gruppe G", away: "Dritter Gruppe A/E/H/I/J" },
-  83: { home: "Zweiter Gruppe K", away: "Zweiter Gruppe L" },
-  84: { home: "Erster Gruppe H", away: "Zweiter Gruppe J" },
-  85: { home: "Erster Gruppe B", away: "Dritter Gruppe E/F/G/I/J" },
-  86: { home: "Erster Gruppe J", away: "Zweiter Gruppe H" },
-  87: { home: "Erster Gruppe K", away: "Dritter Gruppe D/E/I/J/L" },
-  88: { home: "Zweiter Gruppe D", away: "Zweiter Gruppe G" },
-};
-
-function defaultRoundOf32Placeholder(matchNumber: number, side: "home" | "away") {
-  return ROUND_OF_32_PLACEHOLDERS[matchNumber]?.[side] ?? "Offen";
 }
 
 function scoreInputToNumber(value: string): number | null {
@@ -53,7 +26,6 @@ function scoreInputToNumber(value: string): number | null {
 function statusClass(status: ResultSaveStatus) {
   if (status === "saved") return "adminResultSavedGreen";
   if (status === "dirty") return "adminResultDirtyYellow";
-  if (status === "partialTeamSaved") return "adminResultPartialTeamBlue";
   if (status === "expectedMissing") return "adminResultExpectedMissingRed";
   return "adminResultUpcomingGrey";
 }
@@ -100,7 +72,6 @@ function hasValidFinalResult(
 
 export function ResultAdminCard({
   match,
-  teams,
   current,
 }: {
   match: Match;
@@ -126,19 +97,7 @@ export function ResultAdminCard({
   );
   const [winnerTeamId, setWinnerTeamId] = useState(match.winner_team_id ?? "");
   const [saveState, setSaveState] = useState<"idle" | "error">("idle");
-  const [teamHomeId, setTeamHomeId] = useState(match.home_team_id ?? "");
-  const [teamAwayId, setTeamAwayId] = useState(match.away_team_id ?? "");
-  const [savedTeamHomeId, setSavedTeamHomeId] = useState(match.home_team_id ?? "");
-  const [savedTeamAwayId, setSavedTeamAwayId] = useState(match.away_team_id ?? "");
-  const [savedHomePlaceholder, setSavedHomePlaceholder] = useState(
-    match.home_placeholder ?? defaultRoundOf32Placeholder(match.match_number, "home"),
-  );
-  const [savedAwayPlaceholder, setSavedAwayPlaceholder] = useState(
-    match.away_placeholder ?? defaultRoundOf32Placeholder(match.match_number, "away"),
-  );
-  const [teamSaveState, setTeamSaveState] = useState<TeamSaveStatus>("idle");
   const lastRequestKey = useRef("");
-  const lastTeamRequestKey = useRef("");
 
   const homeNumber = scoreInputToNumber(homeScore);
   const awayNumber = scoreInputToNumber(awayScore);
@@ -164,17 +123,6 @@ export function ResultAdminCard({
   );
 
   const expectedFinished = isExpectedFinished(match.kickoff_time);
-  const canEditTeamsManually = match.stage === "round_of_32";
-  const teamsMatchSaved =
-    teamHomeId === savedTeamHomeId && teamAwayId === savedTeamAwayId;
-  const exactlyOneSavedTeam =
-    canEditTeamsManually &&
-    teamsMatchSaved &&
-    Boolean(savedTeamHomeId || savedTeamAwayId) &&
-    !(savedTeamHomeId && savedTeamAwayId) &&
-    matchesSaved &&
-    bothEmpty;
-
   const hasOfficialResult = savedHomeScore !== null && savedAwayScore !== null;
   const hasProvisionalResult =
     !hasOfficialResult &&
@@ -189,15 +137,11 @@ export function ResultAdminCard({
   const visualStatus: ResultSaveStatus =
     completeAndValid && matchesSaved
       ? "saved"
-      : !teamsMatchSaved
-        ? "dirty"
-        : exactlyOneSavedTeam
-          ? "partialTeamSaved"
-          : matchesSaved && bothEmpty
-            ? expectedFinished
-              ? "expectedMissing"
-              : "upcoming"
-            : "dirty";
+      : matchesSaved && bothEmpty
+        ? expectedFinished
+          ? "expectedMissing"
+          : "upcoming"
+        : "dirty";
 
   useEffect(() => {
     setSavedHomeScore(match.home_score);
@@ -206,31 +150,11 @@ export function ResultAdminCard({
     setHomeScore(match.home_score?.toString() ?? "");
     setAwayScore(match.away_score?.toString() ?? "");
     setWinnerTeamId(match.winner_team_id ?? "");
-    setTeamHomeId(match.home_team_id ?? "");
-    setTeamAwayId(match.away_team_id ?? "");
-    setSavedTeamHomeId(match.home_team_id ?? "");
-    setSavedTeamAwayId(match.away_team_id ?? "");
-    setSavedHomePlaceholder(
-      match.home_placeholder ?? defaultRoundOf32Placeholder(match.match_number, "home"),
-    );
-    setSavedAwayPlaceholder(
-      match.away_placeholder ?? defaultRoundOf32Placeholder(match.match_number, "away"),
-    );
-    setTeamSaveState("idle");
-  }, [
-    match.id,
-    match.home_score,
-    match.away_score,
-    match.winner_team_id,
-    match.home_team_id,
-    match.away_team_id,
-    match.home_placeholder,
-    match.away_placeholder,
-    match.match_number,
-  ]);
+  }, [match.id, match.home_score, match.away_score, match.winner_team_id]);
 
   useEffect(() => {
     if (matchesSaved) return;
+    if (showWinnerChoice && !winnerTeamId) return;
 
     const requestHomeScore = homeEmpty ? null : homeNumber;
     const requestAwayScore = awayEmpty ? null : awayNumber;
@@ -271,63 +195,13 @@ export function ResultAdminCard({
     matchesSaved,
     normalizedWinnerTeamId,
     showWinnerChoice,
+    winnerTeamId,
   ]);
 
-  const displayHomeTeam = canEditTeamsManually
-    ? teamHomeId
-      ? teams.find((team) => team.id === teamHomeId) ?? null
-      : null
-    : match.home_team;
-  const displayAwayTeam = canEditTeamsManually
-    ? teamAwayId
-      ? teams.find((team) => team.id === teamAwayId) ?? null
-      : null
-    : match.away_team;
-  const displayHomeName = displayHomeTeam?.name ?? savedHomePlaceholder;
-  const displayAwayName = displayAwayTeam?.name ?? savedAwayPlaceholder;
-
-  useEffect(() => {
-    if (!canEditTeamsManually || teamsMatchSaved) return;
-
-    const requestHomeTeamId = teamHomeId || null;
-    const requestAwayTeamId = teamAwayId || null;
-    const requestKey = `${match.id}:${requestHomeTeamId ?? ""}:${requestAwayTeamId ?? ""}`;
-    lastTeamRequestKey.current = requestKey;
-    setTeamSaveState("dirty");
-
-    const timeout = window.setTimeout(async () => {
-      const result = await saveKnockoutTeamsInlineAction({
-        matchId: match.id,
-        homeTeamId: requestHomeTeamId,
-        awayTeamId: requestAwayTeamId,
-      });
-
-      if (lastTeamRequestKey.current !== requestKey) return;
-
-      if (result.ok) {
-        setSavedTeamHomeId(result.homeTeamId ?? "");
-        setSavedTeamAwayId(result.awayTeamId ?? "");
-        setSavedHomePlaceholder(
-          result.homePlaceholder ?? defaultRoundOf32Placeholder(match.match_number, "home"),
-        );
-        setSavedAwayPlaceholder(
-          result.awayPlaceholder ?? defaultRoundOf32Placeholder(match.match_number, "away"),
-        );
-        setTeamSaveState("idle");
-      } else {
-        setTeamSaveState("error");
-      }
-    }, 325);
-
-    return () => window.clearTimeout(timeout);
-  }, [
-    canEditTeamsManually,
-    match.id,
-    match.match_number,
-    teamAwayId,
-    teamHomeId,
-    teamsMatchSaved,
-  ]);
+  const displayHomeTeam = match.home_team ?? null;
+  const displayAwayTeam = match.away_team ?? null;
+  const displayHomeName = teamName(match, "home");
+  const displayAwayName = teamName(match, "away");
 
   return (
     <article
@@ -363,7 +237,11 @@ export function ResultAdminCard({
               min="0"
               inputMode="numeric"
               value={homeScore}
-              placeholder={hasProvisionalResult ? String(match.provisional_home_score ?? '') : undefined}
+              placeholder={
+                hasProvisionalResult
+                  ? String(match.provisional_home_score ?? "")
+                  : undefined
+              }
               onChange={(event) => {
                 setHomeScore(event.target.value);
                 setSaveState("idle");
@@ -376,7 +254,11 @@ export function ResultAdminCard({
               min="0"
               inputMode="numeric"
               value={awayScore}
-              placeholder={hasProvisionalResult ? String(match.provisional_away_score ?? '') : undefined}
+              placeholder={
+                hasProvisionalResult
+                  ? String(match.provisional_away_score ?? "")
+                  : undefined
+              }
               onChange={(event) => {
                 setAwayScore(event.target.value);
                 setSaveState("idle");
@@ -393,7 +275,9 @@ export function ResultAdminCard({
 
         {hasProvisionalResult && provisionalSubmissionTime && (
           <div className="provisionalResultAttribution">
-            Eingetragen von <strong>{match.provisional_submitted_by_name ?? "unbekannt"}</strong> am {provisionalSubmissionTime}
+            Eingetragen von{" "}
+            <strong>{match.provisional_submitted_by_name ?? "unbekannt"}</strong>{" "}
+            am {provisionalSubmissionTime}
           </div>
         )}
 
@@ -455,48 +339,6 @@ export function ResultAdminCard({
           </div>
         )}
       </div>
-
-      {knockoutStage && (
-        <div className="adminForm knockoutTeamsForm">
-          {canEditTeamsManually ? (
-            <>
-              <label>
-                Heimteam
-                <select
-                  value={teamHomeId}
-                  onChange={(event) => setTeamHomeId(event.target.value)}
-                >
-                  <option value="">Offen lassen</option>
-                  {teams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Auswärtsteam
-                <select
-                  value={teamAwayId}
-                  onChange={(event) => setTeamAwayId(event.target.value)}
-                >
-                  <option value="">Offen lassen</option>
-                  {teams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {teamSaveState === "error" && (
-                <div className="resultAutoSaveHint">
-                  Teams konnten nicht gespeichert werden.
-                </div>
-              )}
-            </>
-          ) : null}
-        </div>
-      )}
     </article>
   );
 }

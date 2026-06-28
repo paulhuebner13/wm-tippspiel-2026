@@ -12,7 +12,6 @@ import {
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { isKnockoutStage } from "@/lib/scoring";
 import { isPredictionLocked } from "@/lib/time";
-import { getBracketTargetsForSource, getLoserTeamId } from "@/lib/bracket";
 import {
   calculateFixedThirdPlacePlacements,
   calculateFixedTopTwoPlacements,
@@ -27,6 +26,66 @@ type MatchTeamResolutionInput = {
   home_team_id: string | null;
   away_team_id: string | null;
 };
+
+type BracketTarget = {
+  targetMatchNumber: number;
+  side: "home" | "away";
+  sourceResult: "winner" | "loser";
+};
+
+const BRACKET_TARGETS_BY_SOURCE: Record<number, BracketTarget[]> = {
+  73: [{ targetMatchNumber: 89, side: "home", sourceResult: "winner" }],
+  75: [{ targetMatchNumber: 89, side: "away", sourceResult: "winner" }],
+  74: [{ targetMatchNumber: 90, side: "home", sourceResult: "winner" }],
+  77: [{ targetMatchNumber: 90, side: "away", sourceResult: "winner" }],
+  76: [{ targetMatchNumber: 91, side: "home", sourceResult: "winner" }],
+  78: [{ targetMatchNumber: 91, side: "away", sourceResult: "winner" }],
+  79: [{ targetMatchNumber: 92, side: "home", sourceResult: "winner" }],
+  80: [{ targetMatchNumber: 92, side: "away", sourceResult: "winner" }],
+  83: [{ targetMatchNumber: 93, side: "home", sourceResult: "winner" }],
+  84: [{ targetMatchNumber: 93, side: "away", sourceResult: "winner" }],
+  81: [{ targetMatchNumber: 94, side: "home", sourceResult: "winner" }],
+  82: [{ targetMatchNumber: 94, side: "away", sourceResult: "winner" }],
+  86: [{ targetMatchNumber: 95, side: "home", sourceResult: "winner" }],
+  88: [{ targetMatchNumber: 95, side: "away", sourceResult: "winner" }],
+  85: [{ targetMatchNumber: 96, side: "home", sourceResult: "winner" }],
+  87: [{ targetMatchNumber: 96, side: "away", sourceResult: "winner" }],
+  89: [{ targetMatchNumber: 97, side: "home", sourceResult: "winner" }],
+  90: [{ targetMatchNumber: 97, side: "away", sourceResult: "winner" }],
+  93: [{ targetMatchNumber: 98, side: "home", sourceResult: "winner" }],
+  94: [{ targetMatchNumber: 98, side: "away", sourceResult: "winner" }],
+  91: [{ targetMatchNumber: 99, side: "home", sourceResult: "winner" }],
+  92: [{ targetMatchNumber: 99, side: "away", sourceResult: "winner" }],
+  95: [{ targetMatchNumber: 100, side: "home", sourceResult: "winner" }],
+  96: [{ targetMatchNumber: 100, side: "away", sourceResult: "winner" }],
+  97: [{ targetMatchNumber: 101, side: "home", sourceResult: "winner" }],
+  98: [{ targetMatchNumber: 101, side: "away", sourceResult: "winner" }],
+  99: [{ targetMatchNumber: 102, side: "home", sourceResult: "winner" }],
+  100: [{ targetMatchNumber: 102, side: "away", sourceResult: "winner" }],
+  101: [
+    { targetMatchNumber: 103, side: "home", sourceResult: "loser" },
+    { targetMatchNumber: 104, side: "home", sourceResult: "winner" },
+  ],
+  102: [
+    { targetMatchNumber: 103, side: "away", sourceResult: "loser" },
+    { targetMatchNumber: 104, side: "away", sourceResult: "winner" },
+  ],
+};
+
+function getBracketTargetsForSource(sourceMatchNumber: number) {
+  return BRACKET_TARGETS_BY_SOURCE[sourceMatchNumber] ?? [];
+}
+
+function getLoserTeamId(input: {
+  homeTeamId: string | null;
+  awayTeamId: string | null;
+  winnerTeamId: string | null;
+}) {
+  if (!input.winnerTeamId) return null;
+  if (input.winnerTeamId === input.homeTeamId) return input.awayTeamId;
+  if (input.winnerTeamId === input.awayTeamId) return input.homeTeamId;
+  return null;
+}
 
 async function getEffectiveRoundOf32TeamIds(match: MatchTeamResolutionInput) {
   if (
@@ -726,7 +785,7 @@ export async function saveProvisionalResultInlineAction(input: {
   const { data: match } = await supabaseAdmin
     .from("matches")
     .select(
-      "id, kickoff_time, stage, home_team_id, away_team_id, home_score, away_score, winner_team_id",
+      "id, match_number, kickoff_time, stage, home_team_id, away_team_id, home_score, away_score, winner_team_id",
     )
     .eq("id", matchId)
     .single();
@@ -738,34 +797,59 @@ export async function saveProvisionalResultInlineAction(input: {
   const hasOfficialResult =
     match.home_score !== null && match.away_score !== null;
   const knockout = isKnockoutStage(match.stage);
-  const provisionalOpenAt = new Date(
-    new Date(match.kickoff_time).getTime() + 105 * 60 * 1000,
-  );
+  const provisionalOpenAt = new Date(match.kickoff_time).getTime() +
+    105 * 60 * 1000;
 
   if (
     hasOfficialResult ||
-    knockout ||
-    Date.now() < provisionalOpenAt.getTime()
+    Number.isNaN(provisionalOpenAt) ||
+    Date.now() < provisionalOpenAt
   ) {
     return { ok: false, error: "locked" };
+  }
+
+  const effectiveTeams = await getEffectiveRoundOf32TeamIds(match);
+  const effectiveHomeTeamId = effectiveTeams.homeTeamId;
+  const effectiveAwayTeamId = effectiveTeams.awayTeamId;
+
+  if (knockout && (!effectiveHomeTeamId || !effectiveAwayTeamId)) {
+    return { ok: false, error: "teams_missing" };
   }
 
   const hasBothScores = homeScore !== null && awayScore !== null;
   let storedWinnerTeamId: string | null = null;
 
   if (hasBothScores && knockout) {
-    if (homeScore > awayScore) storedWinnerTeamId = match.home_team_id;
-    else if (homeScore < awayScore) storedWinnerTeamId = match.away_team_id;
-    else if (
-      winnerTeamId === match.home_team_id ||
-      winnerTeamId === match.away_team_id
-    )
+    if (homeScore > awayScore) {
+      storedWinnerTeamId = effectiveHomeTeamId;
+    } else if (homeScore < awayScore) {
+      storedWinnerTeamId = effectiveAwayTeamId;
+    } else if (
+      winnerTeamId === effectiveHomeTeamId ||
+      winnerTeamId === effectiveAwayTeamId
+    ) {
       storedWinnerTeamId = winnerTeamId;
+    } else {
+      return { ok: false, error: "missing_winner" };
+    }
   }
+
+  const shouldPersistInferredTeams =
+    match.stage === "round_of_32" &&
+    Boolean(effectiveHomeTeamId && effectiveAwayTeamId);
 
   const { error } = await supabaseAdmin
     .from("matches")
     .update({
+      home_team_id: shouldPersistInferredTeams
+        ? (match.home_team_id ?? effectiveHomeTeamId)
+        : undefined,
+      away_team_id: shouldPersistInferredTeams
+        ? (match.away_team_id ?? effectiveAwayTeamId)
+        : undefined,
+      home_placeholder: shouldPersistInferredTeams ? null : undefined,
+      away_placeholder: shouldPersistInferredTeams ? null : undefined,
+      is_open_for_predictions: shouldPersistInferredTeams ? true : undefined,
       provisional_home_score: homeScore,
       provisional_away_score: awayScore,
       provisional_winner_team_id: knockout ? storedWinnerTeamId : null,
@@ -779,6 +863,9 @@ export async function saveProvisionalResultInlineAction(input: {
     return { ok: false, error: "save_failed" };
   }
 
+  revalidatePath("/admin");
+  revalidatePath("/tables");
+  revalidatePath("/countdown");
   return { ok: true, winnerTeamId: storedWinnerTeamId };
 }
 

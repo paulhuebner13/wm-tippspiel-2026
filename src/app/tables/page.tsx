@@ -23,6 +23,16 @@ type MatchWithTeams = Match & {
   away_team?: Team | null;
 };
 
+type ResolvedBracketMatch = MatchWithTeams & {
+  resolved_home_team?: Team | null;
+  resolved_away_team?: Team | null;
+};
+
+type BracketSourcePart = {
+  result: "winner" | "runnerUp";
+  matchNumber: number;
+};
+
 type StandingStatus =
   | "qualified"
   | "qualifiedFixed"
@@ -92,6 +102,36 @@ const BRACKET_SOURCE_MATCHES: Record<number, string> = {
   103: "RU101/RU102",
   104: "W101/W102",
 };
+
+function parseBracketSourcePart(value: string): BracketSourcePart | null {
+  if (value.startsWith("RU")) {
+    const matchNumber = Number(value.slice(2));
+    return Number.isInteger(matchNumber)
+      ? { result: "runnerUp", matchNumber }
+      : null;
+  }
+
+  if (value.startsWith("W")) {
+    const matchNumber = Number(value.slice(1));
+    return Number.isInteger(matchNumber)
+      ? { result: "winner", matchNumber }
+      : null;
+  }
+
+  return null;
+}
+
+function parseBracketSourceLabel(matchNumber: number) {
+  const sourceLabel = BRACKET_SOURCE_MATCHES[matchNumber];
+  if (!sourceLabel) return null;
+
+  const [homeSource, awaySource] = sourceLabel.split("/");
+  const home = parseBracketSourcePart(homeSource);
+  const away = parseBracketSourcePart(awaySource);
+  if (!home || !away) return null;
+
+  return { home, away };
+}
 
 function bracketOrderIndex(match: MatchWithTeams) {
   const order = BRACKET_MATCH_ORDER[match.stage];
@@ -751,27 +791,157 @@ function getInferredBracketTeam(
   return fixedThirdPlacePlacements.get(fixedGroupPlacementKey(thirdGroup, 3)) ?? null;
 }
 
+function sideTeam(match: ResolvedBracketMatch, side: "home" | "away") {
+  if (side === "home") {
+    return match.resolved_home_team ?? match.home_team ?? null;
+  }
+  return match.resolved_away_team ?? match.away_team ?? null;
+}
+
+function getResolvedWinnerTeam(match: ResolvedBracketMatch) {
+  const homeTeam = sideTeam(match, "home");
+  const awayTeam = sideTeam(match, "away");
+  const winnerTeamId = resultWinnerTeamId(match);
+
+  if (winnerTeamId) {
+    if (homeTeam?.id === winnerTeamId) return homeTeam;
+    if (awayTeam?.id === winnerTeamId) return awayTeam;
+    if (match.home_team?.id === winnerTeamId) return match.home_team;
+    if (match.away_team?.id === winnerTeamId) return match.away_team;
+  }
+
+  const homeScore = resultHomeScore(match);
+  const awayScore = resultAwayScore(match);
+  if (homeScore === null || awayScore === null || homeScore === awayScore) {
+    return null;
+  }
+
+  return homeScore > awayScore ? homeTeam : awayTeam;
+}
+
+function getResolvedRunnerUpTeam(match: ResolvedBracketMatch) {
+  const homeTeam = sideTeam(match, "home");
+  const awayTeam = sideTeam(match, "away");
+  const winnerTeam = getResolvedWinnerTeam(match);
+
+  if (!winnerTeam) return null;
+  if (winnerTeam.id === homeTeam?.id) return awayTeam;
+  if (winnerTeam.id === awayTeam?.id) return homeTeam;
+  return null;
+}
+
+function resolveBracketSourceTeam(
+  source: BracketSourcePart,
+  resolvedMatchesByNumber: Map<number, ResolvedBracketMatch>,
+) {
+  const sourceMatch = resolvedMatchesByNumber.get(source.matchNumber);
+  if (!sourceMatch) return null;
+
+  return source.result === "winner"
+    ? getResolvedWinnerTeam(sourceMatch)
+    : getResolvedRunnerUpTeam(sourceMatch);
+}
+
+function resolveBracketMatches(
+  matches: MatchWithTeams[],
+  fixedTopTwoPlacements: FixedGroupPlacementMap,
+  fixedThirdPlacePlacements: FixedGroupPlacementMap,
+) {
+  const resolvedMatchesByNumber = new Map<number, ResolvedBracketMatch>();
+  const stages: Array<Stage | "third_place"> = [
+    "round_of_32",
+    "round_of_16",
+    "quarter_final",
+    "semi_final",
+    "third_place",
+    "final",
+  ];
+
+  for (const stage of stages) {
+    const stageMatches = matches
+      .filter((match) => match.stage === stage)
+      .sort(sortBracketMatches);
+
+    for (const match of stageMatches) {
+      const source = parseBracketSourceLabel(match.match_number);
+      const inferredHomeTeam =
+        match.stage === "round_of_32"
+          ? getInferredBracketTeam(
+              match,
+              "home",
+              fixedTopTwoPlacements,
+              fixedThirdPlacePlacements,
+            )
+          : null;
+      const inferredAwayTeam =
+        match.stage === "round_of_32"
+          ? getInferredBracketTeam(
+              match,
+              "away",
+              fixedTopTwoPlacements,
+              fixedThirdPlacePlacements,
+            )
+          : null;
+
+      const resolvedHomeTeam = source
+        ? resolveBracketSourceTeam(source.home, resolvedMatchesByNumber) ??
+          match.home_team ??
+          inferredHomeTeam ??
+          null
+        : match.home_team ?? inferredHomeTeam ?? null;
+      const resolvedAwayTeam = source
+        ? resolveBracketSourceTeam(source.away, resolvedMatchesByNumber) ??
+          match.away_team ??
+          inferredAwayTeam ??
+          null
+        : match.away_team ?? inferredAwayTeam ?? null;
+
+      resolvedMatchesByNumber.set(match.match_number, {
+        ...match,
+        resolved_home_team: resolvedHomeTeam,
+        resolved_away_team: resolvedAwayTeam,
+      });
+    }
+  }
+
+  return matches.map(
+    (match) => resolvedMatchesByNumber.get(match.match_number) ?? match,
+  );
+}
+
+function getBracketScrollTargetMatchNumber(matches: ResolvedBracketMatch[]) {
+  const now = Date.now();
+  const kickoffGraceMs = 150 * 60 * 1000;
+  const bracketMatches = matches
+    .filter((match) =>
+      [...BRACKET_STAGES, "third_place"].includes(match.stage),
+    )
+    .sort((a, b) => {
+      const timeDiff =
+        new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime();
+      if (timeDiff !== 0) return timeDiff;
+      return a.match_number - b.match_number;
+    });
+
+  const unfinishedMatches = bracketMatches.filter((match) => !hasResult(match));
+  const activeOrFutureMatch = unfinishedMatches.find((match) => {
+    const kickoff = new Date(match.kickoff_time).getTime();
+    return !Number.isNaN(kickoff) && kickoff + kickoffGraceMs >= now;
+  });
+
+  return activeOrFutureMatch?.match_number ?? unfinishedMatches[0]?.match_number ?? null;
+}
+
 function BracketTeam({
   match,
   side,
-  fixedTopTwoPlacements,
-  fixedThirdPlacePlacements,
   specialEffectActive,
 }: {
-  match: MatchWithTeams;
+  match: ResolvedBracketMatch;
   side: "home" | "away";
-  fixedTopTwoPlacements: FixedGroupPlacementMap;
-  fixedThirdPlacePlacements: FixedGroupPlacementMap;
   specialEffectActive: boolean;
 }) {
-  const storedTeam = side === "home" ? match.home_team : match.away_team;
-  const inferredTeam = getInferredBracketTeam(
-    match,
-    side,
-    fixedTopTwoPlacements,
-    fixedThirdPlacePlacements,
-  );
-  const rawTeam = storedTeam ?? inferredTeam;
+  const rawTeam = sideTeam(match, side);
   const team = applySpecialEffectToTeam(rawTeam, specialEffectActive);
   const score =
     side === "home" ? resultHomeScore(match) : resultAwayScore(match);
@@ -790,40 +960,33 @@ function BracketTeam({
 
 function BracketMatch({
   match,
-  displayNumber,
-  fixedTopTwoPlacements,
-  fixedThirdPlacePlacements,
   specialEffectActive,
 }: {
-  match: MatchWithTeams;
-  displayNumber: number;
-  fixedTopTwoPlacements: FixedGroupPlacementMap;
-  fixedThirdPlacePlacements: FixedGroupPlacementMap;
+  match: ResolvedBracketMatch;
   specialEffectActive: boolean;
 }) {
   return (
     <article
       className={`bracketMatch ${hasResult(match) ? "bracketMatchDone" : ""}`}
+      data-bracket-match-number={match.match_number}
     >
       <div className="bracketMatchMeta">
         <span>Spiel Nr. {match.match_number}</span>
         {BRACKET_SOURCE_MATCHES[match.match_number] && (
-          <span className="bracketSourceLabel">aus {BRACKET_SOURCE_MATCHES[match.match_number]}</span>
+          <span className="bracketSourceLabel">
+            aus {BRACKET_SOURCE_MATCHES[match.match_number]}
+          </span>
         )}
         <span>{formatKickoff(match.kickoff_time)}</span>
       </div>
       <BracketTeam
         match={match}
         side="home"
-        fixedTopTwoPlacements={fixedTopTwoPlacements}
-        fixedThirdPlacePlacements={fixedThirdPlacePlacements}
         specialEffectActive={specialEffectActive}
       />
       <BracketTeam
         match={match}
         side="away"
-        fixedTopTwoPlacements={fixedTopTwoPlacements}
-        fixedThirdPlacePlacements={fixedThirdPlacePlacements}
         specialEffectActive={specialEffectActive}
       />
     </article>
@@ -857,8 +1020,15 @@ export default async function TablesPage() {
   const standings = buildStandings(teams, matches, scenariosByGroup);
   const fixedTopTwoPlacements = calculateFixedTopTwoPlacements(teams, matches);
   const fixedThirdPlacePlacements = calculateFixedThirdPlacePlacements(teams, matches);
+  const bracketMatches = resolveBracketMatches(
+    matches,
+    fixedTopTwoPlacements,
+    fixedThirdPlacePlacements,
+  );
   const currentStage = getCurrentStage(matches);
-  const thirdPlaceMatch = matches.find(
+  const bracketScrollTargetMatchNumber =
+    getBracketScrollTargetMatchNumber(bracketMatches);
+  const thirdPlaceMatch = bracketMatches.find(
     (match) => match.stage === "third_place",
   );
   return (
@@ -936,10 +1106,10 @@ export default async function TablesPage() {
           </div>
 
           <div className="bracketScroll" data-bracket-scroll>
-            <BracketAutoScroll currentStage={currentStage} />
+            <BracketAutoScroll currentStage={currentStage} targetMatchNumber={bracketScrollTargetMatchNumber} />
             <div className="bracketBoard">
               {BRACKET_STAGES.map((stage) => {
-                const stageMatches = matches
+                const stageMatches = bracketMatches
                   .filter((match) => match.stage === stage)
                   .sort(sortBracketMatches);
 
@@ -955,9 +1125,6 @@ export default async function TablesPage() {
                         <BracketMatch
                           key={match.id}
                           match={match}
-                          displayNumber={match.match_number}
-                          fixedTopTwoPlacements={fixedTopTwoPlacements}
-                          fixedThirdPlacePlacements={fixedThirdPlacePlacements}
                           specialEffectActive={specialEffectActive}
                         />
                       ))}
@@ -975,9 +1142,6 @@ export default async function TablesPage() {
                   <div className="bracketColumnMatches">
                     <BracketMatch
                       match={thirdPlaceMatch}
-                      displayNumber={thirdPlaceMatch.match_number}
-                      fixedTopTwoPlacements={fixedTopTwoPlacements}
-                      fixedThirdPlacePlacements={fixedThirdPlacePlacements}
                       specialEffectActive={specialEffectActive}
                     />
                   </div>

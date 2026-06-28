@@ -20,8 +20,8 @@ function scoreInputToNumber(value: string): number | null {
 }
 
 function canSubmitProvisional(match: Match, now: number) {
-  if (isKnockoutStage(match.stage)) return false;
   if (match.home_score !== null && match.away_score !== null) return false;
+  if (!match.home_team_id || !match.away_team_id) return false;
   const openAt = new Date(new Date(match.kickoff_time).getTime() + 105 * 60 * 1000).getTime();
   if (Number.isNaN(openAt)) return false;
   return now >= openAt;
@@ -77,6 +77,7 @@ export function ResultSubmitterCard({ match, current = false }: { match: Match; 
 
   useEffect(() => {
     if (!editable || matchesSaved) return;
+    if (showWinnerChoice && !winnerTeamId) return;
 
     const requestHome = homeEmpty ? null : homeNumber;
     const requestAway = awayEmpty ? null : awayNumber;
@@ -105,7 +106,7 @@ export function ResultSubmitterCard({ match, current = false }: { match: Match; 
     }, 650);
 
     return () => window.clearTimeout(timeout);
-  }, [awayEmpty, awayNumber, editable, homeEmpty, homeNumber, match.id, matchesSaved, normalizedWinner]);
+  }, [awayEmpty, awayNumber, editable, homeEmpty, homeNumber, match.id, matchesSaved, normalizedWinner, showWinnerChoice, winnerTeamId]);
 
   const hasProvisionalResult = !hasOfficialResult && savedHome !== null && savedAway !== null;
   const cardClass = hasOfficialResult

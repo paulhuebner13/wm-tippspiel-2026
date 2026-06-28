@@ -5,7 +5,12 @@ import { ResultSubmitterCard } from "@/components/ResultSubmitterCard";
 import { requireResultEditor } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { isKnockoutStage } from "@/lib/scoring";
-import { applyFixedTopTwoToMatches } from "@/lib/fixedGroupPlacements";
+import {
+  calculateFixedThirdPlacePlacements,
+  calculateFixedTopTwoPlacements,
+  getInferredBracketTeam,
+  type MatchWithTeams,
+} from "@/lib/fixedGroupPlacements";
 import {
   applySpecialEffectsToMatches,
   applySpecialEffectsToTeams,
@@ -30,19 +35,59 @@ function provisionalOpenAt(match: Match) {
 }
 
 function provisionalCanOpen(match: Match) {
-  if (isKnockoutStage(match.stage)) return false;
   if (match.home_score !== null && match.away_score !== null) return false;
+  if (!match.home_team_id || !match.away_team_id) return false;
   const openAt = provisionalOpenAt(match);
   if (openAt === null) return false;
   return Date.now() >= openAt;
 }
 
 function provisionalWillOpenInFuture(match: Match) {
-  if (isKnockoutStage(match.stage)) return false;
   if (match.home_score !== null && match.away_score !== null) return false;
+  if (!match.home_team_id || !match.away_team_id) return false;
   const openAt = provisionalOpenAt(match);
   if (openAt === null) return false;
   return Date.now() < openAt;
+}
+
+function applyInferredRoundOf32TeamsToMatches(
+  matches: MatchWithTeams[],
+  teams: Team[],
+) {
+  const fixedTopTwoPlacements = calculateFixedTopTwoPlacements(teams, matches);
+  const fixedThirdPlacePlacements = calculateFixedThirdPlacePlacements(
+    teams,
+    matches,
+  );
+
+  return matches.map((match) => {
+    if (match.stage !== "round_of_32") return match;
+
+    const inferredHomeTeam =
+      match.home_team ??
+      getInferredBracketTeam(
+        match,
+        "home",
+        fixedTopTwoPlacements,
+        fixedThirdPlacePlacements,
+      );
+    const inferredAwayTeam =
+      match.away_team ??
+      getInferredBracketTeam(
+        match,
+        "away",
+        fixedTopTwoPlacements,
+        fixedThirdPlacePlacements,
+      );
+
+    return {
+      ...match,
+      home_team: inferredHomeTeam ?? match.home_team ?? null,
+      away_team: inferredAwayTeam ?? match.away_team ?? null,
+      home_team_id: match.home_team_id ?? inferredHomeTeam?.id ?? null,
+      away_team_id: match.away_team_id ?? inferredAwayTeam?.id ?? null,
+    };
+  });
 }
 
 function hasCompleteResult(match: Match) {
@@ -74,12 +119,12 @@ export default async function AdminPage() {
   const rawTeams = (teamsData ?? []) as Team[];
   const specialEffectActive = await getUserSpecialEffectActive(user.id);
   const teams = applySpecialEffectsToTeams(rawTeams, specialEffectActive);
-  const matchesWithFixedTeams = applyFixedTopTwoToMatches(
-    (matchesData ?? []) as Match[],
+  const matchesWithInferredTeams = applyInferredRoundOf32TeamsToMatches(
+    (matchesData ?? []) as MatchWithTeams[],
     rawTeams,
   );
   const matches = applySpecialEffectsToMatches(
-    matchesWithFixedTeams,
+    matchesWithInferredTeams as Match[],
     specialEffectActive,
   );
 
