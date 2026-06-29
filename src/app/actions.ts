@@ -12,10 +12,9 @@ import {
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { isKnockoutStage } from "@/lib/scoring";
 import { isPredictionLocked } from "@/lib/time";
+import { getBracketTargetsForSource, getLoserTeamId } from "@/lib/bracket";
 import {
-  calculateFixedThirdPlacePlacements,
-  calculateFixedTopTwoPlacements,
-  getInferredBracketTeam,
+  applyFixedTopTwoToMatches,
   type MatchWithTeams,
 } from "@/lib/fixedGroupPlacements";
 import type { Team } from "@/lib/types";
@@ -27,71 +26,8 @@ type MatchTeamResolutionInput = {
   away_team_id: string | null;
 };
 
-type BracketTarget = {
-  targetMatchNumber: number;
-  side: "home" | "away";
-  sourceResult: "winner" | "loser";
-};
-
-const BRACKET_TARGETS_BY_SOURCE: Record<number, BracketTarget[]> = {
-  73: [{ targetMatchNumber: 89, side: "home", sourceResult: "winner" }],
-  75: [{ targetMatchNumber: 89, side: "away", sourceResult: "winner" }],
-  74: [{ targetMatchNumber: 90, side: "home", sourceResult: "winner" }],
-  77: [{ targetMatchNumber: 90, side: "away", sourceResult: "winner" }],
-  76: [{ targetMatchNumber: 91, side: "home", sourceResult: "winner" }],
-  78: [{ targetMatchNumber: 91, side: "away", sourceResult: "winner" }],
-  79: [{ targetMatchNumber: 92, side: "home", sourceResult: "winner" }],
-  80: [{ targetMatchNumber: 92, side: "away", sourceResult: "winner" }],
-  83: [{ targetMatchNumber: 93, side: "home", sourceResult: "winner" }],
-  84: [{ targetMatchNumber: 93, side: "away", sourceResult: "winner" }],
-  81: [{ targetMatchNumber: 94, side: "home", sourceResult: "winner" }],
-  82: [{ targetMatchNumber: 94, side: "away", sourceResult: "winner" }],
-  86: [{ targetMatchNumber: 95, side: "home", sourceResult: "winner" }],
-  88: [{ targetMatchNumber: 95, side: "away", sourceResult: "winner" }],
-  85: [{ targetMatchNumber: 96, side: "home", sourceResult: "winner" }],
-  87: [{ targetMatchNumber: 96, side: "away", sourceResult: "winner" }],
-  89: [{ targetMatchNumber: 97, side: "home", sourceResult: "winner" }],
-  90: [{ targetMatchNumber: 97, side: "away", sourceResult: "winner" }],
-  93: [{ targetMatchNumber: 98, side: "home", sourceResult: "winner" }],
-  94: [{ targetMatchNumber: 98, side: "away", sourceResult: "winner" }],
-  91: [{ targetMatchNumber: 99, side: "home", sourceResult: "winner" }],
-  92: [{ targetMatchNumber: 99, side: "away", sourceResult: "winner" }],
-  95: [{ targetMatchNumber: 100, side: "home", sourceResult: "winner" }],
-  96: [{ targetMatchNumber: 100, side: "away", sourceResult: "winner" }],
-  97: [{ targetMatchNumber: 101, side: "home", sourceResult: "winner" }],
-  98: [{ targetMatchNumber: 101, side: "away", sourceResult: "winner" }],
-  99: [{ targetMatchNumber: 102, side: "home", sourceResult: "winner" }],
-  100: [{ targetMatchNumber: 102, side: "away", sourceResult: "winner" }],
-  101: [
-    { targetMatchNumber: 103, side: "home", sourceResult: "loser" },
-    { targetMatchNumber: 104, side: "home", sourceResult: "winner" },
-  ],
-  102: [
-    { targetMatchNumber: 103, side: "away", sourceResult: "loser" },
-    { targetMatchNumber: 104, side: "away", sourceResult: "winner" },
-  ],
-};
-
-function getBracketTargetsForSource(sourceMatchNumber: number) {
-  return BRACKET_TARGETS_BY_SOURCE[sourceMatchNumber] ?? [];
-}
-
-function getLoserTeamId(input: {
-  homeTeamId: string | null;
-  awayTeamId: string | null;
-  winnerTeamId: string | null;
-}) {
-  if (!input.winnerTeamId) return null;
-  if (input.winnerTeamId === input.homeTeamId) return input.awayTeamId;
-  if (input.winnerTeamId === input.awayTeamId) return input.homeTeamId;
-  return null;
-}
-
 async function getEffectiveRoundOf32TeamIds(match: MatchTeamResolutionInput) {
-  if (
-    match.stage !== "round_of_32" ||
-    (match.home_team_id && match.away_team_id)
-  ) {
+  if (!isKnockoutStage(match.stage)) {
     return {
       homeTeamId: match.home_team_id,
       awayTeamId: match.away_team_id,
@@ -110,36 +46,15 @@ async function getEffectiveRoundOf32TeamIds(match: MatchTeamResolutionInput) {
   ]);
 
   const teams = (teamsData ?? []) as Team[];
-  const matches = (matchesData ?? []) as MatchWithTeams[];
-  const currentMatch = matches.find((item) => item.id === match.id);
-  if (!currentMatch) {
-    return {
-      homeTeamId: match.home_team_id,
-      awayTeamId: match.away_team_id,
-    };
-  }
-
-  const fixedTopTwoPlacements = calculateFixedTopTwoPlacements(teams, matches);
-  const fixedThirdPlacePlacements = calculateFixedThirdPlacePlacements(
+  const resolvedMatches = applyFixedTopTwoToMatches(
+    (matchesData ?? []) as MatchWithTeams[],
     teams,
-    matches,
   );
-  const inferredHomeTeam = getInferredBracketTeam(
-    currentMatch,
-    "home",
-    fixedTopTwoPlacements,
-    fixedThirdPlacePlacements,
-  );
-  const inferredAwayTeam = getInferredBracketTeam(
-    currentMatch,
-    "away",
-    fixedTopTwoPlacements,
-    fixedThirdPlacePlacements,
-  );
+  const currentMatch = resolvedMatches.find((item) => item.id === match.id);
 
   return {
-    homeTeamId: match.home_team_id ?? inferredHomeTeam?.id ?? null,
-    awayTeamId: match.away_team_id ?? inferredAwayTeam?.id ?? null,
+    homeTeamId: currentMatch?.home_team_id ?? match.home_team_id ?? null,
+    awayTeamId: currentMatch?.away_team_id ?? match.away_team_id ?? null,
   };
 }
 
@@ -610,10 +525,10 @@ export async function saveResultAction(formData: FormData) {
     .from("matches")
     .update({
       home_team_id: shouldPersistInferredTeams
-        ? (match.home_team_id ?? effectiveHomeTeamId)
+        ? effectiveHomeTeamId
         : undefined,
       away_team_id: shouldPersistInferredTeams
-        ? (match.away_team_id ?? effectiveAwayTeamId)
+        ? effectiveAwayTeamId
         : undefined,
       home_placeholder: shouldPersistInferredTeams ? null : undefined,
       away_placeholder: shouldPersistInferredTeams ? null : undefined,
@@ -718,10 +633,10 @@ export async function saveResultInlineAction(input: {
     .from("matches")
     .update({
       home_team_id: shouldPersistInferredTeams
-        ? (match.home_team_id ?? effectiveHomeTeamId)
+        ? effectiveHomeTeamId
         : undefined,
       away_team_id: shouldPersistInferredTeams
-        ? (match.away_team_id ?? effectiveAwayTeamId)
+        ? effectiveAwayTeamId
         : undefined,
       home_placeholder: shouldPersistInferredTeams ? null : undefined,
       away_placeholder: shouldPersistInferredTeams ? null : undefined,
@@ -797,8 +712,8 @@ export async function saveProvisionalResultInlineAction(input: {
   const hasOfficialResult =
     match.home_score !== null && match.away_score !== null;
   const knockout = isKnockoutStage(match.stage);
-  const provisionalOpenAt = new Date(match.kickoff_time).getTime() +
-    105 * 60 * 1000;
+  const provisionalOpenAt =
+    new Date(match.kickoff_time).getTime() + 105 * 60 * 1000;
 
   if (
     hasOfficialResult ||
@@ -842,10 +757,10 @@ export async function saveProvisionalResultInlineAction(input: {
     .from("matches")
     .update({
       home_team_id: shouldPersistInferredTeams
-        ? (match.home_team_id ?? effectiveHomeTeamId)
+        ? effectiveHomeTeamId
         : undefined,
       away_team_id: shouldPersistInferredTeams
-        ? (match.away_team_id ?? effectiveAwayTeamId)
+        ? effectiveAwayTeamId
         : undefined,
       home_placeholder: shouldPersistInferredTeams ? null : undefined,
       away_placeholder: shouldPersistInferredTeams ? null : undefined,

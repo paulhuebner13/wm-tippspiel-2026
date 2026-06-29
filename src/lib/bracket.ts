@@ -1,33 +1,44 @@
 export type BracketSide = "home" | "away";
 
+export type BracketSourceResult = "winner" | "loser";
+
 export type BracketTarget = {
   sourceMatchNumber: number;
   targetMatchNumber: number;
   side: BracketSide;
-  sourceResult: "winner" | "loser";
+  sourceResult: BracketSourceResult;
 };
 
+export type BracketSource = {
+  matchNumber: number;
+  result: BracketSourceResult;
+};
+
+export type BracketTargetSources = Partial<Record<BracketSide, BracketSource>>;
+
+// Official bracket paths. This is not a database correction: it is the tournament
+// rule that defines where the winner/runner-up of a match goes next.
 export const BRACKET_TARGETS: BracketTarget[] = [
   {
-    sourceMatchNumber: 74,
-    targetMatchNumber: 89,
-    side: "home",
-    sourceResult: "winner",
-  },
-  {
-    sourceMatchNumber: 77,
-    targetMatchNumber: 89,
-    side: "away",
-    sourceResult: "winner",
-  },
-  {
     sourceMatchNumber: 73,
-    targetMatchNumber: 90,
+    targetMatchNumber: 89,
     side: "home",
     sourceResult: "winner",
   },
   {
     sourceMatchNumber: 75,
+    targetMatchNumber: 89,
+    side: "away",
+    sourceResult: "winner",
+  },
+  {
+    sourceMatchNumber: 74,
+    targetMatchNumber: 90,
+    side: "home",
+    sourceResult: "winner",
+  },
+  {
+    sourceMatchNumber: 77,
     targetMatchNumber: 90,
     side: "away",
     sourceResult: "winner",
@@ -209,6 +220,25 @@ export function getBracketTargetsForSource(matchNumber: number) {
   return BRACKET_TARGETS.filter(
     (target) => target.sourceMatchNumber === matchNumber,
   );
+}
+
+export function getBracketSourcesForTarget(
+  matchNumber: number,
+): BracketTargetSources {
+  return BRACKET_TARGETS.filter(
+    (target) => target.targetMatchNumber === matchNumber,
+  ).reduce<BracketTargetSources>((sources, target) => {
+    sources[target.side] = {
+      matchNumber: target.sourceMatchNumber,
+      result: target.sourceResult,
+    };
+    return sources;
+  }, {});
+}
+
+export function getBracketSourcePlaceholder(source: BracketSource | undefined) {
+  if (!source) return "Offen";
+  return `${source.result === "winner" ? "W" : "RU"}${source.matchNumber}`;
 }
 
 export function getLoserTeamId(input: {

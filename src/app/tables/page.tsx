@@ -759,9 +759,6 @@ function getInferredBracketTeam(
   fixedTopTwoPlacements: FixedGroupPlacementMap,
   fixedThirdPlacePlacements: FixedGroupPlacementMap,
 ) {
-  const storedTeam = side === "home" ? match.home_team : match.away_team;
-  if (storedTeam) return null;
-
   const placeholder =
     side === "home" ? match.home_placeholder : match.away_placeholder;
   const parsedTopTwoPlaceholder = parseTopTwoPlaceholder(placeholder);
@@ -883,18 +880,23 @@ function resolveBracketMatches(
             )
           : null;
 
+      const roundOf32HomeTeam =
+        match.stage === "round_of_32"
+          ? inferredHomeTeam ?? match.home_team ?? null
+          : match.home_team ?? null;
+      const roundOf32AwayTeam =
+        match.stage === "round_of_32"
+          ? inferredAwayTeam ?? match.away_team ?? null
+          : match.away_team ?? null;
+
       const resolvedHomeTeam = source
         ? resolveBracketSourceTeam(source.home, resolvedMatchesByNumber) ??
-          match.home_team ??
-          inferredHomeTeam ??
-          null
-        : match.home_team ?? inferredHomeTeam ?? null;
+          roundOf32HomeTeam
+        : roundOf32HomeTeam;
       const resolvedAwayTeam = source
         ? resolveBracketSourceTeam(source.away, resolvedMatchesByNumber) ??
-          match.away_team ??
-          inferredAwayTeam ??
-          null
-        : match.away_team ?? inferredAwayTeam ?? null;
+          roundOf32AwayTeam
+        : roundOf32AwayTeam;
 
       resolvedMatchesByNumber.set(match.match_number, {
         ...match,

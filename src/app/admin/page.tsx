@@ -63,29 +63,25 @@ function applyInferredRoundOf32TeamsToMatches(
   return matches.map((match) => {
     if (match.stage !== "round_of_32") return match;
 
-    const inferredHomeTeam =
-      match.home_team ??
-      getInferredBracketTeam(
-        match,
-        "home",
-        fixedTopTwoPlacements,
-        fixedThirdPlacePlacements,
-      );
-    const inferredAwayTeam =
-      match.away_team ??
-      getInferredBracketTeam(
-        match,
-        "away",
-        fixedTopTwoPlacements,
-        fixedThirdPlacePlacements,
-      );
+    const inferredHomeTeam = getInferredBracketTeam(
+      match,
+      "home",
+      fixedTopTwoPlacements,
+      fixedThirdPlacePlacements,
+    );
+    const inferredAwayTeam = getInferredBracketTeam(
+      match,
+      "away",
+      fixedTopTwoPlacements,
+      fixedThirdPlacePlacements,
+    );
 
     return {
       ...match,
       home_team: inferredHomeTeam ?? match.home_team ?? null,
       away_team: inferredAwayTeam ?? match.away_team ?? null,
-      home_team_id: match.home_team_id ?? inferredHomeTeam?.id ?? null,
-      away_team_id: match.away_team_id ?? inferredAwayTeam?.id ?? null,
+      home_team_id: inferredHomeTeam?.id ?? match.home_team_id ?? null,
+      away_team_id: inferredAwayTeam?.id ?? match.away_team_id ?? null,
     };
   });
 }

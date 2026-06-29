@@ -1,5 +1,10 @@
 import { getFifaRanking } from "./fifaRankings";
 import {
+  getBracketSourcePlaceholder,
+  getBracketSourcesForTarget,
+  type BracketSource,
+} from "./bracket";
+import {
   getThirdPlaceOpponentGroup,
   isThirdPlaceWinnerGroup,
   ROUND_OF_32_THIRD_PLACE_MATCH_NUMBERS,
@@ -141,9 +146,9 @@ export function parseThirdPlacePlaceholder(value: string | null) {
 }
 
 function topSeedGroupForMatch(match: MatchWithTeams) {
-  const knownByMatchNumber = Object.entries(ROUND_OF_32_THIRD_PLACE_MATCH_NUMBERS).find(
-    ([, matchNumber]) => matchNumber === match.match_number,
-  )?.[0];
+  const knownByMatchNumber = Object.entries(
+    ROUND_OF_32_THIRD_PLACE_MATCH_NUMBERS,
+  ).find(([, matchNumber]) => matchNumber === match.match_number)?.[0];
 
   if (knownByMatchNumber && isThirdPlaceWinnerGroup(knownByMatchNumber)) {
     return knownByMatchNumber;
@@ -304,16 +309,22 @@ function calculatePossibleRanks(teams: Team[], groupMatches: MatchWithTeams[]) {
 }
 
 function groupHasAllResults(groupMatches: MatchWithTeams[]) {
-  return groupMatches.length > 0 && groupMatches.every((match) => hasResult(match));
+  return (
+    groupMatches.length > 0 && groupMatches.every((match) => hasResult(match))
+  );
 }
 
-function buildCompletedGroupStandings(teams: Team[], matches: MatchWithTeams[]) {
+function buildCompletedGroupStandings(
+  teams: Team[],
+  matches: MatchWithTeams[],
+) {
   const standingsByGroup = new Map<string, StandingRow[]>();
   const teamsByGroup = new Map<string, Team[]>();
 
   for (const team of teams) {
     if (!team.group_name) continue;
-    if (!teamsByGroup.has(team.group_name)) teamsByGroup.set(team.group_name, []);
+    if (!teamsByGroup.has(team.group_name))
+      teamsByGroup.set(team.group_name, []);
     teamsByGroup.get(team.group_name)?.push(team);
   }
 
@@ -331,6 +342,17 @@ function buildCompletedGroupStandings(teams: Team[], matches: MatchWithTeams[]) 
   return standingsByGroup;
 }
 
+function compareThirdPlaceRows(a: StandingRow, b: StandingRow) {
+  if (b.points !== a.points) return b.points - a.points;
+  if (b.goalDifference !== a.goalDifference)
+    return b.goalDifference - a.goalDifference;
+  if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
+  const rankA = fifaRankValue(a.team);
+  const rankB = fifaRankValue(b.team);
+  if (rankA !== rankB) return rankA - rankB;
+  return a.team.name.localeCompare(b.team.name, "de-AT");
+}
+
 export function calculateFixedThirdPlacePlacements(
   teams: Team[],
   matches: MatchWithTeams[],
@@ -342,24 +364,19 @@ export function calculateFixedThirdPlacePlacements(
 
   const thirdPlacedRows = Array.from(completedStandings.entries())
     .map(([groupName, rows]) => ({ groupName, row: rows[2] }))
-    .filter((entry): entry is { groupName: string; row: StandingRow } => Boolean(entry.row))
+    .filter((entry): entry is { groupName: string; row: StandingRow } =>
+      Boolean(entry.row),
+    )
     .sort((a, b) => compareThirdPlaceRows(a.row, b.row));
 
   for (const entry of thirdPlacedRows.slice(0, 8)) {
-    fixedPlacements.set(fixedGroupPlacementKey(entry.groupName, 3), entry.row.team);
+    fixedPlacements.set(
+      fixedGroupPlacementKey(entry.groupName, 3),
+      entry.row.team,
+    );
   }
 
   return fixedPlacements;
-}
-
-function compareThirdPlaceRows(a: StandingRow, b: StandingRow) {
-  if (b.points !== a.points) return b.points - a.points;
-  if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
-  if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
-  const rankA = fifaRankValue(a.team);
-  const rankB = fifaRankValue(b.team);
-  if (rankA !== rankB) return rankA - rankB;
-  return a.team.name.localeCompare(b.team.name, "de-AT");
 }
 
 export function calculateFixedTopTwoPlacements(
@@ -402,9 +419,6 @@ export function getInferredBracketTeam(
   fixedTopTwoPlacements: FixedGroupPlacementMap,
   fixedThirdPlacePlacements?: FixedGroupPlacementMap,
 ) {
-  const storedTeam = side === "home" ? match.home_team : match.away_team;
-  if (storedTeam) return null;
-
   const placeholder =
     side === "home" ? match.home_placeholder : match.away_placeholder;
   const parsedTopTwoPlaceholder = parseTopTwoPlaceholder(placeholder);
@@ -421,12 +435,18 @@ export function getInferredBracketTeam(
   }
 
   const thirdPlaceGroups = fixedThirdPlacePlacements
-    ? Array.from(fixedThirdPlacePlacements.keys()).map((key) => key.split(":")[0])
+    ? Array.from(fixedThirdPlacePlacements.keys()).map(
+        (key) => key.split(":")[0],
+      )
     : [];
   const winnerGroup = topSeedGroupForMatch(match);
   const parsedThirdPlacePlaceholder = parseThirdPlacePlaceholder(placeholder);
 
-  if (!winnerGroup || !parsedThirdPlacePlaceholder || thirdPlaceGroups.length !== 8) {
+  if (
+    !winnerGroup ||
+    !parsedThirdPlacePlaceholder ||
+    thirdPlaceGroups.length !== 8
+  ) {
     return null;
   }
 
@@ -435,7 +455,100 @@ export function getInferredBracketTeam(
     return null;
   }
 
-  return fixedThirdPlacePlacements?.get(fixedGroupPlacementKey(thirdGroup, 3)) ?? null;
+  return (
+    fixedThirdPlacePlacements?.get(fixedGroupPlacementKey(thirdGroup, 3)) ??
+    null
+  );
+}
+
+function getStageResolveOrder(stage: MatchWithTeams["stage"]) {
+  switch (stage) {
+    case "round_of_32":
+      return 1;
+    case "round_of_16":
+      return 2;
+    case "quarter_final":
+      return 3;
+    case "semi_final":
+      return 4;
+    case "third_place":
+      return 5;
+    case "final":
+      return 6;
+    default:
+      return 0;
+  }
+}
+
+function sideTeam(match: MatchWithTeams, side: "home" | "away") {
+  return side === "home"
+    ? (match.home_team ?? null)
+    : (match.away_team ?? null);
+}
+
+function resultWinnerTeamId(match: MatchWithTeams) {
+  return match.winner_team_id ?? match.provisional_winner_team_id ?? null;
+}
+
+function getResolvedWinnerTeam(match: MatchWithTeams) {
+  const homeTeam = sideTeam(match, "home");
+  const awayTeam = sideTeam(match, "away");
+  const winnerTeamId = resultWinnerTeamId(match);
+
+  if (winnerTeamId) {
+    if (homeTeam?.id === winnerTeamId) return homeTeam;
+    if (awayTeam?.id === winnerTeamId) return awayTeam;
+  }
+
+  const homeScore = resultHomeScore(match);
+  const awayScore = resultAwayScore(match);
+  if (homeScore === null || awayScore === null || homeScore === awayScore) {
+    return null;
+  }
+
+  return homeScore > awayScore ? homeTeam : awayTeam;
+}
+
+function getResolvedLoserTeam(match: MatchWithTeams) {
+  const homeTeam = sideTeam(match, "home");
+  const awayTeam = sideTeam(match, "away");
+  const winnerTeam = getResolvedWinnerTeam(match);
+
+  if (!winnerTeam) return null;
+  if (winnerTeam.id === homeTeam?.id) return awayTeam;
+  if (winnerTeam.id === awayTeam?.id) return homeTeam;
+  return null;
+}
+
+function resolveSourceTeam(
+  source: BracketSource | undefined,
+  resolvedMatchesByNumber: Map<number, MatchWithTeams>,
+) {
+  if (!source) return null;
+  const sourceMatch = resolvedMatchesByNumber.get(source.matchNumber);
+  if (!sourceMatch) return null;
+  return source.result === "winner"
+    ? getResolvedWinnerTeam(sourceMatch)
+    : getResolvedLoserTeam(sourceMatch);
+}
+
+function applyResolvedSide(
+  match: MatchWithTeams,
+  side: "home" | "away",
+  team: Team | null,
+  placeholder: string | undefined,
+) {
+  const teamColumn = side === "home" ? "home_team" : "away_team";
+  const teamIdColumn = side === "home" ? "home_team_id" : "away_team_id";
+  const placeholderColumn =
+    side === "home" ? "home_placeholder" : "away_placeholder";
+
+  return {
+    ...match,
+    [teamColumn]: team,
+    [teamIdColumn]: team?.id ?? null,
+    [placeholderColumn]: team ? null : placeholder,
+  };
 }
 
 export function applyFixedTopTwoToMatches(
@@ -443,38 +556,89 @@ export function applyFixedTopTwoToMatches(
   teams: Team[],
 ) {
   const fixedTopTwoPlacements = calculateFixedTopTwoPlacements(teams, matches);
-  const fixedThirdPlacePlacements = calculateFixedThirdPlacePlacements(teams, matches);
-
-  return matches.map((match) => {
-    const inferredHomeTeam = getInferredBracketTeam(
-      match,
-      "home",
-      fixedTopTwoPlacements,
-      fixedThirdPlacePlacements,
-    );
-    const inferredAwayTeam = getInferredBracketTeam(
-      match,
-      "away",
-      fixedTopTwoPlacements,
-      fixedThirdPlacePlacements,
-    );
-
-    if (!inferredHomeTeam && !inferredAwayTeam) return match;
-
-    const homeTeam = match.home_team ?? inferredHomeTeam ?? null;
-    const awayTeam = match.away_team ?? inferredAwayTeam ?? null;
-    const homeTeamId = match.home_team_id ?? inferredHomeTeam?.id ?? null;
-    const awayTeamId = match.away_team_id ?? inferredAwayTeam?.id ?? null;
-
-    return {
-      ...match,
-      home_team: homeTeam,
-      away_team: awayTeam,
-      home_team_id: homeTeamId,
-      away_team_id: awayTeamId,
-      is_open_for_predictions:
-        match.is_open_for_predictions ||
-        Boolean(homeTeamId && awayTeamId && !match.is_finished),
-    };
+  const fixedThirdPlacePlacements = calculateFixedThirdPlacePlacements(
+    teams,
+    matches,
+  );
+  const resolvedMatchesByNumber = new Map<number, MatchWithTeams>();
+  const sortedMatches = [...matches].sort((a, b) => {
+    const stageDiff =
+      getStageResolveOrder(a.stage) - getStageResolveOrder(b.stage);
+    if (stageDiff !== 0) return stageDiff;
+    return a.match_number - b.match_number;
   });
+
+  for (const match of sortedMatches) {
+    const sources = getBracketSourcesForTarget(match.match_number);
+    let resolvedMatch: MatchWithTeams = match;
+
+    if (match.stage === "round_of_32") {
+      const inferredHomeTeam = getInferredBracketTeam(
+        match,
+        "home",
+        fixedTopTwoPlacements,
+        fixedThirdPlacePlacements,
+      );
+      const inferredAwayTeam = getInferredBracketTeam(
+        match,
+        "away",
+        fixedTopTwoPlacements,
+        fixedThirdPlacePlacements,
+      );
+
+      resolvedMatch = {
+        ...resolvedMatch,
+        home_team: inferredHomeTeam ?? match.home_team ?? null,
+        away_team: inferredAwayTeam ?? match.away_team ?? null,
+        home_team_id: inferredHomeTeam?.id ?? match.home_team_id ?? null,
+        away_team_id: inferredAwayTeam?.id ?? match.away_team_id ?? null,
+        home_placeholder:
+          inferredHomeTeam || match.home_team ? null : match.home_placeholder,
+        away_placeholder:
+          inferredAwayTeam || match.away_team ? null : match.away_placeholder,
+      };
+    } else if (sources.home || sources.away) {
+      const resolvedHomeTeam = resolveSourceTeam(
+        sources.home,
+        resolvedMatchesByNumber,
+      );
+      const resolvedAwayTeam = resolveSourceTeam(
+        sources.away,
+        resolvedMatchesByNumber,
+      );
+
+      // Later knockout rounds must follow the source matches (W73, W75, ...), not
+      // stale team ids that may already be stored in the database from an older
+      // wrong propagation.
+      resolvedMatch = applyResolvedSide(
+        resolvedMatch,
+        "home",
+        resolvedHomeTeam,
+        getBracketSourcePlaceholder(sources.home),
+      );
+      resolvedMatch = applyResolvedSide(
+        resolvedMatch,
+        "away",
+        resolvedAwayTeam,
+        getBracketSourcePlaceholder(sources.away),
+      );
+    }
+
+    const hasDistinctTeams = Boolean(
+      resolvedMatch.home_team_id &&
+      resolvedMatch.away_team_id &&
+      resolvedMatch.home_team_id !== resolvedMatch.away_team_id,
+    );
+
+    resolvedMatchesByNumber.set(match.match_number, {
+      ...resolvedMatch,
+      is_open_for_predictions:
+        resolvedMatch.is_open_for_predictions ||
+        Boolean(hasDistinctTeams && !resolvedMatch.is_finished),
+    });
+  }
+
+  return matches.map(
+    (match) => resolvedMatchesByNumber.get(match.match_number) ?? match,
+  );
 }
