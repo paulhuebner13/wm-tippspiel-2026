@@ -80,9 +80,29 @@ const BRACKET_STAGES: Stage[] = [
 ];
 
 const BRACKET_MATCH_ORDER: Partial<Record<Stage, number[]>> = {
-  round_of_32: [73, 76, 74, 75, 78, 77, 79, 80, 82, 81, 84, 83, 85, 88, 86, 87],
-  round_of_16: [90, 89, 91, 92, 93, 94, 95, 96],
-  quarter_final: [97, 98, 99, 100],
+  // Visual bracket order: source matches are grouped directly above/below the
+  // next match they feed into. This does not change official match numbers,
+  // kickoff times, teams, results, or propagation logic.
+  round_of_32: [
+    73, 75, // -> 90
+    74, 77, // -> 89
+    84, 83, // -> 93
+    82, 81, // -> 94
+    76, 78, // -> 91
+    79, 80, // -> 92
+    88, 86, // -> 95
+    85, 87, // -> 96
+  ],
+  round_of_16: [
+    90, 89, // -> 97
+    93, 94, // -> 98
+    91, 92, // -> 99
+    95, 96, // -> 100
+  ],
+  quarter_final: [
+    97, 98, // -> 101
+    99, 100, // -> 102
+  ],
   semi_final: [101, 102],
   final: [104],
   third_place: [103],
