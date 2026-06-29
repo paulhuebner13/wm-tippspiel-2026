@@ -80,8 +80,8 @@ const BRACKET_STAGES: Stage[] = [
 ];
 
 const BRACKET_MATCH_ORDER: Partial<Record<Stage, number[]>> = {
-  round_of_32: [73, 75, 74, 77, 83, 84, 81, 82, 76, 78, 79, 80, 86, 88, 85, 87],
-  round_of_16: [89, 90, 93, 94, 91, 92, 95, 96],
+  round_of_32: [73, 76, 74, 75, 78, 77, 79, 80, 82, 81, 84, 83, 85, 88, 86, 87],
+  round_of_16: [90, 89, 91, 92, 93, 94, 95, 96],
   quarter_final: [97, 98, 99, 100],
   semi_final: [101, 102],
   final: [104],
@@ -89,15 +89,15 @@ const BRACKET_MATCH_ORDER: Partial<Record<Stage, number[]>> = {
 };
 
 const BRACKET_SOURCE_MATCHES: Record<number, string> = {
-  89: "W73/W75",
-  90: "W74/W77",
+  90: "W73/W75",
+  89: "W74/W77",
   91: "W76/W78",
   92: "W79/W80",
-  93: "W83/W84",
-  94: "W81/W82",
-  95: "W86/W88",
+  93: "W84/W83",
+  94: "W82/W81",
+  95: "W88/W86",
   96: "W85/W87",
-  97: "W89/W90",
+  97: "W90/W89",
   98: "W93/W94",
   99: "W91/W92",
   100: "W95/W96",
