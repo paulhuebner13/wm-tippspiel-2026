@@ -17,11 +17,11 @@ import {
   applyFixedTopTwoToMatches,
   type MatchWithTeams,
 } from "@/lib/fixedGroupPlacements";
-import type { Team } from "@/lib/types";
+import type { Stage, Team } from "@/lib/types";
 
 type MatchTeamResolutionInput = {
   id: string;
-  stage: string;
+  stage: Stage;
   home_team_id: string | null;
   away_team_id: string | null;
 };
