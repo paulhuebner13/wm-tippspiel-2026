@@ -16,6 +16,33 @@ export type BracketSource = {
 
 export type BracketTargetSources = Partial<Record<BracketSide, BracketSource>>;
 
+
+export const ROUND_OF_32_PLACEHOLDERS: Record<number, { home: string; away: string }> = {
+  73: { home: "Zweiter Gruppe A", away: "Zweiter Gruppe B" },
+  74: { home: "Erster Gruppe E", away: "Dritter Gruppe A/B/C/D/F" },
+  75: { home: "Erster Gruppe F", away: "Zweiter Gruppe C" },
+  76: { home: "Erster Gruppe C", away: "Zweiter Gruppe F" },
+  77: { home: "Erster Gruppe I", away: "Dritter Gruppe C/D/F/G/H" },
+  78: { home: "Zweiter Gruppe E", away: "Zweiter Gruppe I" },
+  79: { home: "Erster Gruppe A", away: "Dritter Gruppe C/E/F/H/I" },
+  80: { home: "Erster Gruppe L", away: "Dritter Gruppe E/H/I/J/K" },
+  81: { home: "Erster Gruppe D", away: "Dritter Gruppe B/E/F/I/J" },
+  82: { home: "Erster Gruppe G", away: "Dritter Gruppe A/E/H/I/J" },
+  83: { home: "Zweiter Gruppe K", away: "Zweiter Gruppe L" },
+  84: { home: "Erster Gruppe H", away: "Zweiter Gruppe J" },
+  85: { home: "Erster Gruppe B", away: "Dritter Gruppe E/F/G/I/J" },
+  86: { home: "Erster Gruppe J", away: "Zweiter Gruppe H" },
+  87: { home: "Erster Gruppe K", away: "Dritter Gruppe D/E/I/J/L" },
+  88: { home: "Zweiter Gruppe D", away: "Zweiter Gruppe G" },
+};
+
+export function getRoundOf32Placeholder(
+  matchNumber: number,
+  side: BracketSide,
+) {
+  return ROUND_OF_32_PLACEHOLDERS[matchNumber]?.[side] ?? null;
+}
+
 // Official bracket paths. This is not a database correction: it is the tournament
 // rule that defines where the winner/runner-up of a match goes next.
 export const BRACKET_TARGETS: BracketTarget[] = [

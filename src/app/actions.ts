@@ -57,8 +57,8 @@ async function getEffectiveRoundOf32TeamIds(match: MatchTeamResolutionInput) {
   const currentMatch = resolvedMatches.find((item) => item.id === match.id);
 
   return {
-    homeTeamId: currentMatch?.home_team_id ?? match.home_team_id ?? null,
-    awayTeamId: currentMatch?.away_team_id ?? match.away_team_id ?? null,
+    homeTeamId: currentMatch ? currentMatch.home_team_id ?? null : match.home_team_id,
+    awayTeamId: currentMatch ? currentMatch.away_team_id ?? null : match.away_team_id,
   };
 }
 
@@ -160,6 +160,122 @@ async function updatePredictionOpenState(matchId: string) {
       updated_at: new Date().toISOString(),
     })
     .eq("id", matchId);
+}
+
+function asNullableString(value: string | null | undefined) {
+  return value ?? null;
+}
+
+function matchHasAnyResultState(match: Record<string, unknown>) {
+  return Boolean(
+    match.home_score != null ||
+      match.away_score != null ||
+      match.winner_team_id != null ||
+      match.provisional_home_score != null ||
+      match.provisional_away_score != null ||
+      match.provisional_winner_team_id != null ||
+      match.provisional_updated_at != null ||
+      match.is_finished,
+  );
+}
+
+async function reconcileKnockoutTreeFromLogic() {
+  // Rebuild all knockout participants from the actual current logic:
+  // group standings -> round of 32, then W/RU sources -> later rounds.
+  // This removes stale teams/results left behind after a source result is changed
+  // or deleted. It is intentionally iterative because clearing one match result
+  // can change the source for the next round.
+  for (let pass = 0; pass < 8; pass += 1) {
+    const [{ data: teamsData }, { data: matchesData }] = await Promise.all([
+      supabaseAdmin.from("teams").select("*"),
+      supabaseAdmin.from("matches").select(
+        `
+          *,
+          home_team:teams!matches_home_team_id_fkey(*),
+          away_team:teams!matches_away_team_id_fkey(*)
+        `,
+      ),
+    ]);
+
+    const teams = (teamsData ?? []) as Team[];
+    const rawMatches = (matchesData ?? []) as MatchWithTeams[];
+    const rawMatchesByNumber = new Map(
+      rawMatches.map((match) => [match.match_number, match]),
+    );
+    const resolvedMatches = applyFixedTopTwoToMatches(rawMatches, teams);
+    let changedAnything = false;
+
+    for (const resolvedMatch of resolvedMatches) {
+      if (!isKnockoutStage(resolvedMatch.stage)) continue;
+
+      const rawMatch = rawMatchesByNumber.get(resolvedMatch.match_number) as
+        | (MatchWithTeams & Record<string, unknown>)
+        | undefined;
+      if (!rawMatch) continue;
+
+      const desiredHomeTeamId = asNullableString(resolvedMatch.home_team_id);
+      const desiredAwayTeamId = asNullableString(resolvedMatch.away_team_id);
+      const desiredHomePlaceholder = desiredHomeTeamId
+        ? null
+        : asNullableString(resolvedMatch.home_placeholder);
+      const desiredAwayPlaceholder = desiredAwayTeamId
+        ? null
+        : asNullableString(resolvedMatch.away_placeholder);
+
+      const homeTeamChanged =
+        asNullableString(rawMatch.home_team_id) !== desiredHomeTeamId;
+      const awayTeamChanged =
+        asNullableString(rawMatch.away_team_id) !== desiredAwayTeamId;
+      const participantsChanged = homeTeamChanged || awayTeamChanged;
+      const resultImpossibleWithoutTeams =
+        (!desiredHomeTeamId || !desiredAwayTeamId) &&
+        matchHasAnyResultState(rawMatch);
+      const shouldClearResult = participantsChanged || resultImpossibleWithoutTeams;
+      const nextIsFinished = shouldClearResult ? false : Boolean(rawMatch.is_finished);
+      const nextOpenForPredictions = Boolean(
+        desiredHomeTeamId && desiredAwayTeamId && !nextIsFinished,
+      );
+
+      const updatePayload: Record<string, unknown> = {};
+
+      if (homeTeamChanged) updatePayload.home_team_id = desiredHomeTeamId;
+      if (awayTeamChanged) updatePayload.away_team_id = desiredAwayTeamId;
+      if (asNullableString(rawMatch.home_placeholder) !== desiredHomePlaceholder) {
+        updatePayload.home_placeholder = desiredHomePlaceholder;
+      }
+      if (asNullableString(rawMatch.away_placeholder) !== desiredAwayPlaceholder) {
+        updatePayload.away_placeholder = desiredAwayPlaceholder;
+      }
+      if (Boolean(rawMatch.is_open_for_predictions) !== nextOpenForPredictions) {
+        updatePayload.is_open_for_predictions = nextOpenForPredictions;
+      }
+
+      if (shouldClearResult) {
+        updatePayload.home_score = null;
+        updatePayload.away_score = null;
+        updatePayload.winner_team_id = null;
+        updatePayload.provisional_home_score = null;
+        updatePayload.provisional_away_score = null;
+        updatePayload.provisional_winner_team_id = null;
+        updatePayload.provisional_submitted_by_name = null;
+        updatePayload.provisional_updated_at = null;
+        updatePayload.is_finished = false;
+      }
+
+      if (Object.keys(updatePayload).length === 0) continue;
+
+      changedAnything = true;
+      await supabaseAdmin
+        .from("matches")
+        .update({
+          ...updatePayload,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", rawMatch.id);
+    }
+
+    if (!changedAnything) break;
+  }
 }
 
 type PropagationMatch = {
@@ -628,7 +744,12 @@ export async function saveResultAction(formData: FormData) {
     });
   }
 
+  await reconcileKnockoutTreeFromLogic();
+
   revalidatePath("/admin");
+  revalidatePath("/matches");
+  revalidatePath("/tables");
+  revalidatePath("/countdown");
   revalidatePath("/results");
   revalidatePath("/ranking");
   redirect("/admin?saved=1");
@@ -727,6 +848,8 @@ export async function saveResultInlineAction(input: {
       winnerTeamId: isFinished ? storedWinnerTeamId : null,
     });
   }
+
+  await reconcileKnockoutTreeFromLogic();
 
   // Do not revalidate /admin here. This action is used by the inline admin result
   // editor; revalidating the current page while the user is still typing can cause
@@ -830,6 +953,8 @@ export async function saveProvisionalResultInlineAction(input: {
   if (error) {
     return { ok: false, error: "save_failed" };
   }
+
+  await reconcileKnockoutTreeFromLogic();
 
   revalidatePath("/admin");
   revalidatePath("/tables");

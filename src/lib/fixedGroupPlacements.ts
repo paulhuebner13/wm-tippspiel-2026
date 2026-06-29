@@ -2,6 +2,7 @@ import { getFifaRanking } from "./fifaRankings";
 import {
   getBracketSourcePlaceholder,
   getBracketSourcesForTarget,
+  getRoundOf32Placeholder,
   type BracketSource,
 } from "./bracket";
 import {
@@ -420,7 +421,12 @@ export function getInferredBracketTeam(
   fixedThirdPlacePlacements?: FixedGroupPlacementMap,
 ) {
   const placeholder =
-    side === "home" ? match.home_placeholder : match.away_placeholder;
+    match.stage === "round_of_32"
+      ? getRoundOf32Placeholder(match.match_number, side) ??
+        (side === "home" ? match.home_placeholder : match.away_placeholder)
+      : side === "home"
+        ? match.home_placeholder
+        : match.away_placeholder;
   const parsedTopTwoPlaceholder = parseTopTwoPlaceholder(placeholder);
 
   if (parsedTopTwoPlaceholder) {
@@ -586,16 +592,28 @@ export function applyFixedTopTwoToMatches(
         fixedThirdPlacePlacements,
       );
 
-      // Round-of-32 teams are primarily derived from the current group standings.
-      // If a side cannot currently be inferred, keep the stored side as a
-      // fallback. This prevents finished/predicted matches from rendering as
-      // "Offen 0:1 Offen" when only one dependent input was temporarily cleared.
-      // As soon as the group logic can infer the side again, the inferred team
-      // wins and stale stored ids are overwritten in the rendered model.
-      const fallbackHomeTeam = match.home_team ?? null;
-      const fallbackAwayTeam = match.away_team ?? null;
-      const resolvedHomeTeam = inferredHomeTeam ?? fallbackHomeTeam;
-      const resolvedAwayTeam = inferredAwayTeam ?? fallbackAwayTeam;
+      // Round-of-32 slots are derived from the current group standings and the
+      // official group/third-place placeholders. Stored team ids from an older
+      // propagation must not be treated as truth here; otherwise a team can stay
+      // in the bracket after the group result that produced it was removed.
+      const canonicalHomePlaceholder =
+        getRoundOf32Placeholder(match.match_number, "home") ??
+        match.home_placeholder ??
+        "Offen";
+      const canonicalAwayPlaceholder =
+        getRoundOf32Placeholder(match.match_number, "away") ??
+        match.away_placeholder ??
+        "Offen";
+      const homeHasOfficialPlaceholder = Boolean(
+        getRoundOf32Placeholder(match.match_number, "home"),
+      );
+      const awayHasOfficialPlaceholder = Boolean(
+        getRoundOf32Placeholder(match.match_number, "away"),
+      );
+      const resolvedHomeTeam =
+        inferredHomeTeam ?? (homeHasOfficialPlaceholder ? null : match.home_team ?? null);
+      const resolvedAwayTeam =
+        inferredAwayTeam ?? (awayHasOfficialPlaceholder ? null : match.away_team ?? null);
 
       resolvedMatch = {
         ...resolvedMatch,
@@ -603,8 +621,8 @@ export function applyFixedTopTwoToMatches(
         away_team: resolvedAwayTeam,
         home_team_id: resolvedHomeTeam?.id ?? null,
         away_team_id: resolvedAwayTeam?.id ?? null,
-        home_placeholder: resolvedHomeTeam ? null : match.home_placeholder,
-        away_placeholder: resolvedAwayTeam ? null : match.away_placeholder,
+        home_placeholder: resolvedHomeTeam ? null : canonicalHomePlaceholder,
+        away_placeholder: resolvedAwayTeam ? null : canonicalAwayPlaceholder,
       };
     } else if (sources.home || sources.away) {
       const resolvedHomeTeam = resolveSourceTeam(

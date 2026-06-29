@@ -6,6 +6,7 @@ import { getFifaRanking } from "@/lib/fifaRankings";
 import { requireUser } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { formatKickoff } from "@/lib/time";
+import { getRoundOf32Placeholder } from "@/lib/bracket";
 import {
   getThirdPlaceOpponentGroup,
   isThirdPlaceWinnerGroup,
@@ -26,6 +27,8 @@ type MatchWithTeams = Match & {
 type ResolvedBracketMatch = MatchWithTeams & {
   resolved_home_team?: Team | null;
   resolved_away_team?: Team | null;
+  resolved_home_placeholder?: string | null;
+  resolved_away_placeholder?: string | null;
 };
 
 type BracketSourcePart = {
@@ -131,6 +134,10 @@ function parseBracketSourceLabel(matchNumber: number) {
   if (!home || !away) return null;
 
   return { home, away };
+}
+
+function bracketSourcePartPlaceholder(source: BracketSourcePart) {
+  return `${source.result === "winner" ? "Sieger" : "Verlierer"} Spiel ${source.matchNumber}`;
 }
 
 function bracketOrderIndex(match: MatchWithTeams) {
@@ -760,7 +767,12 @@ function getInferredBracketTeam(
   fixedThirdPlacePlacements: FixedGroupPlacementMap,
 ) {
   const placeholder =
-    side === "home" ? match.home_placeholder : match.away_placeholder;
+    match.stage === "round_of_32"
+      ? getRoundOf32Placeholder(match.match_number, side) ??
+        (side === "home" ? match.home_placeholder : match.away_placeholder)
+      : side === "home"
+        ? match.home_placeholder
+        : match.away_placeholder;
   const parsedTopTwoPlaceholder = parseTopTwoPlaceholder(placeholder);
 
   if (parsedTopTwoPlaceholder) {
@@ -790,9 +802,14 @@ function getInferredBracketTeam(
 
 function sideTeam(match: ResolvedBracketMatch, side: "home" | "away") {
   if (side === "home") {
-    return match.resolved_home_team ?? match.home_team ?? null;
+    return Object.prototype.hasOwnProperty.call(match, "resolved_home_team")
+      ? match.resolved_home_team ?? null
+      : match.home_team ?? null;
   }
-  return match.resolved_away_team ?? match.away_team ?? null;
+
+  return Object.prototype.hasOwnProperty.call(match, "resolved_away_team")
+    ? match.resolved_away_team ?? null
+    : match.away_team ?? null;
 }
 
 function getResolvedWinnerTeam(match: ResolvedBracketMatch) {
@@ -803,8 +820,6 @@ function getResolvedWinnerTeam(match: ResolvedBracketMatch) {
   if (winnerTeamId) {
     if (homeTeam?.id === winnerTeamId) return homeTeam;
     if (awayTeam?.id === winnerTeamId) return awayTeam;
-    if (match.home_team?.id === winnerTeamId) return match.home_team;
-    if (match.away_team?.id === winnerTeamId) return match.away_team;
   }
 
   const homeScore = resultHomeScore(match);
@@ -880,28 +895,71 @@ function resolveBracketMatches(
             )
           : null;
 
+      const canonicalHomePlaceholder =
+        match.stage === "round_of_32"
+          ? getRoundOf32Placeholder(match.match_number, "home") ??
+            match.home_placeholder ??
+            "Offen"
+          : match.home_placeholder ?? "Offen";
+      const canonicalAwayPlaceholder =
+        match.stage === "round_of_32"
+          ? getRoundOf32Placeholder(match.match_number, "away") ??
+            match.away_placeholder ??
+            "Offen"
+          : match.away_placeholder ?? "Offen";
+      const homeHasOfficialRoundOf32Placeholder = Boolean(
+        match.stage === "round_of_32" &&
+          getRoundOf32Placeholder(match.match_number, "home"),
+      );
+      const awayHasOfficialRoundOf32Placeholder = Boolean(
+        match.stage === "round_of_32" &&
+          getRoundOf32Placeholder(match.match_number, "away"),
+      );
+
       const roundOf32HomeTeam =
         match.stage === "round_of_32"
-          ? inferredHomeTeam ?? match.home_team ?? null
+          ? inferredHomeTeam ??
+            (homeHasOfficialRoundOf32Placeholder ? null : match.home_team ?? null)
           : match.home_team ?? null;
       const roundOf32AwayTeam =
         match.stage === "round_of_32"
-          ? inferredAwayTeam ?? match.away_team ?? null
+          ? inferredAwayTeam ??
+            (awayHasOfficialRoundOf32Placeholder ? null : match.away_team ?? null)
           : match.away_team ?? null;
 
       const resolvedHomeTeam = source
-        ? resolveBracketSourceTeam(source.home, resolvedMatchesByNumber) ??
-          roundOf32HomeTeam
+        ? resolveBracketSourceTeam(source.home, resolvedMatchesByNumber)
         : roundOf32HomeTeam;
       const resolvedAwayTeam = source
-        ? resolveBracketSourceTeam(source.away, resolvedMatchesByNumber) ??
-          roundOf32AwayTeam
+        ? resolveBracketSourceTeam(source.away, resolvedMatchesByNumber)
         : roundOf32AwayTeam;
+      const resolvedHomePlaceholder = source
+        ? resolvedHomeTeam
+          ? null
+          : bracketSourcePartPlaceholder(source.home)
+        : roundOf32HomeTeam
+          ? null
+          : canonicalHomePlaceholder;
+      const resolvedAwayPlaceholder = source
+        ? resolvedAwayTeam
+          ? null
+          : bracketSourcePartPlaceholder(source.away)
+        : roundOf32AwayTeam
+          ? null
+          : canonicalAwayPlaceholder;
 
       resolvedMatchesByNumber.set(match.match_number, {
         ...match,
+        home_team: resolvedHomeTeam,
+        away_team: resolvedAwayTeam,
+        home_team_id: resolvedHomeTeam?.id ?? null,
+        away_team_id: resolvedAwayTeam?.id ?? null,
+        home_placeholder: resolvedHomePlaceholder,
+        away_placeholder: resolvedAwayPlaceholder,
         resolved_home_team: resolvedHomeTeam,
         resolved_away_team: resolvedAwayTeam,
+        resolved_home_placeholder: resolvedHomePlaceholder,
+        resolved_away_placeholder: resolvedAwayPlaceholder,
       });
     }
   }
@@ -949,7 +1007,11 @@ function BracketTeam({
     side === "home" ? resultHomeScore(match) : resultAwayScore(match);
   const won =
     resultWinnerTeamId(match) && rawTeam?.id === resultWinnerTeamId(match);
-  const name = team?.name ?? teamName(match, side);
+  const resolvedPlaceholder =
+    side === "home"
+      ? match.resolved_home_placeholder
+      : match.resolved_away_placeholder;
+  const name = team?.name ?? resolvedPlaceholder ?? teamName(match, side);
 
   return (
     <div className={`bracketTeam ${won ? "bracketTeamWinner" : ""}`}>
