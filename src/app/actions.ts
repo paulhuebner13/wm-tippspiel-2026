@@ -17,6 +17,7 @@ import {
   getBracketSourcePlaceholder,
   getBracketTargetsForSource,
   getLoserTeamId,
+  getOfficialKickoffTimeForMatchNumber,
 } from "@/lib/bracket";
 import {
   applyFixedTopTwoToMatches,
@@ -28,6 +29,7 @@ type MatchTeamResolutionInput = {
   id: string;
   match_number: number;
   stage: Stage;
+  kickoff_time: string;
   home_team_id: string | null;
   away_team_id: string | null;
 };
@@ -38,6 +40,7 @@ async function getEffectiveRoundOf32TeamIds(match: MatchTeamResolutionInput) {
       homeTeamId: match.home_team_id,
       awayTeamId: match.away_team_id,
       matchNumber: match.match_number,
+      kickoffTime: match.kickoff_time,
     };
   }
 
@@ -66,6 +69,10 @@ async function getEffectiveRoundOf32TeamIds(match: MatchTeamResolutionInput) {
     homeTeamId: currentMatch ? currentMatch.home_team_id ?? null : match.home_team_id,
     awayTeamId: currentMatch ? currentMatch.away_team_id ?? null : match.away_team_id,
     matchNumber: currentMatch?.match_number ?? match.match_number,
+    kickoffTime:
+      currentMatch?.kickoff_time ??
+      getOfficialKickoffTimeForMatchNumber(match.match_number) ??
+      match.kickoff_time,
   };
 }
 
@@ -522,11 +529,15 @@ export async function savePredictionAction(formData: FormData) {
     .eq("id", matchId)
     .single();
 
-  if (!match || match.is_finished || isPredictionLocked(match.kickoff_time)) {
+  if (!match || match.is_finished) {
     redirect("/matches?error=locked");
   }
 
   const effectiveTeams = await getEffectiveRoundOf32TeamIds(match);
+
+  if (isPredictionLocked(effectiveTeams.kickoffTime)) {
+    redirect("/matches?error=locked");
+  }
   const isOpenForPredictions =
     match.is_open_for_predictions ||
     Boolean(effectiveTeams.homeTeamId && effectiveTeams.awayTeamId);
@@ -602,11 +613,15 @@ export async function savePredictionInlineAction(input: {
     .eq("id", matchId)
     .single();
 
-  if (!match || match.is_finished || isPredictionLocked(match.kickoff_time)) {
+  if (!match || match.is_finished) {
     return { ok: false, error: "locked" };
   }
 
   const effectiveTeams = await getEffectiveRoundOf32TeamIds(match);
+
+  if (isPredictionLocked(effectiveTeams.kickoffTime)) {
+    return { ok: false, error: "locked" };
+  }
   const isOpenForPredictions =
     match.is_open_for_predictions ||
     Boolean(effectiveTeams.homeTeamId && effectiveTeams.awayTeamId);
@@ -911,8 +926,11 @@ export async function saveProvisionalResultInlineAction(input: {
   const hasOfficialResult =
     match.home_score !== null && match.away_score !== null;
   const knockout = isKnockoutStage(match.stage);
+  const effectiveTeams = await getEffectiveRoundOf32TeamIds(match);
+  const effectiveHomeTeamId = effectiveTeams.homeTeamId;
+  const effectiveAwayTeamId = effectiveTeams.awayTeamId;
   const provisionalOpenAt =
-    new Date(match.kickoff_time).getTime() + 105 * 60 * 1000;
+    new Date(effectiveTeams.kickoffTime).getTime() + 105 * 60 * 1000;
 
   if (
     hasOfficialResult ||
@@ -921,10 +939,6 @@ export async function saveProvisionalResultInlineAction(input: {
   ) {
     return { ok: false, error: "locked" };
   }
-
-  const effectiveTeams = await getEffectiveRoundOf32TeamIds(match);
-  const effectiveHomeTeamId = effectiveTeams.homeTeamId;
-  const effectiveAwayTeamId = effectiveTeams.awayTeamId;
 
   if (knockout && (!effectiveHomeTeamId || !effectiveAwayTeamId)) {
     return { ok: false, error: "teams_missing" };

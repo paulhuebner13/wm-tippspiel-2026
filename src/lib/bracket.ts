@@ -26,6 +26,45 @@ export const OFFICIAL_MATCH_NUMBERS_BY_STAGE: Record<string, number[]> = {
   final: [104],
 };
 
+export const OFFICIAL_KNOCKOUT_KICKOFF_TIMES: Record<number, string> = {
+  73: "2026-06-28T19:00:00.000Z",
+  75: "2026-06-29T17:00:00.000Z",
+  74: "2026-06-29T20:30:00.000Z",
+  77: "2026-06-30T01:00:00.000Z",
+  83: "2026-06-30T17:00:00.000Z",
+  84: "2026-06-30T21:00:00.000Z",
+  81: "2026-07-01T01:00:00.000Z",
+  82: "2026-07-01T16:00:00.000Z",
+  76: "2026-07-01T20:00:00.000Z",
+  78: "2026-07-02T00:00:00.000Z",
+  79: "2026-07-02T19:00:00.000Z",
+  80: "2026-07-02T23:00:00.000Z",
+  86: "2026-07-03T03:00:00.000Z",
+  88: "2026-07-03T18:00:00.000Z",
+  85: "2026-07-03T22:00:00.000Z",
+  87: "2026-07-04T01:30:00.000Z",
+  89: "2026-07-04T17:00:00.000Z",
+  90: "2026-07-04T21:00:00.000Z",
+  91: "2026-07-05T20:00:00.000Z",
+  92: "2026-07-06T00:00:00.000Z",
+  93: "2026-07-06T19:00:00.000Z",
+  94: "2026-07-07T00:00:00.000Z",
+  95: "2026-07-07T16:00:00.000Z",
+  96: "2026-07-07T20:00:00.000Z",
+  97: "2026-07-09T20:00:00.000Z",
+  98: "2026-07-10T19:00:00.000Z",
+  99: "2026-07-11T21:00:00.000Z",
+  100: "2026-07-12T01:00:00.000Z",
+  101: "2026-07-14T19:00:00.000Z",
+  102: "2026-07-15T19:00:00.000Z",
+  103: "2026-07-18T21:00:00.000Z",
+  104: "2026-07-19T19:00:00.000Z",
+};
+
+export function getOfficialKickoffTimeForMatchNumber(matchNumber: number) {
+  return OFFICIAL_KNOCKOUT_KICKOFF_TIMES[matchNumber] ?? null;
+}
+
 type MatchNumberInput = {
   id: string;
   stage: string;
@@ -79,13 +118,21 @@ export function applyOfficialBracketMatchNumbers<T extends MatchNumberInput>(
 
   return matches.map((match) => {
     const officialMatchNumber = officialNumberById.get(match.id);
-    if (!officialMatchNumber || officialMatchNumber === match.match_number) {
+    if (!officialMatchNumber) return match;
+
+    const officialKickoffTime = getOfficialKickoffTimeForMatchNumber(officialMatchNumber);
+
+    if (
+      officialMatchNumber === match.match_number &&
+      (!officialKickoffTime || officialKickoffTime === match.kickoff_time)
+    ) {
       return match;
     }
 
     return {
       ...match,
       match_number: officialMatchNumber,
+      kickoff_time: officialKickoffTime ?? match.kickoff_time,
     };
   });
 }
