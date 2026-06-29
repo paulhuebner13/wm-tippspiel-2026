@@ -17,6 +17,80 @@ export type BracketSource = {
 export type BracketTargetSources = Partial<Record<BracketSide, BracketSource>>;
 
 
+export const OFFICIAL_MATCH_NUMBERS_BY_STAGE: Record<string, number[]> = {
+  round_of_32: [73, 75, 74, 77, 83, 84, 81, 82, 76, 78, 79, 80, 86, 88, 85, 87],
+  round_of_16: [89, 90, 91, 92, 93, 94, 95, 96],
+  quarter_final: [97, 98, 99, 100],
+  semi_final: [101, 102],
+  third_place: [103],
+  final: [104],
+};
+
+type MatchNumberInput = {
+  id: string;
+  stage: string;
+  kickoff_time: string;
+  match_number: number;
+};
+
+function compareByKickoffThenStoredNumber(a: MatchNumberInput, b: MatchNumberInput) {
+  const timeDiff =
+    new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime();
+  if (timeDiff !== 0) return timeDiff;
+  return a.match_number - b.match_number;
+}
+
+export function getOfficialMatchNumberForMatch(
+  match: MatchNumberInput,
+  allMatches: MatchNumberInput[],
+) {
+  const officialNumbers = OFFICIAL_MATCH_NUMBERS_BY_STAGE[match.stage];
+  if (!officialNumbers) return match.match_number;
+
+  const stageMatches = allMatches
+    .filter((candidate) => candidate.stage === match.stage)
+    .sort(compareByKickoffThenStoredNumber);
+  const index = stageMatches.findIndex((candidate) => candidate.id === match.id);
+
+  return index >= 0 ? officialNumbers[index] ?? match.match_number : match.match_number;
+}
+
+export function applyOfficialBracketMatchNumbers<T extends MatchNumberInput>(
+  matches: T[],
+): T[] {
+  if (matches.length === 0) return matches;
+
+  const officialNumberById = new Map<string, number>();
+
+  for (const [stage, officialNumbers] of Object.entries(
+    OFFICIAL_MATCH_NUMBERS_BY_STAGE,
+  )) {
+    const stageMatches = matches
+      .filter((match) => match.stage === stage)
+      .sort(compareByKickoffThenStoredNumber);
+
+    stageMatches.forEach((match, index) => {
+      officialNumberById.set(
+        match.id,
+        officialNumbers[index] ?? match.match_number,
+      );
+    });
+  }
+
+  return matches.map((match) => {
+    const officialMatchNumber = officialNumberById.get(match.id);
+    if (!officialMatchNumber || officialMatchNumber === match.match_number) {
+      return match;
+    }
+
+    return {
+      ...match,
+      match_number: officialMatchNumber,
+    };
+  });
+}
+
+
 export const ROUND_OF_32_PLACEHOLDERS: Record<number, { home: string; away: string }> = {
   73: { home: "Zweiter Gruppe A", away: "Zweiter Gruppe B" },
   74: { home: "Erster Gruppe E", away: "Dritter Gruppe A/B/C/D/F" },

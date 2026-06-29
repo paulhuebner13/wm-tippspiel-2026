@@ -1,5 +1,6 @@
 import { getFifaRanking } from "./fifaRankings";
 import {
+  applyOfficialBracketMatchNumbers,
   getBracketSourcePlaceholder,
   getBracketSourcesForTarget,
   getRoundOf32Placeholder,
@@ -561,13 +562,17 @@ export function applyFixedTopTwoToMatches(
   matches: MatchWithTeams[],
   teams: Team[],
 ) {
-  const fixedTopTwoPlacements = calculateFixedTopTwoPlacements(teams, matches);
+  const officialMatches = applyOfficialBracketMatchNumbers(matches);
+  const fixedTopTwoPlacements = calculateFixedTopTwoPlacements(
+    teams,
+    officialMatches,
+  );
   const fixedThirdPlacePlacements = calculateFixedThirdPlacePlacements(
     teams,
-    matches,
+    officialMatches,
   );
   const resolvedMatchesByNumber = new Map<number, MatchWithTeams>();
-  const sortedMatches = [...matches].sort((a, b) => {
+  const sortedMatches = [...officialMatches].sort((a, b) => {
     const stageDiff =
       getStageResolveOrder(a.stage) - getStageResolveOrder(b.stage);
     if (stageDiff !== 0) return stageDiff;
@@ -665,7 +670,7 @@ export function applyFixedTopTwoToMatches(
     });
   }
 
-  return matches.map(
+  return officialMatches.map(
     (match) => resolvedMatchesByNumber.get(match.match_number) ?? match,
   );
 }

@@ -13,6 +13,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { isKnockoutStage } from "@/lib/scoring";
 import { isPredictionLocked } from "@/lib/time";
 import {
+  applyOfficialBracketMatchNumbers,
   getBracketSourcePlaceholder,
   getBracketTargetsForSource,
   getLoserTeamId,
@@ -25,6 +26,7 @@ import type { Stage, Team } from "@/lib/types";
 
 type MatchTeamResolutionInput = {
   id: string;
+  match_number: number;
   stage: Stage;
   home_team_id: string | null;
   away_team_id: string | null;
@@ -35,6 +37,7 @@ async function getEffectiveRoundOf32TeamIds(match: MatchTeamResolutionInput) {
     return {
       homeTeamId: match.home_team_id,
       awayTeamId: match.away_team_id,
+      matchNumber: match.match_number,
     };
   }
 
@@ -50,8 +53,11 @@ async function getEffectiveRoundOf32TeamIds(match: MatchTeamResolutionInput) {
   ]);
 
   const teams = (teamsData ?? []) as Team[];
-  const resolvedMatches = applyFixedTopTwoToMatches(
+  const officialMatches = applyOfficialBracketMatchNumbers(
     (matchesData ?? []) as MatchWithTeams[],
+  );
+  const resolvedMatches = applyFixedTopTwoToMatches(
+    officialMatches,
     teams,
   );
   const currentMatch = resolvedMatches.find((item) => item.id === match.id);
@@ -59,6 +65,7 @@ async function getEffectiveRoundOf32TeamIds(match: MatchTeamResolutionInput) {
   return {
     homeTeamId: currentMatch ? currentMatch.home_team_id ?? null : match.home_team_id,
     awayTeamId: currentMatch ? currentMatch.away_team_id ?? null : match.away_team_id,
+    matchNumber: currentMatch?.match_number ?? match.match_number,
   };
 }
 
@@ -199,16 +206,17 @@ async function reconcileKnockoutTreeFromLogic() {
 
     const teams = (teamsData ?? []) as Team[];
     const rawMatches = (matchesData ?? []) as MatchWithTeams[];
-    const rawMatchesByNumber = new Map(
-      rawMatches.map((match) => [match.match_number, match]),
+    const rawMatchesById = new Map(
+      rawMatches.map((match) => [match.id, match]),
     );
-    const resolvedMatches = applyFixedTopTwoToMatches(rawMatches, teams);
+    const officialMatches = applyOfficialBracketMatchNumbers(rawMatches);
+    const resolvedMatches = applyFixedTopTwoToMatches(officialMatches, teams);
     let changedAnything = false;
 
     for (const resolvedMatch of resolvedMatches) {
       if (!isKnockoutStage(resolvedMatch.stage)) continue;
 
-      const rawMatch = rawMatchesByNumber.get(resolvedMatch.match_number) as
+      const rawMatch = rawMatchesById.get(resolvedMatch.id) as
         | (MatchWithTeams & Record<string, unknown>)
         | undefined;
       if (!rawMatch) continue;
@@ -282,6 +290,7 @@ type PropagationMatch = {
   id: string;
   match_number: number;
   stage: Stage;
+  kickoff_time: string;
   home_team_id: string | null;
   away_team_id: string | null;
   home_score: number | null;
@@ -358,24 +367,27 @@ async function propagateKnockoutTeams(
           result: target.sourceResult,
         });
 
-    const { data: targetMatch } = await supabaseAdmin
+    const { data: allTargetMatches } = await supabaseAdmin
       .from("matches")
       .select(
-        "id, match_number, stage, home_team_id, away_team_id, home_score, away_score, winner_team_id, is_finished",
-      )
-      .eq("match_number", target.targetMatchNumber)
-      .single();
+        "id, match_number, stage, kickoff_time, home_team_id, away_team_id, home_score, away_score, winner_team_id, is_finished",
+      );
+    const targetMatch = applyOfficialBracketMatchNumbers(
+      (allTargetMatches ?? []) as PropagationMatch[],
+    ).find((candidate) => candidate.match_number === target.targetMatchNumber);
+
+    if (!targetMatch) continue;
 
     const previousTeamId =
       target.side === "home"
-        ? targetMatch?.home_team_id ?? null
-        : targetMatch?.away_team_id ?? null;
+        ? targetMatch.home_team_id ?? null
+        : targetMatch.away_team_id ?? null;
     const teamChanged = previousTeamId !== teamId;
 
     const nextHomeTeamId =
-      target.side === "home" ? teamId : targetMatch?.home_team_id ?? null;
+      target.side === "home" ? teamId : targetMatch.home_team_id ?? null;
     const nextAwayTeamId =
-      target.side === "away" ? teamId : targetMatch?.away_team_id ?? null;
+      target.side === "away" ? teamId : targetMatch.away_team_id ?? null;
 
     await supabaseAdmin
       .from("matches")
@@ -384,9 +396,7 @@ async function propagateKnockoutTeams(
         [placeholderColumn]: placeholder,
         updated_at: new Date().toISOString(),
       })
-      .eq("match_number", target.targetMatchNumber);
-
-    if (!targetMatch) continue;
+      .eq("id", targetMatch.id);
 
     if (teamChanged && isKnockoutStage(targetMatch.stage)) {
       await clearMatchResultAndDownstream(
@@ -507,7 +517,7 @@ export async function savePredictionAction(formData: FormData) {
   const { data: match } = await supabaseAdmin
     .from("matches")
     .select(
-      "id, kickoff_time, stage, is_finished, is_open_for_predictions, home_team_id, away_team_id",
+      "id, match_number, kickoff_time, stage, is_finished, is_open_for_predictions, home_team_id, away_team_id",
     )
     .eq("id", matchId)
     .single();
@@ -587,7 +597,7 @@ export async function savePredictionInlineAction(input: {
   const { data: match } = await supabaseAdmin
     .from("matches")
     .select(
-      "id, kickoff_time, stage, is_finished, is_open_for_predictions, home_team_id, away_team_id",
+      "id, match_number, kickoff_time, stage, is_finished, is_open_for_predictions, home_team_id, away_team_id",
     )
     .eq("id", matchId)
     .single();
@@ -737,7 +747,7 @@ export async function saveResultAction(formData: FormData) {
 
   if (knockout) {
     await propagateKnockoutTeams({
-      sourceMatchNumber: match.match_number,
+      sourceMatchNumber: effectiveTeams.matchNumber,
       homeTeamId: effectiveHomeTeamId,
       awayTeamId: effectiveAwayTeamId,
       winnerTeamId: automaticWinner,
@@ -842,7 +852,7 @@ export async function saveResultInlineAction(input: {
 
   if (knockout) {
     await propagateKnockoutTeams({
-      sourceMatchNumber: match.match_number,
+      sourceMatchNumber: effectiveTeams.matchNumber,
       homeTeamId: effectiveHomeTeamId,
       awayTeamId: effectiveAwayTeamId,
       winnerTeamId: isFinished ? storedWinnerTeamId : null,

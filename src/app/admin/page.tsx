@@ -5,6 +5,7 @@ import { ResultSubmitterCard } from "@/components/ResultSubmitterCard";
 import { requireResultEditor } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { isKnockoutStage } from "@/lib/scoring";
+import { applyOfficialBracketMatchNumbers } from "@/lib/bracket";
 import {
   calculateFixedThirdPlacePlacements,
   calculateFixedTopTwoPlacements,
@@ -115,8 +116,11 @@ export default async function AdminPage() {
   const rawTeams = (teamsData ?? []) as Team[];
   const specialEffectActive = await getUserSpecialEffectActive(user.id);
   const teams = applySpecialEffectsToTeams(rawTeams, specialEffectActive);
-  const matchesWithInferredTeams = applyInferredRoundOf32TeamsToMatches(
+  const officialMatchesData = applyOfficialBracketMatchNumbers(
     (matchesData ?? []) as MatchWithTeams[],
+  );
+  const matchesWithInferredTeams = applyInferredRoundOf32TeamsToMatches(
+    officialMatchesData,
     rawTeams,
   );
   const matches = applySpecialEffectsToMatches(

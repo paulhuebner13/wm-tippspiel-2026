@@ -6,6 +6,7 @@ import { getFifaRanking } from "@/lib/fifaRankings";
 import { requireUser } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { formatKickoff } from "@/lib/time";
+import { applyOfficialBracketMatchNumbers } from "@/lib/bracket";
 import { getRoundOf32Placeholder } from "@/lib/bracket";
 import {
   getThirdPlaceOpponentGroup,
@@ -1078,7 +1079,9 @@ export default async function TablesPage() {
     .order("kickoff_time", { ascending: true });
 
   const teams = (teamsData ?? []) as Team[];
-  const matches = (matchesData ?? []) as MatchWithTeams[];
+  const matches = applyOfficialBracketMatchNumbers(
+    (matchesData ?? []) as MatchWithTeams[],
+  );
   const specialEffectActive = await getUserSpecialEffectActive(user.id);
   const scenariosByGroup = buildGroupScenarioMap(teams, matches);
   const standings = buildStandings(teams, matches, scenariosByGroup);
