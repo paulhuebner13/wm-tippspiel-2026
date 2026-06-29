@@ -27,9 +27,9 @@ import type { Stage, Team } from "@/lib/types";
 
 type MatchTeamResolutionInput = {
   id: string;
-  match_number: number;
+  match_number?: number | null;
   stage: Stage;
-  kickoff_time: string;
+  kickoff_time?: string | null;
   home_team_id: string | null;
   away_team_id: string | null;
 };
@@ -39,8 +39,8 @@ async function getEffectiveRoundOf32TeamIds(match: MatchTeamResolutionInput) {
     return {
       homeTeamId: match.home_team_id,
       awayTeamId: match.away_team_id,
-      matchNumber: match.match_number,
-      kickoffTime: match.kickoff_time,
+      matchNumber: match.match_number ?? 0,
+      kickoffTime: match.kickoff_time ?? "",
     };
   }
 
@@ -68,11 +68,12 @@ async function getEffectiveRoundOf32TeamIds(match: MatchTeamResolutionInput) {
   return {
     homeTeamId: currentMatch ? currentMatch.home_team_id ?? null : match.home_team_id,
     awayTeamId: currentMatch ? currentMatch.away_team_id ?? null : match.away_team_id,
-    matchNumber: currentMatch?.match_number ?? match.match_number,
+    matchNumber: currentMatch?.match_number ?? match.match_number ?? 0,
     kickoffTime:
       currentMatch?.kickoff_time ??
-      getOfficialKickoffTimeForMatchNumber(match.match_number) ??
-      match.kickoff_time,
+      (match.match_number ? getOfficialKickoffTimeForMatchNumber(match.match_number) : null) ??
+      match.kickoff_time ??
+      "",
   };
 }
 
@@ -719,7 +720,7 @@ export async function saveResultAction(formData: FormData) {
 
   const { data: match } = await supabaseAdmin
     .from("matches")
-    .select("id, match_number, stage, home_team_id, away_team_id")
+    .select("id, match_number, kickoff_time, stage, home_team_id, away_team_id")
     .eq("id", matchId)
     .single();
 
@@ -801,7 +802,7 @@ export async function saveResultInlineAction(input: {
 
   const { data: match } = await supabaseAdmin
     .from("matches")
-    .select("id, match_number, stage, home_team_id, away_team_id")
+    .select("id, match_number, kickoff_time, stage, home_team_id, away_team_id")
     .eq("id", matchId)
     .single();
 
@@ -1271,7 +1272,7 @@ export async function overridePredictionAction(formData: FormData) {
 
   const { data: match } = await supabaseAdmin
     .from("matches")
-    .select("id, match_number, stage, home_team_id, away_team_id")
+    .select("id, match_number, kickoff_time, stage, home_team_id, away_team_id")
     .eq("id", matchId)
     .single();
 
@@ -1351,7 +1352,7 @@ export async function overridePredictionInlineAction(input: {
 
   const { data: match } = await supabaseAdmin
     .from("matches")
-    .select("id, match_number, stage, home_team_id, away_team_id")
+    .select("id, match_number, kickoff_time, stage, home_team_id, away_team_id")
     .eq("id", matchId)
     .single();
 
