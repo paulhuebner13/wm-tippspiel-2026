@@ -238,6 +238,11 @@ export function getBracketSourcesForTarget(
 
 export function getBracketSourcePlaceholder(source: BracketSource | undefined) {
   if (!source) return "Offen";
+  return `${source.result === "winner" ? "Sieger" : "Verlierer"} Spiel ${source.matchNumber}`;
+}
+
+export function getBracketSourceShortLabel(source: BracketSource | undefined) {
+  if (!source) return "Offen";
   return `${source.result === "winner" ? "W" : "RU"}${source.matchNumber}`;
 }
 

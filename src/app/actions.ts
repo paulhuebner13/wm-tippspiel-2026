@@ -728,10 +728,15 @@ export async function saveResultInlineAction(input: {
     });
   }
 
-  // Do not revalidate paths here. This action is used by the inline admin result editor.
-  // Revalidating the current admin page while the user is still typing can cause the
-  // server-rendered values to overwrite the local input fields. The UI updates
-  // optimistically instead, and other pages will see the saved result on their next load.
+  // Do not revalidate /admin here. This action is used by the inline admin result
+  // editor; revalidating the current page while the user is still typing can cause
+  // server-rendered values to overwrite local input fields. Other tabs should update
+  // on their next load.
+  revalidatePath("/matches");
+  revalidatePath("/tables");
+  revalidatePath("/countdown");
+  revalidatePath("/results");
+  revalidatePath("/ranking");
   return { ok: true, winnerTeamId: storedWinnerTeamId };
 }
 

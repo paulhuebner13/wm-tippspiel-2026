@@ -586,17 +586,25 @@ export function applyFixedTopTwoToMatches(
         fixedThirdPlacePlacements,
       );
 
-      // Round-of-32 teams are derived from current group standings. Do not fall
-      // back to stored team ids here: those ids may be stale if a group result
-      // was entered and later deleted/changed.
+      // Round-of-32 teams are primarily derived from the current group standings.
+      // If a side cannot currently be inferred, keep the stored side as a
+      // fallback. This prevents finished/predicted matches from rendering as
+      // "Offen 0:1 Offen" when only one dependent input was temporarily cleared.
+      // As soon as the group logic can infer the side again, the inferred team
+      // wins and stale stored ids are overwritten in the rendered model.
+      const fallbackHomeTeam = match.home_team ?? null;
+      const fallbackAwayTeam = match.away_team ?? null;
+      const resolvedHomeTeam = inferredHomeTeam ?? fallbackHomeTeam;
+      const resolvedAwayTeam = inferredAwayTeam ?? fallbackAwayTeam;
+
       resolvedMatch = {
         ...resolvedMatch,
-        home_team: inferredHomeTeam ?? null,
-        away_team: inferredAwayTeam ?? null,
-        home_team_id: inferredHomeTeam?.id ?? null,
-        away_team_id: inferredAwayTeam?.id ?? null,
-        home_placeholder: inferredHomeTeam ? null : match.home_placeholder,
-        away_placeholder: inferredAwayTeam ? null : match.away_placeholder,
+        home_team: resolvedHomeTeam,
+        away_team: resolvedAwayTeam,
+        home_team_id: resolvedHomeTeam?.id ?? null,
+        away_team_id: resolvedAwayTeam?.id ?? null,
+        home_placeholder: resolvedHomeTeam ? null : match.home_placeholder,
+        away_placeholder: resolvedAwayTeam ? null : match.away_placeholder,
       };
     } else if (sources.home || sources.away) {
       const resolvedHomeTeam = resolveSourceTeam(
