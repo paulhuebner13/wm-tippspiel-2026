@@ -12,7 +12,11 @@ import {
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { isKnockoutStage } from "@/lib/scoring";
 import { isPredictionLocked } from "@/lib/time";
-import { getBracketTargetsForSource, getLoserTeamId } from "@/lib/bracket";
+import {
+  getBracketSourcePlaceholder,
+  getBracketTargetsForSource,
+  getLoserTeamId,
+} from "@/lib/bracket";
 import {
   applyFixedTopTwoToMatches,
   type MatchWithTeams,
@@ -158,12 +162,64 @@ async function updatePredictionOpenState(matchId: string) {
     .eq("id", matchId);
 }
 
-async function propagateKnockoutTeams(input: {
-  sourceMatchNumber: number;
-  homeTeamId: string | null;
-  awayTeamId: string | null;
-  winnerTeamId: string | null;
-}) {
+type PropagationMatch = {
+  id: string;
+  match_number: number;
+  stage: Stage;
+  home_team_id: string | null;
+  away_team_id: string | null;
+  home_score: number | null;
+  away_score: number | null;
+  winner_team_id: string | null;
+  is_finished: boolean;
+};
+
+async function clearMatchResultAndDownstream(
+  match: Pick<
+    PropagationMatch,
+    "id" | "match_number" | "home_team_id" | "away_team_id"
+  >,
+  visited: Set<number>,
+) {
+  await supabaseAdmin
+    .from("matches")
+    .update({
+      home_score: null,
+      away_score: null,
+      winner_team_id: null,
+      provisional_home_score: null,
+      provisional_away_score: null,
+      provisional_winner_team_id: null,
+      provisional_submitted_by_name: null,
+      provisional_updated_at: null,
+      is_finished: false,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", match.id);
+
+  await propagateKnockoutTeams(
+    {
+      sourceMatchNumber: match.match_number,
+      homeTeamId: match.home_team_id,
+      awayTeamId: match.away_team_id,
+      winnerTeamId: null,
+    },
+    visited,
+  );
+}
+
+async function propagateKnockoutTeams(
+  input: {
+    sourceMatchNumber: number;
+    homeTeamId: string | null;
+    awayTeamId: string | null;
+    winnerTeamId: string | null;
+  },
+  visited = new Set<number>(),
+) {
+  if (visited.has(input.sourceMatchNumber)) return;
+  visited.add(input.sourceMatchNumber);
+
   const targets = getBracketTargetsForSource(input.sourceMatchNumber);
   if (targets.length === 0) return;
 
@@ -179,23 +235,54 @@ async function propagateKnockoutTeams(input: {
     const teamColumn = target.side === "home" ? "home_team_id" : "away_team_id";
     const placeholderColumn =
       target.side === "home" ? "home_placeholder" : "away_placeholder";
+    const placeholder = teamId
+      ? null
+      : getBracketSourcePlaceholder({
+          matchNumber: input.sourceMatchNumber,
+          result: target.sourceResult,
+        });
+
+    const { data: targetMatch } = await supabaseAdmin
+      .from("matches")
+      .select(
+        "id, match_number, stage, home_team_id, away_team_id, home_score, away_score, winner_team_id, is_finished",
+      )
+      .eq("match_number", target.targetMatchNumber)
+      .single();
+
+    const previousTeamId =
+      target.side === "home"
+        ? targetMatch?.home_team_id ?? null
+        : targetMatch?.away_team_id ?? null;
+    const teamChanged = previousTeamId !== teamId;
+
+    const nextHomeTeamId =
+      target.side === "home" ? teamId : targetMatch?.home_team_id ?? null;
+    const nextAwayTeamId =
+      target.side === "away" ? teamId : targetMatch?.away_team_id ?? null;
 
     await supabaseAdmin
       .from("matches")
       .update({
         [teamColumn]: teamId,
-        [placeholderColumn]: teamId ? null : undefined,
+        [placeholderColumn]: placeholder,
         updated_at: new Date().toISOString(),
       })
       .eq("match_number", target.targetMatchNumber);
 
-    const { data: targetMatch } = await supabaseAdmin
-      .from("matches")
-      .select("id")
-      .eq("match_number", target.targetMatchNumber)
-      .single();
+    if (!targetMatch) continue;
 
-    if (targetMatch) {
+    if (teamChanged && isKnockoutStage(targetMatch.stage)) {
+      await clearMatchResultAndDownstream(
+        {
+          id: targetMatch.id,
+          match_number: targetMatch.match_number,
+          home_team_id: nextHomeTeamId,
+          away_team_id: nextAwayTeamId,
+        },
+        visited,
+      );
+    } else {
       await updatePredictionOpenState(targetMatch.id);
     }
   }
@@ -517,22 +604,9 @@ export async function saveResultAction(formData: FormData) {
         ? effectiveAwayTeamId
         : winnerTeamId;
 
-  const shouldPersistInferredTeams =
-    match.stage === "round_of_32" &&
-    Boolean(effectiveHomeTeamId && effectiveAwayTeamId);
-
   await supabaseAdmin
     .from("matches")
     .update({
-      home_team_id: shouldPersistInferredTeams
-        ? effectiveHomeTeamId
-        : undefined,
-      away_team_id: shouldPersistInferredTeams
-        ? effectiveAwayTeamId
-        : undefined,
-      home_placeholder: shouldPersistInferredTeams ? null : undefined,
-      away_placeholder: shouldPersistInferredTeams ? null : undefined,
-      is_open_for_predictions: shouldPersistInferredTeams ? true : undefined,
       home_score: homeScore,
       away_score: awayScore,
       winner_team_id: knockout ? automaticWinner : null,
@@ -625,22 +699,9 @@ export async function saveResultInlineAction(input: {
     }
   }
 
-  const shouldPersistInferredTeams =
-    match.stage === "round_of_32" &&
-    Boolean(effectiveHomeTeamId && effectiveAwayTeamId);
-
   const { error } = await supabaseAdmin
     .from("matches")
     .update({
-      home_team_id: shouldPersistInferredTeams
-        ? effectiveHomeTeamId
-        : undefined,
-      away_team_id: shouldPersistInferredTeams
-        ? effectiveAwayTeamId
-        : undefined,
-      home_placeholder: shouldPersistInferredTeams ? null : undefined,
-      away_placeholder: shouldPersistInferredTeams ? null : undefined,
-      is_open_for_predictions: shouldPersistInferredTeams ? true : undefined,
       home_score: homeScore,
       away_score: awayScore,
       winner_team_id: knockout ? storedWinnerTeamId : null,
@@ -749,22 +810,9 @@ export async function saveProvisionalResultInlineAction(input: {
     }
   }
 
-  const shouldPersistInferredTeams =
-    match.stage === "round_of_32" &&
-    Boolean(effectiveHomeTeamId && effectiveAwayTeamId);
-
   const { error } = await supabaseAdmin
     .from("matches")
     .update({
-      home_team_id: shouldPersistInferredTeams
-        ? effectiveHomeTeamId
-        : undefined,
-      away_team_id: shouldPersistInferredTeams
-        ? effectiveAwayTeamId
-        : undefined,
-      home_placeholder: shouldPersistInferredTeams ? null : undefined,
-      away_placeholder: shouldPersistInferredTeams ? null : undefined,
-      is_open_for_predictions: shouldPersistInferredTeams ? true : undefined,
       provisional_home_score: homeScore,
       provisional_away_score: awayScore,
       provisional_winner_team_id: knockout ? storedWinnerTeamId : null,

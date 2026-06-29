@@ -586,16 +586,17 @@ export function applyFixedTopTwoToMatches(
         fixedThirdPlacePlacements,
       );
 
+      // Round-of-32 teams are derived from current group standings. Do not fall
+      // back to stored team ids here: those ids may be stale if a group result
+      // was entered and later deleted/changed.
       resolvedMatch = {
         ...resolvedMatch,
-        home_team: inferredHomeTeam ?? match.home_team ?? null,
-        away_team: inferredAwayTeam ?? match.away_team ?? null,
-        home_team_id: inferredHomeTeam?.id ?? match.home_team_id ?? null,
-        away_team_id: inferredAwayTeam?.id ?? match.away_team_id ?? null,
-        home_placeholder:
-          inferredHomeTeam || match.home_team ? null : match.home_placeholder,
-        away_placeholder:
-          inferredAwayTeam || match.away_team ? null : match.away_placeholder,
+        home_team: inferredHomeTeam ?? null,
+        away_team: inferredAwayTeam ?? null,
+        home_team_id: inferredHomeTeam?.id ?? null,
+        away_team_id: inferredAwayTeam?.id ?? null,
+        home_placeholder: inferredHomeTeam ? null : match.home_placeholder,
+        away_placeholder: inferredAwayTeam ? null : match.away_placeholder,
       };
     } else if (sources.home || sources.away) {
       const resolvedHomeTeam = resolveSourceTeam(
