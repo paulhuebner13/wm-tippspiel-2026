@@ -70,6 +70,31 @@ function hasValidFinalResult(
   );
 }
 
+function getExpectedWinnerTeamId(
+  match: Match,
+  home: number | null,
+  away: number | null,
+  selectedWinnerTeamId: string | null,
+) {
+  if (home === null || away === null) return null;
+  if (!isKnockoutStage(match.stage)) return null;
+  if (home > away) return match.home_team_id ?? null;
+  if (home < away) return match.away_team_id ?? null;
+  return selectedWinnerTeamId;
+}
+
+function getVisibleWinnerChoice(match: Match) {
+  if (
+    match.home_score !== null &&
+    match.away_score !== null &&
+    match.home_score === match.away_score
+  ) {
+    return match.winner_team_id ?? "";
+  }
+
+  return "";
+}
+
 export function ResultAdminCard({
   match,
   current,
@@ -88,6 +113,18 @@ export function ResultAdminCard({
   const [savedWinnerTeamId, setSavedWinnerTeamId] = useState<string | null>(
     match.winner_team_id ?? null,
   );
+  const [provisionalHomeScore, setProvisionalHomeScore] = useState<
+    number | null
+  >(match.provisional_home_score ?? null);
+  const [provisionalAwayScore, setProvisionalAwayScore] = useState<
+    number | null
+  >(match.provisional_away_score ?? null);
+  const [provisionalSubmittedByName, setProvisionalSubmittedByName] = useState<
+    string | null
+  >(match.provisional_submitted_by_name ?? null);
+  const [provisionalUpdatedAt, setProvisionalUpdatedAt] = useState<
+    string | null
+  >(match.provisional_updated_at ?? null);
 
   const [homeScore, setHomeScore] = useState(
     match.home_score?.toString() ?? "",
@@ -95,7 +132,7 @@ export function ResultAdminCard({
   const [awayScore, setAwayScore] = useState(
     match.away_score?.toString() ?? "",
   );
-  const [winnerTeamId, setWinnerTeamId] = useState(match.winner_team_id ?? "");
+  const [winnerTeamId, setWinnerTeamId] = useState(getVisibleWinnerChoice(match));
   const [saveState, setSaveState] = useState<"idle" | "error">("idle");
   const lastRequestKey = useRef("");
 
@@ -103,35 +140,39 @@ export function ResultAdminCard({
   const awayNumber = scoreInputToNumber(awayScore);
   const homeEmpty = homeScore.trim() === "";
   const awayEmpty = awayScore.trim() === "";
-  const bothEmpty = homeEmpty && awayEmpty && !winnerTeamId;
+  const bothEmpty = homeEmpty && awayEmpty;
   const bothScoresFilled =
     !homeEmpty && !awayEmpty && homeNumber !== null && awayNumber !== null;
   const isDraw = bothScoresFilled && homeNumber === awayNumber;
   const showWinnerChoice = knockoutStage && isDraw;
   const normalizedWinnerTeamId = showWinnerChoice ? winnerTeamId || null : null;
-
-  const matchesSaved =
-    savedHomeScore === (homeEmpty ? null : homeNumber) &&
-    savedAwayScore === (awayEmpty ? null : awayNumber) &&
-    (savedWinnerTeamId ?? null) === normalizedWinnerTeamId;
-
-  const completeAndValid = hasValidFinalResult(
+  const expectedWinnerTeamId = getExpectedWinnerTeamId(
     match,
     homeEmpty ? null : homeNumber,
     awayEmpty ? null : awayNumber,
     normalizedWinnerTeamId,
   );
 
+  const matchesSaved =
+    savedHomeScore === (homeEmpty ? null : homeNumber) &&
+    savedAwayScore === (awayEmpty ? null : awayNumber) &&
+    (savedWinnerTeamId ?? null) === expectedWinnerTeamId;
+
+  const completeAndValid = hasValidFinalResult(
+    match,
+    homeEmpty ? null : homeNumber,
+    awayEmpty ? null : awayNumber,
+    expectedWinnerTeamId,
+  );
+
   const expectedFinished = isExpectedFinished(match.kickoff_time);
   const hasOfficialResult = savedHomeScore !== null && savedAwayScore !== null;
   const hasProvisionalResult =
     !hasOfficialResult &&
-    match.provisional_home_score !== null &&
-    match.provisional_home_score !== undefined &&
-    match.provisional_away_score !== null &&
-    match.provisional_away_score !== undefined;
-  const provisionalSubmissionTime = match.provisional_updated_at
-    ? formatProvisionalSubmissionTime(match.provisional_updated_at)
+    provisionalHomeScore !== null &&
+    provisionalAwayScore !== null;
+  const provisionalSubmissionTime = provisionalUpdatedAt
+    ? formatProvisionalSubmissionTime(provisionalUpdatedAt)
     : null;
 
   const visualStatus: ResultSaveStatus =
@@ -149,8 +190,21 @@ export function ResultAdminCard({
     setSavedWinnerTeamId(match.winner_team_id ?? null);
     setHomeScore(match.home_score?.toString() ?? "");
     setAwayScore(match.away_score?.toString() ?? "");
-    setWinnerTeamId(match.winner_team_id ?? "");
-  }, [match.id, match.home_score, match.away_score, match.winner_team_id]);
+    setWinnerTeamId(getVisibleWinnerChoice(match));
+    setProvisionalHomeScore(match.provisional_home_score ?? null);
+    setProvisionalAwayScore(match.provisional_away_score ?? null);
+    setProvisionalSubmittedByName(match.provisional_submitted_by_name ?? null);
+    setProvisionalUpdatedAt(match.provisional_updated_at ?? null);
+  }, [
+    match.id,
+    match.home_score,
+    match.away_score,
+    match.winner_team_id,
+    match.provisional_home_score,
+    match.provisional_away_score,
+    match.provisional_submitted_by_name,
+    match.provisional_updated_at,
+  ]);
 
   useEffect(() => {
     if (matchesSaved) return;
@@ -173,11 +227,30 @@ export function ResultAdminCard({
       if (lastRequestKey.current !== requestKey) return;
 
       if (result.ok) {
+        const officialResultCompleted = hasValidFinalResult(
+          match,
+          requestHomeScore,
+          requestAwayScore,
+          result.winnerTeamId ?? requestWinnerTeamId,
+        );
+        const officialResultCleared =
+          requestHomeScore === null && requestAwayScore === null;
+
         setSavedHomeScore(requestHomeScore);
         setSavedAwayScore(requestAwayScore);
         setSavedWinnerTeamId(result.winnerTeamId ?? null);
-        if (!showWinnerChoice && result.winnerTeamId) {
-          setWinnerTeamId(result.winnerTeamId);
+        if (
+          result.clearedProvisional ||
+          officialResultCompleted ||
+          officialResultCleared
+        ) {
+          setProvisionalHomeScore(null);
+          setProvisionalAwayScore(null);
+          setProvisionalSubmittedByName(null);
+          setProvisionalUpdatedAt(null);
+        }
+        if (!showWinnerChoice) {
+          setWinnerTeamId("");
         }
         setSaveState("idle");
       } else {
@@ -239,11 +312,12 @@ export function ResultAdminCard({
               value={homeScore}
               placeholder={
                 hasProvisionalResult
-                  ? String(match.provisional_home_score ?? "")
+                  ? String(provisionalHomeScore ?? "")
                   : undefined
               }
               onChange={(event) => {
                 setHomeScore(event.target.value);
+                setWinnerTeamId("");
                 setSaveState("idle");
               }}
               aria-label={`${displayHomeName} Tore`}
@@ -256,11 +330,12 @@ export function ResultAdminCard({
               value={awayScore}
               placeholder={
                 hasProvisionalResult
-                  ? String(match.provisional_away_score ?? "")
+                  ? String(provisionalAwayScore ?? "")
                   : undefined
               }
               onChange={(event) => {
                 setAwayScore(event.target.value);
+                setWinnerTeamId("");
                 setSaveState("idle");
               }}
               aria-label={`${displayAwayName} Tore`}
@@ -276,7 +351,7 @@ export function ResultAdminCard({
         {hasProvisionalResult && provisionalSubmissionTime && (
           <div className="provisionalResultAttribution">
             Eingetragen von{" "}
-            <strong>{match.provisional_submitted_by_name ?? "unbekannt"}</strong>{" "}
+            <strong>{provisionalSubmittedByName ?? "unbekannt"}</strong>{" "}
             am {provisionalSubmissionTime}
           </div>
         )}

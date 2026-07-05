@@ -755,6 +755,7 @@ export async function saveResultAction(formData: FormData) {
       provisional_home_score: null,
       provisional_away_score: null,
       provisional_winner_team_id: null,
+      provisional_submitted_by_name: null,
       provisional_updated_at: null,
       is_finished: true,
       updated_at: new Date().toISOString(),
@@ -787,7 +788,8 @@ export async function saveResultInlineAction(input: {
   awayScore: number | null;
   winnerTeamId?: string | null;
 }): Promise<
-  { ok: true; winnerTeamId?: string | null } | { ok: false; error: string }
+  | { ok: true; winnerTeamId?: string | null; clearedProvisional?: boolean }
+  | { ok: false; error: string }
 > {
   await requireAdmin();
 
@@ -846,17 +848,20 @@ export async function saveResultInlineAction(input: {
     }
   }
 
+  const officialResultCleared = homeScore === null && awayScore === null;
+  const shouldClearProvisional = isFinished || officialResultCleared;
+
   const { error } = await supabaseAdmin
     .from("matches")
     .update({
       home_score: homeScore,
       away_score: awayScore,
       winner_team_id: knockout ? storedWinnerTeamId : null,
-      provisional_home_score: isFinished ? null : undefined,
-      provisional_away_score: isFinished ? null : undefined,
-      provisional_winner_team_id: isFinished ? null : undefined,
-      provisional_submitted_by_name: isFinished ? null : undefined,
-      provisional_updated_at: isFinished ? null : undefined,
+      provisional_home_score: shouldClearProvisional ? null : undefined,
+      provisional_away_score: shouldClearProvisional ? null : undefined,
+      provisional_winner_team_id: shouldClearProvisional ? null : undefined,
+      provisional_submitted_by_name: shouldClearProvisional ? null : undefined,
+      provisional_updated_at: shouldClearProvisional ? null : undefined,
       is_finished: isFinished,
       updated_at: new Date().toISOString(),
     })
@@ -886,7 +891,11 @@ export async function saveResultInlineAction(input: {
   revalidatePath("/countdown");
   revalidatePath("/results");
   revalidatePath("/ranking");
-  return { ok: true, winnerTeamId: storedWinnerTeamId };
+  return {
+    ok: true,
+    winnerTeamId: storedWinnerTeamId,
+    clearedProvisional: shouldClearProvisional,
+  };
 }
 
 export async function saveProvisionalResultInlineAction(input: {
