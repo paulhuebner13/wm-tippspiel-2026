@@ -136,7 +136,112 @@ function formatSignedDiff(value: number) {
 }
 
 function DrawFlag() {
-  return <span className="drawFlagMini">Draw</span>;
+  return <span className="drawFlagMini">X</span>;
+}
+
+function optimizerTipOutcomeSide(tip: { home: number; away: number }): OptimizerPreviewOutcomeSide {
+  if (tip.home > tip.away) return "home";
+  if (tip.home < tip.away) return "away";
+  return "draw";
+}
+
+function OptimizerTipVisual({
+  tip,
+  match,
+}: {
+  tip: OptimizerPreviewTip;
+  match: Match;
+}) {
+  const side = optimizerTipOutcomeSide(tip);
+
+  return (
+    <span className="predictionOverviewTipFlag predictionOverviewTipFlagStack matchOptimizerTipFlagStack">
+      <span className="predictionOverviewMainFlag">
+        {side === "home" && <Flag team={match.home_team} />}
+        {side === "away" && <Flag team={match.away_team} />}
+        {side === "draw" && <DrawFlag />}
+      </span>
+      {side === "draw" && tip.advanceSide === "home" && (
+        <span className="predictionOverviewAdvanceFlag">
+          <Flag team={match.home_team} />
+        </span>
+      )}
+      {side === "draw" && tip.advanceSide === "away" && (
+        <span className="predictionOverviewAdvanceFlag">
+          <Flag team={match.away_team} />
+        </span>
+      )}
+    </span>
+  );
+}
+
+function findOptimizerOutcomePick(
+  picks: OptimizerPreviewOutcomePick[],
+  key: string,
+) {
+  return picks.find((pick) => pick.key === key) ?? null;
+}
+
+function OptimizerOutcomePickCard({
+  pick,
+  match,
+}: {
+  pick: OptimizerPreviewOutcomePick | null;
+  match: Match;
+}) {
+  if (!pick?.tip) {
+    return (
+      <div className="matchOptimizerTip matchOptimizerOutcomeTip matchOptimizerOutcomeTipEmpty">
+        <span>–</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="matchOptimizerTip matchOptimizerOutcomeTip" key={pick.key}>
+      <OptimizerTipVisual tip={pick.tip} match={match} />
+      <strong>{pick.tip.scoreLabel}</strong>
+      <em>{formatExpectedPoints(pick.tip.expectedPoints)} EP</em>
+    </div>
+  );
+}
+
+function OptimizerOutcomeMatrix({
+  picks,
+  match,
+  knockoutStage,
+}: {
+  picks: OptimizerPreviewOutcomePick[];
+  match: Match;
+  knockoutStage: boolean;
+}) {
+  if (!knockoutStage) {
+    return (
+      <div className="matchOptimizerTips matchOptimizerOutcomePicks">
+        {picks.map((pick) => (
+          <OptimizerOutcomePickCard key={pick.key} pick={pick} match={match} />
+        ))}
+      </div>
+    );
+  }
+
+  const homeWin = findOptimizerOutcomePick(picks, "homeWin");
+  const drawHomeAdvance = findOptimizerOutcomePick(picks, "drawHomeAdvance");
+  const awayWin = findOptimizerOutcomePick(picks, "awayWin");
+  const drawAwayAdvance = findOptimizerOutcomePick(picks, "drawAwayAdvance");
+
+  return (
+    <div className="matchOptimizerOutcomeMatrix">
+      <div className="matchOptimizerOutcomeColumn matchOptimizerOutcomeColumnHome">
+        <OptimizerOutcomePickCard pick={homeWin} match={match} />
+        <OptimizerOutcomePickCard pick={drawHomeAdvance} match={match} />
+      </div>
+      <div className="matchOptimizerOutcomeColumn matchOptimizerOutcomeColumnAway">
+        <OptimizerOutcomePickCard pick={awayWin} match={match} />
+        <OptimizerOutcomePickCard pick={drawAwayAdvance} match={match} />
+      </div>
+    </div>
+  );
 }
 
 function predictionFlagTeam(match: Match, prediction: Prediction | undefined) {
@@ -802,10 +907,11 @@ export function MatchCard({
                     {optimizerPreview.bestThree.map((tip, index) => (
                       <div
                         className="matchOptimizerTip matchOptimizerBestTip"
-                        key={tip.label}
+                        key={tip.tipKey}
                       >
                         <span>#{index + 1}</span>
-                        <strong>{tip.label}</strong>
+                        <OptimizerTipVisual tip={tip} match={match} />
+                        <strong>{tip.scoreLabel}</strong>
                         <em>{formatExpectedPoints(tip.expectedPoints)} EP</em>
                       </div>
                     ))}
@@ -815,7 +921,8 @@ export function MatchCard({
                     <div className="matchOptimizerTips matchOptimizerAltTips">
                       {optimizerPreview.alternativeDiffs.map((tip) => (
                         <div className="matchOptimizerTip" key={tip.tipKey}>
-                          <strong>{tip.label}</strong>
+                          <OptimizerTipVisual tip={tip} match={match} />
+                          <strong>{tip.scoreLabel}</strong>
                           <em>{formatExpectedPoints(tip.expectedPoints)} EP</em>
                         </div>
                       ))}
@@ -823,34 +930,11 @@ export function MatchCard({
                   )}
 
                   {optimizerPreview.outcomePicks.length > 0 && (
-                    <div className="matchOptimizerTips matchOptimizerAltTips">
-                      {optimizerPreview.outcomePicks.map((pick) =>
-                        pick.tip ? (
-                          <div className="matchOptimizerTip" key={pick.key}>
-                            <span className="predictionOverviewTipFlag predictionOverviewTipFlagStack">
-                              <span className="predictionOverviewMainFlag">
-                                {pick.side === "home" && <Flag team={match.home_team} />}
-                                {pick.side === "away" && <Flag team={match.away_team} />}
-                                {pick.side === "draw" && <DrawFlag />}
-                              </span>
-                              {pick.side === "draw" && pick.advanceSide === "home" && (
-                                <span className="predictionOverviewAdvanceFlag">
-                                  <Flag team={match.home_team} />
-                                </span>
-                              )}
-                              {pick.side === "draw" && pick.advanceSide === "away" && (
-                                <span className="predictionOverviewAdvanceFlag">
-                                  <Flag team={match.away_team} />
-                                </span>
-                              )}
-                            </span>
-                            <span>{pick.title}</span>
-                            <strong>{pick.tip.label}</strong>
-                            <em>{formatExpectedPoints(pick.tip.expectedPoints)} EP</em>
-                          </div>
-                        ) : null,
-                      )}
-                    </div>
+                    <OptimizerOutcomeMatrix
+                      picks={optimizerPreview.outcomePicks}
+                      match={match}
+                      knockoutStage={knockoutStage}
+                    />
                   )}
 
                   <div className="matchOptimizerLists">
