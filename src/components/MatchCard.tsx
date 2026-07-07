@@ -136,7 +136,7 @@ function formatSignedDiff(value: number) {
 }
 
 function DrawFlag() {
-  return <span className="drawFlagMini">X</span>;
+  return <span className="drawFlagMini">Draw</span>;
 }
 
 function optimizerTipOutcomeSide(tip: { home: number; away: number }): OptimizerPreviewOutcomeSide {
@@ -918,7 +918,7 @@ export function MatchCard({
                   </div>
 
                   {optimizerPreview.alternativeDiffs.length > 0 && (
-                    <div className="matchOptimizerTips matchOptimizerAltTips">
+                    <div className="matchOptimizerTips matchOptimizerAltTips matchOptimizerAltDiffTips">
                       {optimizerPreview.alternativeDiffs.map((tip) => (
                         <div className="matchOptimizerTip" key={tip.tipKey}>
                           <OptimizerTipVisual tip={tip} match={match} />
@@ -930,11 +930,13 @@ export function MatchCard({
                   )}
 
                   {optimizerPreview.outcomePicks.length > 0 && (
-                    <OptimizerOutcomeMatrix
-                      picks={optimizerPreview.outcomePicks}
-                      match={match}
-                      knockoutStage={knockoutStage}
-                    />
+                    <div className="matchOptimizerOutcomeSection">
+                      <OptimizerOutcomeMatrix
+                        picks={optimizerPreview.outcomePicks}
+                        match={match}
+                        knockoutStage={knockoutStage}
+                      />
+                    </div>
                   )}
 
                   <div className="matchOptimizerLists">

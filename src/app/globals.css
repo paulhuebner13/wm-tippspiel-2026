@@ -5512,3 +5512,19 @@ html[data-theme='dark'] .standingsTable tr.standingEliminated td {
 .matchOptimizerTipFlagStack {
   margin-bottom: 2px;
 }
+
+
+.matchOptimizerAltDiffTips {
+  margin-bottom: 2px;
+}
+
+.matchOptimizerOutcomeSection {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.matchOptimizerOutcomeSection .matchOptimizerOutcomeMatrix,
+.matchOptimizerOutcomeSection .matchOptimizerOutcomePicks {
+  margin-top: 0;
+}
