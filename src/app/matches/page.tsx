@@ -5,12 +5,7 @@ import { requireUser } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getVisibleProfilesForUser } from "@/lib/visibility";
 import { isMatchStillRelevant, isPredictionLocked } from "@/lib/time";
-import {
-  runTipOptimizer,
-  type OptimizerAdvanceSide,
-  type OptimizerOutcomePick,
-  type OptimizerTipRow,
-} from "@/lib/optimizer";
+import { runTipOptimizer, type OptimizerTipRow } from "@/lib/optimizer";
 import { applyFixedTopTwoToMatches } from "@/lib/fixedGroupPlacements";
 import {
   applySpecialEffectsToMatches,
@@ -119,42 +114,11 @@ function buildPreviousMatches(
     });
 }
 
-function optimizerAdvanceTeamName(
-  match: Match,
-  advanceSide: OptimizerAdvanceSide,
-) {
-  if (advanceSide === "home") return match.home_team?.name ?? "Team 1";
-  if (advanceSide === "away") return match.away_team?.name ?? "Team 2";
-  return null;
-}
-
-function optimizerTipLabel(row: OptimizerTipRow, match: Match) {
-  if (row.home !== row.away || !row.advanceSide) return row.label;
-  const advanceTeamName = optimizerAdvanceTeamName(match, row.advanceSide);
-  return `${row.label} · ${advanceTeamName} weiter`;
-}
-
-function optimizerOutcomeTitle(pick: OptimizerOutcomePick, match: Match) {
-  if (pick.kind === "homeWin") {
-    return `Sieg ${match.home_team?.name ?? "Team 1"}`;
-  }
-  if (pick.kind === "awayWin") {
-    return `Sieg ${match.away_team?.name ?? "Team 2"}`;
-  }
-  if (pick.kind === "drawHomeAdvance") {
-    return `Remis + ${match.home_team?.name ?? "Team 1"} weiter`;
-  }
-  if (pick.kind === "drawAwayAdvance") {
-    return `Remis + ${match.away_team?.name ?? "Team 2"} weiter`;
-  }
-  return "Unentschieden";
-}
-
-function optimizerPreviewTip(row: OptimizerTipRow, match: Match) {
+function optimizerPreviewTip(row: OptimizerTipRow) {
   return {
     home: row.home,
     away: row.away,
-    label: optimizerTipLabel(row, match),
+    label: row.label,
     scoreLabel: row.label,
     tipKey: row.tipKey,
     advanceSide: row.advanceSide,
@@ -209,16 +173,16 @@ function buildOptimizerPreview(
     hasOdds,
     hasProbabilities,
     outcomes,
-    bestThree: result.bestThree.map((row) => optimizerPreviewTip(row, match)),
+    bestThree: result.bestThree.map((row) => optimizerPreviewTip(row)),
     alternativeDiffs: result.alternativeDiffs.map((row) =>
-      optimizerPreviewTip(row, match),
+      optimizerPreviewTip(row),
     ),
     outcomePicks: result.outcomePicks.map((pick) => ({
       key: pick.key,
-      title: optimizerOutcomeTitle(pick, match),
+      title: "",
       side: pick.side,
       advanceSide: pick.advanceSide,
-      tip: pick.tip ? optimizerPreviewTip(pick.tip, match) : null,
+      tip: pick.tip ? optimizerPreviewTip(pick.tip) : null,
     })),
     topScores: [...result.possibleResults]
       .sort((a, b) => b.probability - a.probability)

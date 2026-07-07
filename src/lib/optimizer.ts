@@ -544,13 +544,6 @@ function pickOutcomePicks(rows: OptimizerTipRow[], knockout: boolean): Optimizer
         tip: bestRowMatching(rows, (row) => row.home > row.away),
       },
       {
-        key: 'awayWin',
-        kind: 'awayWin',
-        side: 'away',
-        advanceSide: 'away',
-        tip: bestRowMatching(rows, (row) => row.away > row.home),
-      },
-      {
         key: 'drawHomeAdvance',
         kind: 'drawHomeAdvance',
         side: 'draw',
@@ -569,6 +562,13 @@ function pickOutcomePicks(rows: OptimizerTipRow[], knockout: boolean): Optimizer
           rows,
           (row) => row.home === row.away && row.advanceSide === 'away',
         ),
+      },
+      {
+        key: 'awayWin',
+        kind: 'awayWin',
+        side: 'away',
+        advanceSide: 'away',
+        tip: bestRowMatching(rows, (row) => row.away > row.home),
       },
     ];
   }
