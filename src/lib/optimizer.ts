@@ -318,7 +318,7 @@ function expandActualScenarios(
   possibleResults: { home: number; away: number; probability: number }[],
   knockout: boolean,
 ): ActualScenario[] {
-  return possibleResults.flatMap((actual) => {
+  return possibleResults.flatMap((actual): ActualScenario[] => {
     const actualOutcome = outcome(actual);
     if (!knockout) {
       return [{ ...actual, advanceSide: null }];
