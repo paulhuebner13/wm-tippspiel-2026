@@ -36,6 +36,27 @@ export type MatchHistoryEntry = {
   rightIsCurrent: boolean;
 };
 
+type OptimizerPreviewAdvanceSide = "home" | "away" | null;
+type OptimizerPreviewOutcomeSide = "home" | "away" | "draw";
+
+type OptimizerPreviewTip = {
+  home: number;
+  away: number;
+  label: string;
+  scoreLabel: string;
+  tipKey: string;
+  advanceSide: OptimizerPreviewAdvanceSide;
+  expectedPoints: number;
+};
+
+type OptimizerPreviewOutcomePick = {
+  key: string;
+  title: string;
+  side: OptimizerPreviewOutcomeSide;
+  advanceSide: OptimizerPreviewAdvanceSide;
+  tip: OptimizerPreviewTip | null;
+};
+
 export type OptimizerMatchPreview = {
   hasOdds: boolean;
   hasProbabilities: boolean;
@@ -44,8 +65,9 @@ export type OptimizerMatchPreview = {
     draw: number;
     away: number;
   };
-  bestThree: { label: string; expectedPoints: number }[];
-  alternativeDiffs: { label: string; expectedPoints: number }[];
+  bestThree: OptimizerPreviewTip[];
+  alternativeDiffs: OptimizerPreviewTip[];
+  outcomePicks: OptimizerPreviewOutcomePick[];
   topScores: {
     home: number;
     away: number;
@@ -792,11 +814,42 @@ export function MatchCard({
                   {optimizerPreview.alternativeDiffs.length > 0 && (
                     <div className="matchOptimizerTips matchOptimizerAltTips">
                       {optimizerPreview.alternativeDiffs.map((tip) => (
-                        <div className="matchOptimizerTip" key={tip.label}>
+                        <div className="matchOptimizerTip" key={tip.tipKey}>
                           <strong>{tip.label}</strong>
                           <em>{formatExpectedPoints(tip.expectedPoints)} EP</em>
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {optimizerPreview.outcomePicks.length > 0 && (
+                    <div className="matchOptimizerTips matchOptimizerAltTips">
+                      {optimizerPreview.outcomePicks.map((pick) =>
+                        pick.tip ? (
+                          <div className="matchOptimizerTip" key={pick.key}>
+                            <span className="predictionOverviewTipFlag predictionOverviewTipFlagStack">
+                              <span className="predictionOverviewMainFlag">
+                                {pick.side === "home" && <Flag team={match.home_team} />}
+                                {pick.side === "away" && <Flag team={match.away_team} />}
+                                {pick.side === "draw" && <DrawFlag />}
+                              </span>
+                              {pick.side === "draw" && pick.advanceSide === "home" && (
+                                <span className="predictionOverviewAdvanceFlag">
+                                  <Flag team={match.home_team} />
+                                </span>
+                              )}
+                              {pick.side === "draw" && pick.advanceSide === "away" && (
+                                <span className="predictionOverviewAdvanceFlag">
+                                  <Flag team={match.away_team} />
+                                </span>
+                              )}
+                            </span>
+                            <span>{pick.title}</span>
+                            <strong>{pick.tip.label}</strong>
+                            <em>{formatExpectedPoints(pick.tip.expectedPoints)} EP</em>
+                          </div>
+                        ) : null,
+                      )}
                     </div>
                   )}
 

@@ -1,5 +1,8 @@
 import type { Match, Team } from './types';
-import { POINTS, STAGE_MULTIPLIERS } from './scoring';
+import { POINTS, STAGE_MULTIPLIERS, isKnockoutStage } from './scoring';
+
+export type OptimizerAdvanceSide = 'home' | 'away' | null;
+export type OptimizerOutcomeSide = 'home' | 'away' | 'draw';
 
 export type OptimizerOddResult = {
   home: number;
@@ -17,18 +20,36 @@ export type OptimizerTipRow = {
   home: number;
   away: number;
   label: string;
+  tipKey: string;
+  advanceSide: OptimizerAdvanceSide;
   expectedPoints: number;
   exactProbability: number;
   diffProbability: number;
   onlyOutcomeProbability: number;
   totalOutcomeProbability: number;
+  knockoutAdvanceFullProbability: number;
+  knockoutAdvanceBonusProbability: number;
   exactStillPossible: boolean;
+};
+
+export type OptimizerOutcomePick = {
+  key: string;
+  kind:
+    | 'homeWin'
+    | 'awayWin'
+    | 'draw'
+    | 'drawHomeAdvance'
+    | 'drawAwayAdvance';
+  side: OptimizerOutcomeSide;
+  advanceSide: OptimizerAdvanceSide;
+  tip: OptimizerTipRow | null;
 };
 
 export type OptimizerResult = {
   rows: OptimizerTipRow[];
   bestThree: OptimizerTipRow[];
   alternativeDiffs: OptimizerTipRow[];
+  outcomePicks: OptimizerOutcomePick[];
   possibleResults: Required<Pick<OptimizerOddResult, 'home' | 'away' | 'label' | 'odd' | 'estimated' | 'rawProbability' | 'oddsProbability' | 'rankingProbability' | 'probability'>>[];
   errors: string[];
   summary: {
@@ -260,7 +281,7 @@ function normaliseOddsProbabilities(results: OptimizerOddResult[]) {
   return results.map((r) => ({ ...r, oddsProbability: rawSum > 0 ? r.rawProbability / rawSum : 0 }));
 }
 
-function outcome(score: { home: number; away: number }) {
+function outcome(score: { home: number; away: number }): OptimizerOutcomeSide {
   if (score.home > score.away) return 'home';
   if (score.home < score.away) return 'away';
   return 'draw';
@@ -275,24 +296,122 @@ function getBasePoints(tip: { home: number; away: number }, actual: { home: numb
   return 0;
 }
 
+function tipKey(input: { home: number; away: number; advanceSide: OptimizerAdvanceSide }) {
+  return `${input.home}:${input.away}:${input.advanceSide ?? 'none'}`;
+}
+
+function candidateAdvanceSide(home: number, away: number, knockout: boolean): OptimizerAdvanceSide {
+  if (!knockout) return null;
+  if (home > away) return 'home';
+  if (home < away) return 'away';
+  return null;
+}
+
+type ActualScenario = {
+  home: number;
+  away: number;
+  probability: number;
+  advanceSide: OptimizerAdvanceSide;
+};
+
+function expandActualScenarios(
+  possibleResults: { home: number; away: number; probability: number }[],
+  knockout: boolean,
+): ActualScenario[] {
+  return possibleResults.flatMap((actual) => {
+    const actualOutcome = outcome(actual);
+    if (!knockout) {
+      return [{ ...actual, advanceSide: null }];
+    }
+    if (actualOutcome === 'home') {
+      return [{ ...actual, advanceSide: 'home' as const }];
+    }
+    if (actualOutcome === 'away') {
+      return [{ ...actual, advanceSide: 'away' as const }];
+    }
+
+    // For knockout draws after 90 minutes the score model normally does not know
+    // who wins after extra time / penalties. Use a neutral 50/50 split so the
+    // optimizer can still value the required advance-team pick.
+    return [
+      { ...actual, probability: actual.probability / 2, advanceSide: 'home' as const },
+      { ...actual, probability: actual.probability / 2, advanceSide: 'away' as const },
+    ];
+  });
+}
+
+function calculateKnockoutBonus(
+  tip: { home: number; away: number; advanceSide: OptimizerAdvanceSide },
+  actual: ActualScenario,
+) {
+  const tipOutcome = outcome(tip);
+  const actualOutcome = outcome(actual);
+  if (!actual.advanceSide) return 0;
+
+  if (
+    tipOutcome === 'draw' &&
+    actualOutcome === 'draw' &&
+    tip.advanceSide === actual.advanceSide
+  ) {
+    return POINTS.knockoutAdvanceWinner;
+  }
+
+  if (
+    tipOutcome === 'draw' &&
+    actualOutcome !== 'draw' &&
+    tip.advanceSide === actual.advanceSide
+  ) {
+    return POINTS.knockoutAdvanceTeam;
+  }
+
+  if (
+    tipOutcome !== 'draw' &&
+    actualOutcome === 'draw' &&
+    tip.advanceSide === actual.advanceSide
+  ) {
+    return POINTS.knockoutAdvanceTeam;
+  }
+
+  return 0;
+}
+
 function calculateExpectedPointsForTip(
-  tip: { home: number; away: number; label: string; exactStillPossible: boolean },
+  tip: {
+    home: number;
+    away: number;
+    label: string;
+    tipKey: string;
+    advanceSide: OptimizerAdvanceSide;
+    exactStillPossible: boolean;
+  },
   possibleResults: { home: number; away: number; probability: number }[],
   stageMultiplier: number,
+  knockout: boolean,
 ): OptimizerTipRow {
   let expectedPoints = 0;
   let exactProbability = 0;
   let diffProbability = 0;
   let onlyOutcomeProbability = 0;
   let totalOutcomeProbability = 0;
+  let knockoutAdvanceFullProbability = 0;
+  let knockoutAdvanceBonusProbability = 0;
+  const actualScenarios = expandActualScenarios(possibleResults, knockout);
 
-  for (const actual of possibleResults) {
-    const points = getBasePoints(tip, actual) * stageMultiplier;
-    expectedPoints += actual.probability * points;
+  for (const actual of actualScenarios) {
+    const basePoints = getBasePoints(tip, actual);
+    const knockoutBonus = knockout ? calculateKnockoutBonus(tip, actual) : 0;
+    expectedPoints += actual.probability * (basePoints + knockoutBonus) * stageMultiplier;
+
     if (outcome(tip) === outcome(actual)) totalOutcomeProbability += actual.probability;
     if (tip.home === actual.home && tip.away === actual.away) exactProbability += actual.probability;
     else if (tip.home - tip.away === actual.home - actual.away) diffProbability += actual.probability;
     else if (outcome(tip) === outcome(actual)) onlyOutcomeProbability += actual.probability;
+
+    if (knockoutBonus === POINTS.knockoutAdvanceWinner) {
+      knockoutAdvanceFullProbability += actual.probability;
+    } else if (knockoutBonus === POINTS.knockoutAdvanceTeam) {
+      knockoutAdvanceBonusProbability += actual.probability;
+    }
   }
 
   return {
@@ -302,7 +421,68 @@ function calculateExpectedPointsForTip(
     diffProbability,
     onlyOutcomeProbability,
     totalOutcomeProbability,
+    knockoutAdvanceFullProbability,
+    knockoutAdvanceBonusProbability,
   };
+}
+
+function buildCandidateTips(
+  possibleResults: { home: number; away: number; label: string; probability: number }[],
+  maxGoals: number,
+  minHome: number,
+  minAway: number,
+  knockout: boolean,
+) {
+  const candidates: {
+    home: number;
+    away: number;
+    label: string;
+    tipKey: string;
+    advanceSide: OptimizerAdvanceSide;
+    exactStillPossible: boolean;
+  }[] = [];
+  const seen = new Set<string>();
+
+  function addCandidate(home: number, away: number, advanceSide: OptimizerAdvanceSide) {
+    const label = `${home}:${away}`;
+    const key = tipKey({ home, away, advanceSide });
+    if (seen.has(key)) return;
+    seen.add(key);
+    candidates.push({
+      home,
+      away,
+      label,
+      tipKey: key,
+      advanceSide,
+      exactStillPossible: home >= minHome && away >= minAway,
+    });
+  }
+
+  for (let h = 0; h <= maxGoals; h++) {
+    for (let a = 0; a <= maxGoals; a++) {
+      if (knockout && h === a) {
+        addCandidate(h, a, 'home');
+        addCandidate(h, a, 'away');
+      } else {
+        addCandidate(h, a, candidateAdvanceSide(h, a, knockout));
+      }
+    }
+  }
+
+  for (const result of possibleResults) {
+    if (knockout && result.home === result.away) {
+      addCandidate(result.home, result.away, 'home');
+      addCandidate(result.home, result.away, 'away');
+    } else {
+      addCandidate(
+        result.home,
+        result.away,
+        candidateAdvanceSide(result.home, result.away, knockout),
+      );
+    }
+  }
+
+  return candidates;
 }
 
 function calculateAllTips(
@@ -311,32 +491,12 @@ function calculateAllTips(
   minHome: number,
   minAway: number,
   stageMultiplier: number,
+  knockout: boolean,
 ) {
-  const candidates: { home: number; away: number; label: string; exactStillPossible: boolean }[] = [];
-  const seen = new Set<string>();
-
-  for (let h = 0; h <= maxGoals; h++) {
-    for (let a = 0; a <= maxGoals; a++) {
-      const label = `${h}:${a}`;
-      seen.add(label);
-      candidates.push({ home: h, away: a, label, exactStillPossible: h >= minHome && a >= minAway });
-    }
-  }
-
-  for (const result of possibleResults) {
-    if (!seen.has(result.label)) {
-      seen.add(result.label);
-      candidates.push({
-        home: result.home,
-        away: result.away,
-        label: result.label,
-        exactStillPossible: result.home >= minHome && result.away >= minAway,
-      });
-    }
-  }
-
-  return candidates
-    .map((tip) => calculateExpectedPointsForTip(tip, possibleResults, stageMultiplier))
+  return buildCandidateTips(possibleResults, maxGoals, minHome, minAway, knockout)
+    .map((tip) =>
+      calculateExpectedPointsForTip(tip, possibleResults, stageMultiplier, knockout),
+    )
     .sort((a, b) => b.expectedPoints - a.expectedPoints);
 }
 
@@ -345,7 +505,7 @@ function pickAlternativeDiffs(rows: OptimizerTipRow[], bestThree: OptimizerTipRo
   const alternatives: OptimizerTipRow[] = [];
 
   for (const row of rows) {
-    if (bestThree.some((best) => best.label === row.label)) continue;
+    if (bestThree.some((best) => best.tipKey === row.tipKey)) continue;
     const diff = row.home - row.away;
     if (!usedDiffs.has(diff)) {
       alternatives.push(row);
@@ -356,14 +516,86 @@ function pickAlternativeDiffs(rows: OptimizerTipRow[], bestThree: OptimizerTipRo
 
   if (alternatives.length < 2) {
     for (const row of rows) {
-      if (bestThree.some((best) => best.label === row.label)) continue;
-      if (alternatives.some((alt) => alt.label === row.label)) continue;
+      if (bestThree.some((best) => best.tipKey === row.tipKey)) continue;
+      if (alternatives.some((alt) => alt.tipKey === row.tipKey)) continue;
       alternatives.push(row);
       if (alternatives.length === 2) break;
     }
   }
 
   return alternatives;
+}
+
+function bestRowMatching(
+  rows: OptimizerTipRow[],
+  predicate: (row: OptimizerTipRow) => boolean,
+) {
+  return rows.find(predicate) ?? null;
+}
+
+function pickOutcomePicks(rows: OptimizerTipRow[], knockout: boolean): OptimizerOutcomePick[] {
+  if (knockout) {
+    return [
+      {
+        key: 'homeWin',
+        kind: 'homeWin',
+        side: 'home',
+        advanceSide: 'home',
+        tip: bestRowMatching(rows, (row) => row.home > row.away),
+      },
+      {
+        key: 'awayWin',
+        kind: 'awayWin',
+        side: 'away',
+        advanceSide: 'away',
+        tip: bestRowMatching(rows, (row) => row.away > row.home),
+      },
+      {
+        key: 'drawHomeAdvance',
+        kind: 'drawHomeAdvance',
+        side: 'draw',
+        advanceSide: 'home',
+        tip: bestRowMatching(
+          rows,
+          (row) => row.home === row.away && row.advanceSide === 'home',
+        ),
+      },
+      {
+        key: 'drawAwayAdvance',
+        kind: 'drawAwayAdvance',
+        side: 'draw',
+        advanceSide: 'away',
+        tip: bestRowMatching(
+          rows,
+          (row) => row.home === row.away && row.advanceSide === 'away',
+        ),
+      },
+    ];
+  }
+
+  return [
+    {
+      key: 'homeWin',
+      kind: 'homeWin',
+      side: 'home',
+      advanceSide: null,
+      tip: bestRowMatching(rows, (row) => row.home > row.away),
+    },
+    {
+      key: 'draw',
+      kind: 'draw',
+      side: 'draw',
+      advanceSide: null,
+      tip: bestRowMatching(rows, (row) => row.home === row.away),
+    },
+    {
+      key: 'awayWin',
+      kind: 'awayWin',
+      side: 'away',
+      advanceSide: null,
+      tip: bestRowMatching(rows, (row) => row.away > row.home),
+    },
+  ];
 }
 
 export function runTipOptimizer(input: {
@@ -379,6 +611,7 @@ export function runTipOptimizer(input: {
   sourceBlendWeight?: number;
 }): OptimizerResult {
   const maxGoals = input.maxGoals ?? 7;
+  const knockout = isKnockoutStage(input.match.stage);
   const sourceBlendWeight = clamp(input.sourceBlendWeight ?? 0.5, 0, 1);
   const oddsParsed = input.oddsText.trim() ? parseOdds(input.oddsText) : { results: [], errors: [] };
   const probabilitiesParsed = (input.probabilitiesText ?? '').trim()
@@ -391,6 +624,7 @@ export function runTipOptimizer(input: {
       rows: [],
       bestThree: [],
       alternativeDiffs: [],
+      outcomePicks: [],
       possibleResults: [],
       errors: oddsParsed.errors.length > 0 || probabilitiesParsed.errors.length > 0
         ? [...oddsParsed.errors, ...probabilitiesParsed.errors]
@@ -452,14 +686,23 @@ export function runTipOptimizer(input: {
     }))
     .filter((result) => result.probability > 0) as OptimizerResult['possibleResults'];
   const stageMultiplier = STAGE_MULTIPLIERS[input.match.stage];
-  const rows = calculateAllTips(possibleResults, maxGoals, minHome, minAway, stageMultiplier);
+  const rows = calculateAllTips(
+    possibleResults,
+    maxGoals,
+    minHome,
+    minAway,
+    stageMultiplier,
+    knockout,
+  );
   const bestThree = rows.slice(0, 3);
   const alternativeDiffs = pickAlternativeDiffs(rows, bestThree);
+  const outcomePicks = pickOutcomePicks(rows, knockout);
 
   return {
     rows,
     bestThree,
     alternativeDiffs,
+    outcomePicks,
     possibleResults,
     errors: [...oddsParsed.errors, ...probabilitiesParsed.errors],
     summary: {

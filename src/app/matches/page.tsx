@@ -5,7 +5,12 @@ import { requireUser } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getVisibleProfilesForUser } from "@/lib/visibility";
 import { isMatchStillRelevant, isPredictionLocked } from "@/lib/time";
-import { runTipOptimizer } from "@/lib/optimizer";
+import {
+  runTipOptimizer,
+  type OptimizerAdvanceSide,
+  type OptimizerOutcomePick,
+  type OptimizerTipRow,
+} from "@/lib/optimizer";
 import { applyFixedTopTwoToMatches } from "@/lib/fixedGroupPlacements";
 import {
   applySpecialEffectsToMatches,
@@ -114,6 +119,49 @@ function buildPreviousMatches(
     });
 }
 
+function optimizerAdvanceTeamName(
+  match: Match,
+  advanceSide: OptimizerAdvanceSide,
+) {
+  if (advanceSide === "home") return match.home_team?.name ?? "Team 1";
+  if (advanceSide === "away") return match.away_team?.name ?? "Team 2";
+  return null;
+}
+
+function optimizerTipLabel(row: OptimizerTipRow, match: Match) {
+  if (row.home !== row.away || !row.advanceSide) return row.label;
+  const advanceTeamName = optimizerAdvanceTeamName(match, row.advanceSide);
+  return `${row.label} · ${advanceTeamName} weiter`;
+}
+
+function optimizerOutcomeTitle(pick: OptimizerOutcomePick, match: Match) {
+  if (pick.kind === "homeWin") {
+    return `Sieg ${match.home_team?.name ?? "Team 1"}`;
+  }
+  if (pick.kind === "awayWin") {
+    return `Sieg ${match.away_team?.name ?? "Team 2"}`;
+  }
+  if (pick.kind === "drawHomeAdvance") {
+    return `Remis + ${match.home_team?.name ?? "Team 1"} weiter`;
+  }
+  if (pick.kind === "drawAwayAdvance") {
+    return `Remis + ${match.away_team?.name ?? "Team 2"} weiter`;
+  }
+  return "Unentschieden";
+}
+
+function optimizerPreviewTip(row: OptimizerTipRow, match: Match) {
+  return {
+    home: row.home,
+    away: row.away,
+    label: optimizerTipLabel(row, match),
+    scoreLabel: row.label,
+    tipKey: row.tipKey,
+    advanceSide: row.advanceSide,
+    expectedPoints: row.expectedPoints,
+  };
+}
+
 function buildOptimizerPreview(
   match: Match,
   optimizerInput: any,
@@ -161,13 +209,16 @@ function buildOptimizerPreview(
     hasOdds,
     hasProbabilities,
     outcomes,
-    bestThree: result.bestThree.map((row) => ({
-      label: row.label,
-      expectedPoints: row.expectedPoints,
-    })),
-    alternativeDiffs: result.alternativeDiffs.map((row) => ({
-      label: row.label,
-      expectedPoints: row.expectedPoints,
+    bestThree: result.bestThree.map((row) => optimizerPreviewTip(row, match)),
+    alternativeDiffs: result.alternativeDiffs.map((row) =>
+      optimizerPreviewTip(row, match),
+    ),
+    outcomePicks: result.outcomePicks.map((pick) => ({
+      key: pick.key,
+      title: optimizerOutcomeTitle(pick, match),
+      side: pick.side,
+      advanceSide: pick.advanceSide,
+      tip: pick.tip ? optimizerPreviewTip(pick.tip, match) : null,
     })),
     topScores: [...result.possibleResults]
       .sort((a, b) => b.probability - a.probability)
@@ -184,7 +235,6 @@ function buildOptimizerPreview(
       .slice(0, 7),
   };
 }
-
 
 const PREDICTION_PAGE_SIZE = 1000;
 
