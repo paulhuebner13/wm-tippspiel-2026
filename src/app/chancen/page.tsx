@@ -4,9 +4,8 @@ import { Flag } from '@/components/Flag';
 import { Nav } from '@/components/Nav';
 import { requireUser } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { getVisibleProfilesForUser } from '@/lib/visibility';
 import { calculateTotalPoints, getStageLabel, isKnockoutStage, STAGE_MULTIPLIERS } from '@/lib/scoring';
-import { calculateRankingPointsByProfileId } from '@/lib/rankingPoints';
+import { loadRankingContextForUser } from '@/lib/rankingPoints';
 import { getFifaRanking } from '@/lib/fifaRankings';
 import { runTipOptimizer, type OptimizerTipRow } from '@/lib/optimizer';
 import type { Match, Prediction, Profile, Team } from '@/lib/types';
@@ -475,18 +474,6 @@ function runSimulation(context: SimulationContext, runs: number, seedLabel: stri
   };
 }
 
-function debugRankingStartPoints(
-  profiles: Profile[],
-  matches: MatchWithTeams[],
-  predictions: Prediction[],
-) {
-  // This intentionally uses the same strict scoring call as /ranking:
-  // sum all stored predictions against the current match rows. No simulation data
-  // is involved here. Official/provisional results and all multipliers are handled
-  // inside calculateTotalPoints.
-  return calculateRankingPointsByProfileId(profiles, matches, predictions);
-}
-
 function maxPointsForMatch(match: MatchWithTeams) {
   const maxBase = isKnockoutStage(match.stage) ? 10 : 7;
   return maxBase * STAGE_MULTIPLIERS[match.stage];
@@ -641,36 +628,30 @@ export default async function ChancenPage() {
   const user = await requireUser();
   if (!user.is_admin) redirect('/matches');
 
-  const visibleProfiles = await getVisibleProfilesForUser(user);
-  const visibleProfileIds = visibleProfiles.map((profile) => profile.id);
+  const rankingContext = await loadRankingContextForUser<MatchWithTeams>(
+    user,
+    `
+    *,
+    home_team:teams!matches_home_team_id_fkey(*),
+    away_team:teams!matches_away_team_id_fkey(*)
+  `,
+  );
+  const visibleProfiles = rankingContext.profiles;
+  const matches = rankingContext.matches;
+  const predictions = rankingContext.predictions;
+  const currentPoints = rankingContext.pointsByProfileId;
 
-  const [matchesResponse, predictionsResponse, optimizerInputsResponse, optimizerSettingsResponse] = await Promise.all([
-    supabaseAdmin
-      .from('matches')
-      .select(
-        `
-        *,
-        home_team:teams!matches_home_team_id_fkey(*),
-        away_team:teams!matches_away_team_id_fkey(*)
-      `,
-      )
-      .order('kickoff_time', { ascending: true }),
-    visibleProfileIds.length > 0
-      ? supabaseAdmin.from('predictions').select('*').in('user_id', visibleProfileIds)
-      : Promise.resolve({ data: [] }),
+  const [optimizerInputsResponse, optimizerSettingsResponse] = await Promise.all([
     supabaseAdmin.from('tip_optimizer_inputs').select('match_id, odds_text, probabilities_text, max_goals'),
     supabaseAdmin.from('tip_optimizer_settings').select('source_blend_weight').eq('id', 1).maybeSingle(),
   ]);
 
-  const matches = (matchesResponse.data ?? []) as MatchWithTeams[];
-  const predictions = (predictionsResponse.data ?? []) as Prediction[];
   const optimizerInputs = (optimizerInputsResponse.data ?? []) as OptimizerInputRow[];
   const sourceBlendWeight = Number(optimizerSettingsResponse.data?.source_blend_weight ?? 0.5);
   const optimizerInputByMatchId = new Map(optimizerInputs.map((input) => [input.match_id, input]));
   const predictionsByKey = new Map(predictions.map((prediction) => [predictionKey(prediction.user_id, prediction.match_id), prediction]));
   const unresolvedMatches = matches.filter((match) => !hasVisibleResult(match));
   const remainingMax = maximumRemainingPoints(matches);
-  const currentPoints = debugRankingStartPoints(visibleProfiles, matches, predictions);
   const profileSkillById = new Map(
     visibleProfiles.map((profile) => [profile.id, profileSkillFor(profile, matches, predictionsByKey)]),
   );
@@ -724,10 +705,10 @@ export default async function ChancenPage() {
         <div style={{ display: 'grid', gap: 4, marginBottom: 16 }}>
           <h1>Tippspiel-Chancen</h1>
           <p className="subtle" style={{ margin: 0 }}>
-            Admin-only Simulation für deine sichtbare Tippgruppe. Start = exakt dieselben Punkte wie im Ranking, stur über calculateTotalPoints inklusive Multiplikator; danach werden nur noch offene Spiele simuliert, auch spätere K.-o.-Spiele ohne feststehende Teams.
+            Admin-only Simulation für deine sichtbare Tippgruppe. Ranking-Start kommt direkt aus derselben zentralen Ranking-Berechnung wie /ranking. Danach werden nur noch offene Spiele simuliert, inklusive Multiplikator und späterer K.-o.-Spiele ohne feststehende Teams.
           </p>
           <p style={{ ...mutedSmall, margin: 0 }}>
-            {BASE_RUNS.toLocaleString('de-AT')} deterministische Monte-Carlo-Basisläufe · {TIP_RUNS.toLocaleString('de-AT')} Läufe pro Tipp-Check · {removedCount} chancenlose Spieler ausgeblendet
+            {BASE_RUNS.toLocaleString('de-AT')} deterministische Monte-Carlo-Basisläufe · {TIP_RUNS.toLocaleString('de-AT')} Läufe pro Tipp-Check · {rankingContext.predictions.length} Ranking-Tipps geladen · {removedCount} chancenlose Spieler ausgeblendet
           </p>
         </div>
 
