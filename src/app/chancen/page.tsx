@@ -65,8 +65,8 @@ type SimulationContext = {
   profileSkillById: Map<string, number>;
 };
 
-const BASE_RUNS = 2500;
-const TIP_RUNS = 700;
+const BASE_RUNS = 5000;
+const TIP_RUNS = 900;
 const MAX_RECOMMENDED_MATCHES = 24;
 const PIE_COLORS = [
   '#2563eb',
@@ -136,6 +136,22 @@ function predictionKey(userId: string, matchId: string) {
   return `${userId}:${matchId}`;
 }
 
+function simulatedHomeTeamId(match: MatchWithTeams) {
+  return match.home_team_id ?? `virtual-home-${match.id}`;
+}
+
+function simulatedAwayTeamId(match: MatchWithTeams) {
+  return match.away_team_id ?? `virtual-away-${match.id}`;
+}
+
+function matchWithSimulationTeamIds(match: MatchWithTeams): MatchWithTeams {
+  return {
+    ...match,
+    home_team_id: simulatedHomeTeamId(match),
+    away_team_id: simulatedAwayTeamId(match),
+  };
+}
+
 function resultHomeScore(match: MatchWithTeams) {
   return match.home_score ?? match.provisional_home_score ?? null;
 }
@@ -162,13 +178,15 @@ function hasCompletePrediction(match: MatchWithTeams, prediction: Prediction | u
 }
 
 function sideWinnerTeamId(match: MatchWithTeams, home: number, away: number, rng: () => number) {
-  if (home > away) return match.home_team_id ?? null;
-  if (away > home) return match.away_team_id ?? null;
+  if (home > away) return simulatedHomeTeamId(match);
+  if (away > home) return simulatedAwayTeamId(match);
   if (!isKnockoutStage(match.stage)) return null;
   const homeRank = match.home_team ? getFifaRanking(match.home_team.name)?.rank ?? 80 : 80;
   const awayRank = match.away_team ? getFifaRanking(match.away_team.name)?.rank ?? 80 : 80;
-  const homeAdvanceProbability = Math.max(0.35, Math.min(0.65, 0.5 + (awayRank - homeRank) / 180));
-  return rng() <= homeAdvanceProbability ? match.home_team_id ?? null : match.away_team_id ?? null;
+  const homeAdvanceProbability = match.home_team && match.away_team
+    ? Math.max(0.35, Math.min(0.65, 0.5 + (awayRank - homeRank) / 180))
+    : 0.5;
+  return rng() <= homeAdvanceProbability ? simulatedHomeTeamId(match) : simulatedAwayTeamId(match);
 }
 
 function fixedScenario(match: MatchWithTeams): ActualScenario | null {
@@ -176,8 +194,10 @@ function fixedScenario(match: MatchWithTeams): ActualScenario | null {
   const home = resultHomeScore(match) as number;
   const away = resultAwayScore(match) as number;
   let winnerTeamId = match.winner_team_id ?? match.provisional_winner_team_id ?? null;
-  if (!winnerTeamId && home > away) winnerTeamId = match.home_team_id ?? null;
-  if (!winnerTeamId && away > home) winnerTeamId = match.away_team_id ?? null;
+  if (!winnerTeamId && home > away) winnerTeamId = simulatedHomeTeamId(match);
+  if (!winnerTeamId && away > home) winnerTeamId = simulatedAwayTeamId(match);
+  if (winnerTeamId === match.home_team_id) winnerTeamId = simulatedHomeTeamId(match);
+  if (winnerTeamId === match.away_team_id) winnerTeamId = simulatedAwayTeamId(match);
   return { home, away, winnerTeamId };
 }
 
@@ -264,17 +284,52 @@ function candidateTipsForMatch(match: MatchWithTeams, input: OptimizerInputRow |
 
   if (unique.size > 0) return Array.from(unique.values()).slice(0, 8);
 
-  const fallback: OptimizerTipRow[] = [
-    makeFallbackTip(match, 1, 0),
-    makeFallbackTip(match, 1, 1),
-    makeFallbackTip(match, 0, 1),
-  ];
-  return fallback;
+  const fallbackScores: [number, number][] = isKnockoutStage(match.stage)
+    ? [
+        [1, 0],
+        [0, 1],
+        [1, 1],
+        [2, 1],
+        [1, 2],
+        [0, 0],
+        [2, 0],
+        [0, 2],
+      ]
+    : [
+        [1, 0],
+        [1, 1],
+        [0, 1],
+        [2, 1],
+        [1, 2],
+        [0, 0],
+        [2, 0],
+        [0, 2],
+      ];
+
+  const fallback: OptimizerTipRow[] = [];
+  for (const [home, away] of fallbackScores) {
+    fallback.push(makeFallbackTip(match, home, away));
+    if (home === away && isKnockoutStage(match.stage)) {
+      fallback.push(makeFallbackTip(match, home, away, 'away'));
+    }
+  }
+  return fallback.slice(0, 10);
 }
 
-function makeFallbackTip(match: MatchWithTeams, home: number, away: number): OptimizerTipRow {
+function makeFallbackTip(
+  match: MatchWithTeams,
+  home: number,
+  away: number,
+  forcedAdvanceSide?: 'home' | 'away',
+): OptimizerTipRow {
   const draw = home === away;
-  const advanceSide = draw && isKnockoutStage(match.stage) ? 'home' : home > away ? 'home' : away > home ? 'away' : null;
+  const advanceSide = draw && isKnockoutStage(match.stage)
+    ? forcedAdvanceSide ?? 'home'
+    : home > away
+      ? 'home'
+      : away > home
+        ? 'away'
+        : null;
   return {
     home,
     away,
@@ -316,7 +371,7 @@ function scenarioForMatch(match: MatchWithTeams, scorePoolsByMatchId: Map<string
 function predictionFromTip(match: MatchWithTeams, profileId: string, row: OptimizerTipRow): Prediction {
   let advanceTeamId: string | null = null;
   if (row.home === row.away && isKnockoutStage(match.stage)) {
-    advanceTeamId = row.advanceSide === 'home' ? match.home_team_id ?? null : match.away_team_id ?? null;
+    advanceTeamId = row.advanceSide === 'home' ? simulatedHomeTeamId(match) : simulatedAwayTeamId(match);
   }
 
   return {
@@ -376,11 +431,15 @@ function runSimulation(context: SimulationContext, runs: number, seedLabel: stri
 
     for (const match of context.matches) {
       const scenario = scenarioForMatch(match, context.scorePoolsByMatchId, rng);
+      const scoringMatch = matchWithSimulationTeamIds(match);
       const simulatedMatch: Match = {
-        ...match,
+        ...scoringMatch,
         home_score: scenario.home,
         away_score: scenario.away,
         winner_team_id: scenario.winnerTeamId,
+        provisional_home_score: null,
+        provisional_away_score: null,
+        provisional_winner_team_id: null,
         is_finished: true,
       };
 
@@ -417,9 +476,24 @@ function runSimulation(context: SimulationContext, runs: number, seedLabel: stri
 
 function currentPointsFor(profile: Profile, matches: MatchWithTeams[], predictionsByKey: Map<string, Prediction>) {
   return matches.reduce((sum, match) => {
+    const fixed = fixedScenario(match);
+    if (!fixed) return sum;
     const prediction = predictionsByKey.get(predictionKey(profile.id, match.id));
     if (!hasCompletePrediction(match, prediction)) return sum;
-    return sum + calculateTotalPoints(match, prediction as Prediction);
+    const scoringMatch = matchWithSimulationTeamIds(match);
+    return sum + calculateTotalPoints(
+      {
+        ...scoringMatch,
+        home_score: fixed.home,
+        away_score: fixed.away,
+        winner_team_id: fixed.winnerTeamId,
+        provisional_home_score: null,
+        provisional_away_score: null,
+        provisional_winner_team_id: null,
+        is_finished: true,
+      },
+      prediction as Prediction,
+    );
   }, 0);
 }
 
@@ -440,10 +514,24 @@ function profileSkillFor(profile: Profile, matches: MatchWithTeams[], prediction
   let possible = 0;
 
   for (const match of matches) {
-    if (!hasVisibleResult(match)) continue;
+    const fixed = fixedScenario(match);
+    if (!fixed) continue;
     const prediction = predictionsByKey.get(predictionKey(profile.id, match.id));
     if (!hasCompletePrediction(match, prediction)) continue;
-    earned += calculateTotalPoints(match, prediction as Prediction);
+    const scoringMatch = matchWithSimulationTeamIds(match);
+    earned += calculateTotalPoints(
+      {
+        ...scoringMatch,
+        home_score: fixed.home,
+        away_score: fixed.away,
+        winner_team_id: fixed.winnerTeamId,
+        provisional_home_score: null,
+        provisional_away_score: null,
+        provisional_winner_team_id: null,
+        is_finished: true,
+      },
+      prediction as Prediction,
+    );
     possible += maxPointsForMatch(match);
   }
 
@@ -454,7 +542,7 @@ function profileSkillFor(profile: Profile, matches: MatchWithTeams[], prediction
 function buildRecommendations(context: SimulationContext) {
   const currentUserId = context.currentUserId;
   const openMatches = context.matches
-    .filter((match) => !hasVisibleResult(match) && match.home_team && match.away_team)
+    .filter((match) => !hasVisibleResult(match))
     .filter((match) => !hasCompletePrediction(match, context.predictionsByKey.get(predictionKey(currentUserId, match.id))))
     .slice(0, MAX_RECOMMENDED_MATCHES);
 
@@ -609,7 +697,6 @@ export default async function ChancenPage() {
   const currentDefaultTipsByMatchId = new Map<string, OptimizerTipRow>();
 
   for (const match of unresolvedMatches) {
-    if (!match.home_team || !match.away_team) continue;
     const input = optimizerInputByMatchId.get(match.id);
     scorePoolsByMatchId.set(match.id, scorePoolForMatch(match, input, sourceBlendWeight));
     const candidates = candidateTipsForMatch(match, input, sourceBlendWeight);
@@ -649,10 +736,10 @@ export default async function ChancenPage() {
         <div style={{ display: 'grid', gap: 4, marginBottom: 16 }}>
           <h1>Tippspiel-Chancen</h1>
           <p className="subtle" style={{ margin: 0 }}>
-            Admin-only Simulation für deine sichtbare Tippgruppe. Aktuelle Ranking-Punkte sind der fixe Startwert; nur offene Spiele werden Monte-Carlo-simuliert.
+            Admin-only Simulation für deine sichtbare Tippgruppe. Start = aktuelle Ranking-Punkte exakt mit Multiplikator; danach werden alle noch offenen Spiele Monte-Carlo-simuliert, auch spätere K.-o.-Spiele ohne feststehende Teams.
           </p>
           <p style={{ ...mutedSmall, margin: 0 }}>
-            {BASE_RUNS.toLocaleString('de-AT')} Monte-Carlo-Basisläufe · {TIP_RUNS.toLocaleString('de-AT')} Läufe pro Tipp-Check · {removedCount} chancenlose Spieler ausgeblendet
+            {BASE_RUNS.toLocaleString('de-AT')} deterministische Monte-Carlo-Basisläufe · {TIP_RUNS.toLocaleString('de-AT')} Läufe pro Tipp-Check · {removedCount} chancenlose Spieler ausgeblendet
           </p>
         </div>
 
@@ -699,7 +786,7 @@ export default async function ChancenPage() {
         <section className="card" style={{ marginTop: 14 }}>
           <h2 style={sectionTitle}>Tipps, die deine Gewinnchance maximieren</h2>
           <p style={{ ...mutedSmall, marginTop: -4 }}>
-            Es werden nur deine noch offenen Spiele gezeigt. Vorhandene Tipps anderer Spieler bleiben fix; fehlende Tipps werden aus Optimierer-Daten oder, falls keine Daten da sind, aus der bisherigen Trefferquote der Spieler simuliert.
+            Es werden alle für dich noch offenen Spiele angezeigt, auch spätere Platzhalter-Spiele. Vorhandene Tipps anderer Spieler bleiben fix; fehlende Tipps werden aus Optimierer-Daten oder, falls keine Daten da sind, aus der bisherigen Trefferquote der Spieler simuliert.
           </p>
 
           {recommendations.length === 0 ? (
