@@ -61,6 +61,8 @@ type SimulationContext = {
   scorePoolsByMatchId: Map<string, ScoreOption[]>;
   fallbackTipsByMatchId: Map<string, OptimizerTipRow[]>;
   currentDefaultTipsByMatchId: Map<string, OptimizerTipRow>;
+  startingPointsByProfileId: Map<string, number>;
+  profileSkillById: Map<string, number>;
 };
 
 const BASE_RUNS = 2500;
@@ -134,8 +136,16 @@ function predictionKey(userId: string, matchId: string) {
   return `${userId}:${matchId}`;
 }
 
-function hasResult(match: MatchWithTeams) {
-  return match.home_score !== null && match.away_score !== null;
+function resultHomeScore(match: MatchWithTeams) {
+  return match.home_score ?? match.provisional_home_score ?? null;
+}
+
+function resultAwayScore(match: MatchWithTeams) {
+  return match.away_score ?? match.provisional_away_score ?? null;
+}
+
+function hasVisibleResult(match: MatchWithTeams) {
+  return resultHomeScore(match) !== null && resultAwayScore(match) !== null;
 }
 
 function hasCompletePrediction(match: MatchWithTeams, prediction: Prediction | undefined | null) {
@@ -162,10 +172,10 @@ function sideWinnerTeamId(match: MatchWithTeams, home: number, away: number, rng
 }
 
 function fixedScenario(match: MatchWithTeams): ActualScenario | null {
-  if (!hasResult(match)) return null;
-  const home = match.home_score as number;
-  const away = match.away_score as number;
-  let winnerTeamId = match.winner_team_id ?? null;
+  if (!hasVisibleResult(match)) return null;
+  const home = resultHomeScore(match) as number;
+  const away = resultAwayScore(match) as number;
+  let winnerTeamId = match.winner_team_id ?? match.provisional_winner_team_id ?? null;
   if (!winnerTeamId && home > away) winnerTeamId = match.home_team_id ?? null;
   if (!winnerTeamId && away > home) winnerTeamId = match.away_team_id ?? null;
   return { home, away, winnerTeamId };
@@ -319,13 +329,15 @@ function predictionFromTip(match: MatchWithTeams, profileId: string, row: Optimi
   };
 }
 
-function sampleTip(rows: OptimizerTipRow[], rng: () => number) {
+function sampleTip(rows: OptimizerTipRow[], rng: () => number, skill = 0.55) {
   const available = rows.length > 0 ? rows : [makeFallbackTip({ stage: 'group' } as MatchWithTeams, 1, 1)];
-  const weights = [0.55, 0.3, 0.15, 0.08, 0.05, 0.04, 0.03, 0.02];
-  const total = available.reduce((sum, _row, index) => sum + (weights[index] ?? 0.01), 0);
+  const normalizedSkill = clamp(skill, 0.15, 0.95);
+  const exponent = 0.65 + normalizedSkill * 2.1;
+  const weights = available.map((_row, index) => 1 / Math.pow(index + 1, exponent));
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
   let draw = rng() * total;
   for (let i = 0; i < available.length; i++) {
-    draw -= weights[i] ?? 0.01;
+    draw -= weights[i];
     if (draw <= 0) return available[i];
   }
   return available[0];
@@ -340,7 +352,7 @@ function predictionForProfile(
 ) {
   const existing = context.predictionsByKey.get(predictionKey(profile.id, match.id));
   if (hasCompletePrediction(match, existing)) return existing as Prediction;
-  if (hasResult(match)) return null;
+  if (hasVisibleResult(match)) return null;
 
   if (profile.id === context.currentUserId) {
     const override = currentOverrides.get(match.id) ?? context.currentDefaultTipsByMatchId.get(match.id);
@@ -348,7 +360,7 @@ function predictionForProfile(
   }
 
   const rows = context.fallbackTipsByMatchId.get(match.id) ?? [];
-  const sampled = sampleTip(rows, rng);
+  const sampled = sampleTip(rows, rng, context.profileSkillById.get(profile.id) ?? 0.55);
   return predictionFromTip(match, profile.id, sampled);
 }
 
@@ -358,7 +370,9 @@ function runSimulation(context: SimulationContext, runs: number, seedLabel: stri
   const rng = seededRandom(hashString(seedLabel));
 
   for (let run = 0; run < runs; run++) {
-    const totals = new Map(context.profiles.map((profile) => [profile.id, 0]));
+    const totals = new Map(
+      context.profiles.map((profile) => [profile.id, context.startingPointsByProfileId.get(profile.id) ?? 0]),
+    );
 
     for (const match of context.matches) {
       const scenario = scenarioForMatch(match, context.scorePoolsByMatchId, rng);
@@ -403,25 +417,44 @@ function runSimulation(context: SimulationContext, runs: number, seedLabel: stri
 
 function currentPointsFor(profile: Profile, matches: MatchWithTeams[], predictionsByKey: Map<string, Prediction>) {
   return matches.reduce((sum, match) => {
-    if (!hasResult(match)) return sum;
     const prediction = predictionsByKey.get(predictionKey(profile.id, match.id));
     if (!hasCompletePrediction(match, prediction)) return sum;
     return sum + calculateTotalPoints(match, prediction as Prediction);
   }, 0);
 }
 
+function maxPointsForMatch(match: MatchWithTeams) {
+  const maxBase = isKnockoutStage(match.stage) ? 10 : 7;
+  return maxBase * STAGE_MULTIPLIERS[match.stage];
+}
+
 function maximumRemainingPoints(matches: MatchWithTeams[]) {
   return matches.reduce((sum, match) => {
-    if (hasResult(match)) return sum;
-    const maxBase = isKnockoutStage(match.stage) ? 10 : 7;
-    return sum + maxBase * STAGE_MULTIPLIERS[match.stage];
+    if (hasVisibleResult(match)) return sum;
+    return sum + maxPointsForMatch(match);
   }, 0);
+}
+
+function profileSkillFor(profile: Profile, matches: MatchWithTeams[], predictionsByKey: Map<string, Prediction>) {
+  let earned = 0;
+  let possible = 0;
+
+  for (const match of matches) {
+    if (!hasVisibleResult(match)) continue;
+    const prediction = predictionsByKey.get(predictionKey(profile.id, match.id));
+    if (!hasCompletePrediction(match, prediction)) continue;
+    earned += calculateTotalPoints(match, prediction as Prediction);
+    possible += maxPointsForMatch(match);
+  }
+
+  if (possible <= 0) return 0.55;
+  return clamp(earned / possible, 0.15, 0.95);
 }
 
 function buildRecommendations(context: SimulationContext) {
   const currentUserId = context.currentUserId;
   const openMatches = context.matches
-    .filter((match) => !hasResult(match) && match.home_team && match.away_team)
+    .filter((match) => !hasVisibleResult(match) && match.home_team && match.away_team)
     .filter((match) => !hasCompletePrediction(match, context.predictionsByKey.get(predictionKey(currentUserId, match.id))))
     .slice(0, MAX_RECOMMENDED_MATCHES);
 
@@ -557,8 +590,14 @@ export default async function ChancenPage() {
   const sourceBlendWeight = Number(optimizerSettingsResponse.data?.source_blend_weight ?? 0.5);
   const optimizerInputByMatchId = new Map(optimizerInputs.map((input) => [input.match_id, input]));
   const predictionsByKey = new Map(predictions.map((prediction) => [predictionKey(prediction.user_id, prediction.match_id), prediction]));
+  const unresolvedMatches = matches.filter((match) => !hasVisibleResult(match));
   const remainingMax = maximumRemainingPoints(matches);
-  const currentPoints = new Map(visibleProfiles.map((profile) => [profile.id, currentPointsFor(profile, matches, predictionsByKey)]));
+  const currentPoints = new Map(
+    visibleProfiles.map((profile) => [profile.id, currentPointsFor(profile, matches, predictionsByKey)]),
+  );
+  const profileSkillById = new Map(
+    visibleProfiles.map((profile) => [profile.id, profileSkillFor(profile, matches, predictionsByKey)]),
+  );
   const currentLeader = Math.max(...Array.from(currentPoints.values()), 0);
   const contenderProfiles = visibleProfiles.filter((profile) => {
     if (profile.id === user.id) return true;
@@ -569,8 +608,8 @@ export default async function ChancenPage() {
   const fallbackTipsByMatchId = new Map<string, OptimizerTipRow[]>();
   const currentDefaultTipsByMatchId = new Map<string, OptimizerTipRow>();
 
-  for (const match of matches) {
-    if (hasResult(match) || !match.home_team || !match.away_team) continue;
+  for (const match of unresolvedMatches) {
+    if (!match.home_team || !match.away_team) continue;
     const input = optimizerInputByMatchId.get(match.id);
     scorePoolsByMatchId.set(match.id, scorePoolForMatch(match, input, sourceBlendWeight));
     const candidates = candidateTipsForMatch(match, input, sourceBlendWeight);
@@ -581,11 +620,13 @@ export default async function ChancenPage() {
   const context: SimulationContext = {
     currentUserId: user.id,
     profiles: contenderProfiles,
-    matches,
+    matches: unresolvedMatches,
     predictionsByKey,
     scorePoolsByMatchId,
     fallbackTipsByMatchId,
     currentDefaultTipsByMatchId,
+    startingPointsByProfileId: currentPoints,
+    profileSkillById,
   };
 
   const baseline = runSimulation(context, BASE_RUNS, 'baseline-tipgame-wins');
@@ -608,10 +649,10 @@ export default async function ChancenPage() {
         <div style={{ display: 'grid', gap: 4, marginBottom: 16 }}>
           <h1>Tippspiel-Chancen</h1>
           <p className="subtle" style={{ margin: 0 }}>
-            Admin-only Simulation für deine sichtbare Tippgruppe. Abgegebene Tipps bleiben fix; fehlende zukünftige Tipps werden simuliert.
+            Admin-only Simulation für deine sichtbare Tippgruppe. Aktuelle Ranking-Punkte sind der fixe Startwert; nur offene Spiele werden Monte-Carlo-simuliert.
           </p>
           <p style={{ ...mutedSmall, margin: 0 }}>
-            {BASE_RUNS.toLocaleString('de-AT')} Basisläufe · {TIP_RUNS.toLocaleString('de-AT')} Läufe pro Tipp-Check · {removedCount} chancenlose Spieler ausgeblendet
+            {BASE_RUNS.toLocaleString('de-AT')} Monte-Carlo-Basisläufe · {TIP_RUNS.toLocaleString('de-AT')} Läufe pro Tipp-Check · {removedCount} chancenlose Spieler ausgeblendet
           </p>
         </div>
 
@@ -629,7 +670,7 @@ export default async function ChancenPage() {
                   <tr style={{ color: 'var(--muted)', textAlign: 'left' }}>
                     <th style={{ padding: '8px 6px' }}>Spieler</th>
                     <th style={{ padding: '8px 6px', textAlign: 'right' }}>Chance</th>
-                    <th style={{ padding: '8px 6px', textAlign: 'right' }}>Jetzt</th>
+                    <th style={{ padding: '8px 6px', textAlign: 'right' }}>Start</th>
                     <th style={{ padding: '8px 6px', textAlign: 'right' }}>Ø Ende</th>
                   </tr>
                 </thead>
@@ -658,7 +699,7 @@ export default async function ChancenPage() {
         <section className="card" style={{ marginTop: 14 }}>
           <h2 style={sectionTitle}>Tipps, die deine Gewinnchance maximieren</h2>
           <p style={{ ...mutedSmall, marginTop: -4 }}>
-            Es werden nur deine noch offenen Spiele gezeigt. Tipps anderer Spieler werden intern verwendet, aber nicht angezeigt.
+            Es werden nur deine noch offenen Spiele gezeigt. Vorhandene Tipps anderer Spieler bleiben fix; fehlende Tipps werden aus Optimierer-Daten oder, falls keine Daten da sind, aus der bisherigen Trefferquote der Spieler simuliert.
           </p>
 
           {recommendations.length === 0 ? (
