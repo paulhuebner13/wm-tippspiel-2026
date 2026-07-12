@@ -6,6 +6,7 @@ import { requireUser } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getVisibleProfilesForUser } from '@/lib/visibility';
 import { calculateTotalPoints, getStageLabel, isKnockoutStage, STAGE_MULTIPLIERS } from '@/lib/scoring';
+import { calculateRankingPointsByProfileId } from '@/lib/rankingPoints';
 import { getFifaRanking } from '@/lib/fifaRankings';
 import { runTipOptimizer, type OptimizerTipRow } from '@/lib/optimizer';
 import type { Match, Prediction, Profile, Team } from '@/lib/types';
@@ -474,27 +475,16 @@ function runSimulation(context: SimulationContext, runs: number, seedLabel: stri
   };
 }
 
-function currentPointsFor(profile: Profile, matches: MatchWithTeams[], predictionsByKey: Map<string, Prediction>) {
-  return matches.reduce((sum, match) => {
-    const fixed = fixedScenario(match);
-    if (!fixed) return sum;
-    const prediction = predictionsByKey.get(predictionKey(profile.id, match.id));
-    if (!hasCompletePrediction(match, prediction)) return sum;
-    const scoringMatch = matchWithSimulationTeamIds(match);
-    return sum + calculateTotalPoints(
-      {
-        ...scoringMatch,
-        home_score: fixed.home,
-        away_score: fixed.away,
-        winner_team_id: fixed.winnerTeamId,
-        provisional_home_score: null,
-        provisional_away_score: null,
-        provisional_winner_team_id: null,
-        is_finished: true,
-      },
-      prediction as Prediction,
-    );
-  }, 0);
+function debugRankingStartPoints(
+  profiles: Profile[],
+  matches: MatchWithTeams[],
+  predictions: Prediction[],
+) {
+  // This intentionally uses the same strict scoring call as /ranking:
+  // sum all stored predictions against the current match rows. No simulation data
+  // is involved here. Official/provisional results and all multipliers are handled
+  // inside calculateTotalPoints.
+  return calculateRankingPointsByProfileId(profiles, matches, predictions);
 }
 
 function maxPointsForMatch(match: MatchWithTeams) {
@@ -680,9 +670,7 @@ export default async function ChancenPage() {
   const predictionsByKey = new Map(predictions.map((prediction) => [predictionKey(prediction.user_id, prediction.match_id), prediction]));
   const unresolvedMatches = matches.filter((match) => !hasVisibleResult(match));
   const remainingMax = maximumRemainingPoints(matches);
-  const currentPoints = new Map(
-    visibleProfiles.map((profile) => [profile.id, currentPointsFor(profile, matches, predictionsByKey)]),
-  );
+  const currentPoints = debugRankingStartPoints(visibleProfiles, matches, predictions);
   const profileSkillById = new Map(
     visibleProfiles.map((profile) => [profile.id, profileSkillFor(profile, matches, predictionsByKey)]),
   );
@@ -736,7 +724,7 @@ export default async function ChancenPage() {
         <div style={{ display: 'grid', gap: 4, marginBottom: 16 }}>
           <h1>Tippspiel-Chancen</h1>
           <p className="subtle" style={{ margin: 0 }}>
-            Admin-only Simulation für deine sichtbare Tippgruppe. Start = aktuelle Ranking-Punkte exakt mit Multiplikator; danach werden alle noch offenen Spiele Monte-Carlo-simuliert, auch spätere K.-o.-Spiele ohne feststehende Teams.
+            Admin-only Simulation für deine sichtbare Tippgruppe. Start = exakt dieselben Punkte wie im Ranking, stur über calculateTotalPoints inklusive Multiplikator; danach werden nur noch offene Spiele simuliert, auch spätere K.-o.-Spiele ohne feststehende Teams.
           </p>
           <p style={{ ...mutedSmall, margin: 0 }}>
             {BASE_RUNS.toLocaleString('de-AT')} deterministische Monte-Carlo-Basisläufe · {TIP_RUNS.toLocaleString('de-AT')} Läufe pro Tipp-Check · {removedCount} chancenlose Spieler ausgeblendet
@@ -757,7 +745,7 @@ export default async function ChancenPage() {
                   <tr style={{ color: 'var(--muted)', textAlign: 'left' }}>
                     <th style={{ padding: '8px 6px' }}>Spieler</th>
                     <th style={{ padding: '8px 6px', textAlign: 'right' }}>Chance</th>
-                    <th style={{ padding: '8px 6px', textAlign: 'right' }}>Start</th>
+                    <th style={{ padding: '8px 6px', textAlign: 'right' }}>Ranking-Start</th>
                     <th style={{ padding: '8px 6px', textAlign: 'right' }}>Ø Ende</th>
                   </tr>
                 </thead>
