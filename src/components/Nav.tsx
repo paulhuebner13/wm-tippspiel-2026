@@ -17,6 +17,7 @@ export function Nav({ user }: { user: Profile }) {
         <Link href="/ranking">Ranking</Link>
         <Link href="/tables">Turnierbaum</Link>
         {(user.is_admin || user.can_submit_results) && <Link className="adminNavLink" href="/simulation">Simulation</Link>}
+        {user.is_admin && <Link className="adminNavLink" href="/chancen">Chancen</Link>}
         <Link href="/rules">Regeln</Link>
         <Link href="/countdown">Countdown</Link>
         {(user.is_admin || user.can_submit_results) && <Link className="adminNavLink" href="/admin">Resultate</Link>}
