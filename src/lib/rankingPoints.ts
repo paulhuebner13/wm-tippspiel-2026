@@ -113,7 +113,7 @@ export async function loadRankingContextForUser<TMatch extends Match = Match>(
     throw new Error(`Could not load ranking matches: ${matchesError.message}`);
   }
 
-  const matches = (matchesData ?? []) as TMatch[];
+  const matches = (matchesData ?? []) as unknown as TMatch[];
   const rows = calculateRankingRows(profiles, matches, predictions).sort(
     (a, b) => b.total - a.total || a.user.username.localeCompare(b.user.username, 'de-AT'),
   );
