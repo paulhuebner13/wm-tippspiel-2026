@@ -1077,7 +1077,7 @@ export default async function ChancenPage() {
             padding: 12px;
             border: 1px solid var(--line);
             border-radius: 18px;
-            background: rgba(255, 255, 255, 0.54);
+            background: rgba(107, 114, 128, 0.06);
             user-select: none;
             -webkit-user-select: none;
             touch-action: manipulation;
@@ -1119,7 +1119,7 @@ export default async function ChancenPage() {
             padding: 7px 8px;
             border: 1px solid var(--line);
             border-radius: 13px;
-            background: var(--card);
+            background: rgba(107, 114, 128, 0.07);
           }
 
           .chanceTipRowStrong {
@@ -1250,26 +1250,53 @@ export default async function ChancenPage() {
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            width: 42px;
             min-width: 42px;
-            min-height: 25px;
+            height: 26px;
           }
 
           .chanceDrawFlagLarge {
-            font-size: 10px;
-            padding: 6px 9px;
-            border-radius: 8px;
+            width: 42px;
+            min-width: 42px;
+            height: 26px;
+            flex: 0 0 42px;
+            padding: 0;
+            border-radius: 2px;
+            font-size: 8px;
             line-height: 1;
           }
 
           .chanceDrawAdvanceFlag {
             position: absolute;
-            right: -7px;
+            right: -9px;
             bottom: -6px;
+            width: 18px;
+            height: 13px;
             display: inline-flex;
-            transform: scale(0.72);
-            transform-origin: center;
-            border-radius: 5px;
-            box-shadow: 0 0 0 2px var(--card);
+            align-items: center;
+            justify-content: center;
+            padding: 1px;
+            border-radius: 3px;
+            background: var(--card);
+            box-shadow: 0 0 0 1px var(--line);
+          }
+
+          .chanceDrawAdvanceFlag .flagFrame,
+          .chanceDrawAdvanceFlag .flagPlaceholder {
+            width: 16px;
+            min-width: 16px;
+            height: 11px;
+            flex: 0 0 16px;
+          }
+
+          .chanceDrawAdvanceFlag .flagImage,
+          .chanceDrawAdvanceFlag img {
+            width: auto;
+            height: auto;
+            max-width: 16px;
+            max-height: 11px;
+            object-fit: contain;
+            border-radius: 1px;
           }
 
           .chanceNoTip {
@@ -1289,7 +1316,7 @@ export default async function ChancenPage() {
             padding: 7px 10px;
             border-radius: 999px;
             font-size: 12px;
-            background: #f3f4f6;
+            background: rgba(107, 114, 128, 0.14);
             color: var(--text);
           }
 
@@ -1298,7 +1325,7 @@ export default async function ChancenPage() {
             gap: 7px;
             padding: 8px;
             border-radius: 15px;
-            background: rgba(107, 114, 128, 0.07);
+            background: rgba(107, 114, 128, 0.06);
           }
 
           .chanceRivalRow {
@@ -1308,7 +1335,7 @@ export default async function ChancenPage() {
             align-items: center;
             padding: 7px 8px;
             border-radius: 12px;
-            background: var(--card);
+            background: rgba(107, 114, 128, 0.07);
             font-size: 12px;
           }
 
@@ -1373,20 +1400,8 @@ export default async function ChancenPage() {
             }
           }
         `}</style>
-        <div style={{ display: "grid", gap: 4, marginBottom: 16 }}>
+        <div style={{ marginBottom: 16 }}>
           <h1>Tippspiel-Chancen</h1>
-          <p className="subtle" style={{ margin: 0 }}>
-            Admin-only Simulation für deine sichtbare Tippgruppe. Ranking-Start
-            kommt direkt aus derselben zentralen Ranking-Berechnung wie
-            /ranking. Danach werden nur noch offene Spiele simuliert, inklusive
-            Multiplikator und späterer K.-o.-Spiele ohne feststehende Teams.
-          </p>
-          <p style={{ ...mutedSmall, margin: 0 }}>
-            {BASE_RUNS.toLocaleString("de-AT")} deterministische
-            Monte-Carlo-Basisläufe · {TIP_RUNS.toLocaleString("de-AT")} Läufe
-            pro Tipp-Check · {rankingContext.predictions.length} Ranking-Tipps
-            geladen · {removedCount} chancenlose Spieler ausgeblendet
-          </p>
         </div>
 
         <section style={gridTwo}>
@@ -1466,10 +1481,6 @@ export default async function ChancenPage() {
 
         <section className="card" style={{ marginTop: 14 }}>
           <h2 style={sectionTitle}>Gewinnchance maximieren</h2>
-          <p style={{ ...mutedSmall, marginTop: -4 }}>
-            Alle noch nicht gestarteten Spiele. Gegnerische Tipps werden fix eingerechnet.
-          </p>
-
           {recommendations.length === 0 ? (
             <p className="subtle">
               Aktuell gibt es keine noch nicht gestarteten Spiele.
