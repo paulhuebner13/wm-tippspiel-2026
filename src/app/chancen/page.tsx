@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { redirect } from "next/navigation";
 import { Flag } from "@/components/Flag";
 import { Nav } from "@/components/Nav";
+import { LongPressReveal } from "@/components/LongPressReveal";
 import { requireUser } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import {
@@ -724,12 +725,42 @@ function tipOutcomeSide(row: OptimizerTipRow) {
   return "draw";
 }
 
+function teamLabel(team: Team | null | undefined, placeholder?: string | null) {
+  return team?.short_name ?? team?.name ?? placeholder ?? "Offen";
+}
+
+function TeamMini({ team, placeholder }: { team?: Team | null; placeholder?: string | null }) {
+  return (
+    <span className="chanceTeamMini">
+      <span className="chanceTeamMiniFlag">
+        {team ? <Flag team={team} /> : <span className="chanceEmptyFlag">?</span>}
+      </span>
+      <span className="chanceTeamMiniName">{teamLabel(team, placeholder)}</span>
+    </span>
+  );
+}
+
+function DrawAdvanceFlag({ team }: { team?: Team | null }) {
+  return (
+    <span className="chanceDrawStack" aria-label="Unentschieden">
+      <span className="drawFlagMini chanceDrawFlagLarge">Draw</span>
+      {team && (
+        <span className="chanceDrawAdvanceFlag">
+          <Flag team={team} />
+        </span>
+      )}
+    </span>
+  );
+}
+
 function TipBadge({
   match,
   row,
+  compact = false,
 }: {
   match: MatchWithTeams;
   row: OptimizerTipRow;
+  compact?: boolean;
 }) {
   const outcomeSide = tipOutcomeSide(row);
   const advanceTeam =
@@ -740,25 +771,19 @@ function TipBadge({
         : null;
 
   return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 7,
-        justifyContent: "flex-end",
-      }}
-    >
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-        {outcomeSide === "home" && match.home_team && (
-          <Flag team={match.home_team} />
-        )}
-        {outcomeSide === "away" && match.away_team && (
-          <Flag team={match.away_team} />
-        )}
-        {outcomeSide === "draw" && <span className="drawFlagMini">Draw</span>}
-        {outcomeSide === "draw" && advanceTeam && <Flag team={advanceTeam} />}
+    <span className={`chanceTipBadge ${compact ? "chanceTipBadgeCompact" : ""}`}>
+      <span className="chanceTipTeams">
+        <span className={outcomeSide === "home" ? "chanceTipTeam chanceTipTeamPicked" : "chanceTipTeam"}>
+          <TeamMini team={match.home_team} placeholder={match.home_placeholder} />
+        </span>
+        <strong className="chanceTipScore">
+          {row.home}:{row.away}
+        </strong>
+        <span className={outcomeSide === "away" ? "chanceTipTeam chanceTipTeamPicked" : "chanceTipTeam"}>
+          <TeamMini team={match.away_team} placeholder={match.away_placeholder} />
+        </span>
       </span>
-      <strong>{row.label}</strong>
+      {outcomeSide === "draw" && <DrawAdvanceFlag team={advanceTeam} />}
     </span>
   );
 }
@@ -775,16 +800,18 @@ function predictionOutcomeSide(prediction: Prediction) {
 function PredictionBadge({
   match,
   prediction,
+  compact = false,
 }: {
   match: MatchWithTeams;
   prediction: Prediction | null;
+  compact?: boolean;
 }) {
-  if (!prediction) return <em style={{ color: "var(--muted)" }}>kein Tipp</em>;
+  if (!prediction) return <em className="chanceNoTip">kein Tipp</em>;
   if (
     prediction.predicted_home_score === null ||
     prediction.predicted_away_score === null
   ) {
-    return <em style={{ color: "var(--muted)" }}>unvollständig</em>;
+    return <em className="chanceNoTip">unvollständig</em>;
   }
 
   const outcomeSide = predictionOutcomeSide(prediction);
@@ -796,50 +823,30 @@ function PredictionBadge({
         : null;
 
   return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 7,
-        justifyContent: "flex-end",
-      }}
-    >
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-        {outcomeSide === "home" && match.home_team && (
-          <Flag team={match.home_team} />
-        )}
-        {outcomeSide === "away" && match.away_team && (
-          <Flag team={match.away_team} />
-        )}
-        {outcomeSide === "draw" && <span className="drawFlagMini">Draw</span>}
-        {outcomeSide === "draw" && advanceTeam && <Flag team={advanceTeam} />}
+    <span className={`chanceTipBadge ${compact ? "chanceTipBadgeCompact" : ""}`}>
+      <span className="chanceTipTeams">
+        <span className={outcomeSide === "home" ? "chanceTipTeam chanceTipTeamPicked" : "chanceTipTeam"}>
+          <TeamMini team={match.home_team} placeholder={match.home_placeholder} />
+        </span>
+        <strong className="chanceTipScore">
+          {prediction.predicted_home_score}:{prediction.predicted_away_score}
+        </strong>
+        <span className={outcomeSide === "away" ? "chanceTipTeam chanceTipTeamPicked" : "chanceTipTeam"}>
+          <TeamMini team={match.away_team} placeholder={match.away_placeholder} />
+        </span>
       </span>
-      <strong>
-        {prediction.predicted_home_score}:{prediction.predicted_away_score}
-      </strong>
+      {outcomeSide === "draw" && <DrawAdvanceFlag team={advanceTeam} />}
     </span>
   );
 }
 
 function MatchLabel({ match }: { match: MatchWithTeams }) {
   return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 8,
-        flexWrap: "wrap",
-      }}
-    >
-      <span style={{ color: "var(--muted)", fontSize: 12 }}>
-        #{match.match_number}
-      </span>
-      {match.home_team && <Flag team={match.home_team} />}
-      <span>{match.home_team?.name ?? match.home_placeholder ?? "Offen"}</span>
-      <span style={{ color: "var(--muted)" }}>–</span>
-      {match.away_team && <Flag team={match.away_team} />}
-      <span>{match.away_team?.name ?? match.away_placeholder ?? "Offen"}</span>
-    </span>
+    <div className="chanceMatchMini">
+      <TeamMini team={match.home_team} placeholder={match.home_placeholder} />
+      <span className="chanceMatchVs">vs</span>
+      <TeamMini team={match.away_team} placeholder={match.away_placeholder} />
+    </div>
   );
 }
 
@@ -1018,6 +1025,301 @@ export default async function ChancenPage() {
     <>
       <Nav user={user} />
       <main className="page" style={pageWide}>
+        <style>{`
+          .chanceRecommendationList {
+            display: grid;
+            gap: 10px;
+          }
+
+          .chanceRecommendationCard {
+            display: grid;
+            gap: 8px;
+            padding: 10px 0;
+            border-top: 1px solid var(--line);
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+          }
+
+          .chanceRecommendationMain {
+            display: grid;
+            grid-template-columns: minmax(210px, 1fr) minmax(210px, auto) auto;
+            gap: 12px;
+            align-items: center;
+          }
+
+          .chanceRecommendationMatch {
+            display: grid;
+            gap: 5px;
+            min-width: 0;
+          }
+
+          .chanceRecommendationMeta {
+            color: var(--muted);
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+          }
+
+          .chanceRecommendationBest {
+            display: grid;
+            justify-items: end;
+            gap: 4px;
+            min-width: 0;
+          }
+
+          .chanceRecommendationLabel {
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+          }
+
+          .chanceRecommendationChance {
+            display: grid;
+            gap: 2px;
+            justify-items: end;
+            min-width: 68px;
+            color: var(--muted);
+            font-size: 11px;
+          }
+
+          .chanceRecommendationChance strong {
+            color: var(--text);
+            font-size: 15px;
+          }
+
+          .chanceMatchMini {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            gap: 8px;
+            max-width: 360px;
+          }
+
+          .chanceMatchVs {
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+          }
+
+          .chanceTeamMini {
+            display: grid;
+            justify-items: center;
+            align-items: center;
+            gap: 3px;
+            min-width: 0;
+          }
+
+          .chanceTeamMiniFlag {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 22px;
+          }
+
+          .chanceTeamMiniName {
+            max-width: 88px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 11px;
+            color: var(--muted);
+            text-align: center;
+          }
+
+          .chanceEmptyFlag {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 18px;
+            border-radius: 5px;
+            background: rgba(107, 114, 128, 0.14);
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 800;
+          }
+
+          .chanceTipBadge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 7px;
+            min-width: 0;
+          }
+
+          .chanceTipTeams {
+            display: grid;
+            grid-template-columns: minmax(48px, 1fr) auto minmax(48px, 1fr);
+            align-items: center;
+            gap: 7px;
+            min-width: 178px;
+          }
+
+          .chanceTipTeam {
+            opacity: 0.55;
+          }
+
+          .chanceTipTeamPicked {
+            opacity: 1;
+          }
+
+          .chanceTipScore {
+            font-size: 17px;
+            line-height: 1;
+            white-space: nowrap;
+          }
+
+          .chanceTipBadgeCompact {
+            gap: 5px;
+          }
+
+          .chanceTipBadgeCompact .chanceTipTeams {
+            min-width: 138px;
+            gap: 5px;
+          }
+
+          .chanceTipBadgeCompact .chanceTipScore {
+            font-size: 14px;
+          }
+
+          .chanceTipBadgeCompact .chanceTeamMiniName {
+            max-width: 58px;
+            font-size: 10px;
+          }
+
+          .chanceDrawStack {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 42px;
+            min-height: 24px;
+          }
+
+          .chanceDrawFlagLarge {
+            font-size: 10px;
+            padding: 5px 8px;
+            border-radius: 8px;
+            line-height: 1;
+          }
+
+          .chanceDrawAdvanceFlag {
+            position: absolute;
+            right: -7px;
+            bottom: -6px;
+            display: inline-flex;
+            transform: scale(0.72);
+            transform-origin: center;
+            border-radius: 5px;
+            box-shadow: 0 0 0 2px var(--card);
+          }
+
+          .chanceNoTip {
+            color: var(--muted);
+            font-size: 12px;
+          }
+
+          .chanceRivalReveal {
+            margin-top: 2px;
+          }
+
+          .chanceRivalList {
+            display: grid;
+            gap: 6px;
+            max-width: 620px;
+            padding: 8px;
+            border-radius: 14px;
+            background: rgba(107, 114, 128, 0.07);
+          }
+
+          .chanceRivalRow {
+            display: grid;
+            grid-template-columns: minmax(92px, 1fr) auto minmax(140px, auto);
+            gap: 8px;
+            align-items: center;
+            padding: 6px 8px;
+            border-radius: 11px;
+            background: var(--card);
+            font-size: 12px;
+          }
+
+          .chanceRivalName {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-weight: 700;
+          }
+
+          .chanceRivalPoints {
+            color: var(--muted);
+            font-size: 11px;
+            white-space: nowrap;
+          }
+
+          @media (max-width: 720px) {
+            .chanceRecommendationMain {
+              grid-template-columns: 1fr;
+              gap: 8px;
+            }
+
+            .chanceRecommendationBest {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              gap: 10px;
+              justify-items: stretch;
+            }
+
+            .chanceRecommendationChance {
+              display: flex;
+              justify-content: space-between;
+              align-items: baseline;
+              font-size: 11px;
+              min-width: 0;
+            }
+
+            .chanceRecommendationChance strong {
+              font-size: 14px;
+            }
+
+            .chanceMatchMini {
+              max-width: none;
+              gap: 6px;
+            }
+
+            .chanceTipBadge {
+              width: 100%;
+              justify-content: space-between;
+            }
+
+            .chanceTipTeams {
+              min-width: 0;
+              width: 100%;
+              grid-template-columns: minmax(46px, 1fr) auto minmax(46px, 1fr);
+            }
+
+            .chanceTeamMiniName {
+              max-width: 78px;
+            }
+
+            .chanceRivalRow {
+              grid-template-columns: 1fr auto;
+            }
+
+            .chanceRivalRow .chanceTipBadge,
+            .chanceRivalRow .chanceNoTip {
+              grid-column: 1 / -1;
+              justify-self: stretch;
+            }
+          }
+        `}</style>
         <div style={{ display: "grid", gap: 4, marginBottom: 16 }}>
           <h1>Tippspiel-Chancen</h1>
           <p className="subtle" style={{ margin: 0 }}>
@@ -1112,8 +1414,7 @@ export default async function ChancenPage() {
         <section className="card" style={{ marginTop: 14 }}>
           <h2 style={sectionTitle}>Gewinnchance maximieren</h2>
           <p style={{ ...mutedSmall, marginTop: -4 }}>
-            Alle noch nicht gestarteten Spiele. Beste Tipps unter Einbeziehung
-            fixer gegnerischer Tipps.
+            Alle noch nicht gestarteten Spiele. Gegnerische Tipps werden fix eingerechnet.
           </p>
 
           {recommendations.length === 0 ? (
@@ -1121,90 +1422,64 @@ export default async function ChancenPage() {
               Aktuell gibt es keine noch nicht gestarteten Spiele.
             </p>
           ) : (
-            <div style={{ display: "grid", gap: 8 }}>
-              {recommendations.map((recommendation) => (
-                <div
-                  key={recommendation.match.id}
-                  style={{
-                    display: "grid",
-                    gap: 8,
-                    padding: "11px 0",
-                    borderTop: "1px solid var(--line)",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "minmax(220px, 1fr) auto auto",
-                      gap: 12,
-                      alignItems: "center",
-                    }}
-                  >
-                    <div style={{ display: "grid", gap: 3 }}>
-                      <MatchLabel match={recommendation.match} />
-                      <span style={mutedSmall}>
-                        {getStageLabel(recommendation.match.stage)} · aktuell:{" "}
+            <div className="chanceRecommendationList">
+              {recommendations.map((recommendation) => {
+                const reveal = (
+                  <div className="chanceRivalList">
+                    {recommendation.rivalTips.map((rival) => (
+                      <div key={rival.profile.id} className="chanceRivalRow">
+                        <span className="chanceRivalName">{rival.profile.username}</span>
+                        <span className="chanceRivalPoints">{rival.points} P</span>
                         <PredictionBadge
                           match={recommendation.match}
-                          prediction={recommendation.currentPrediction}
+                          prediction={rival.prediction}
+                          compact
                         />
+                      </div>
+                    ))}
+                  </div>
+                );
+
+                return (
+                  <LongPressReveal
+                    key={recommendation.match.id}
+                    className="chanceRecommendationCard"
+                    revealClassName="chanceRivalReveal"
+                    reveal={reveal}
+                  >
+                    <div className="chanceRecommendationMain">
+                      <div className="chanceRecommendationMatch">
+                        <MatchLabel match={recommendation.match} />
+                        <span className="chanceRecommendationMeta">
+                          <span>#{recommendation.match.match_number}</span>
+                          <span>{getStageLabel(recommendation.match.stage)}</span>
+                          <span>
+                            aktuell:{" "}
+                            <PredictionBadge
+                              match={recommendation.match}
+                              prediction={recommendation.currentPrediction}
+                              compact
+                            />
+                          </span>
+                        </span>
+                      </div>
+
+                      <div className="chanceRecommendationBest">
+                        <span className="chanceRecommendationLabel">Optimal</span>
+                        <TipBadge
+                          match={recommendation.match}
+                          row={recommendation.best.row}
+                        />
+                      </div>
+
+                      <span className="chanceRecommendationChance">
+                        <span>Chance</span>
+                        <strong>{formatPercent(recommendation.best.winProbability)}</strong>
                       </span>
                     </div>
-                    <TipBadge
-                      match={recommendation.match}
-                      row={recommendation.best.row}
-                    />
-                    <strong style={{ textAlign: "right" }}>
-                      {formatPercent(recommendation.best.winProbability)}
-                    </strong>
-                  </div>
-
-                  <details style={{ justifySelf: "start" }}>
-                    <summary
-                      style={{
-                        color: "var(--muted)",
-                        cursor: "pointer",
-                        fontSize: 13,
-                      }}
-                    >
-                      Top-5-Tipps anzeigen
-                    </summary>
-                    <div
-                      style={{
-                        display: "grid",
-                        gap: 6,
-                        marginTop: 8,
-                        minWidth: "min(100%, 520px)",
-                      }}
-                    >
-                      {recommendation.rivalTips.map((rival) => (
-                        <div
-                          key={rival.profile.id}
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "minmax(120px, 1fr) auto auto",
-                            gap: 10,
-                            alignItems: "center",
-                            padding: "6px 8px",
-                            borderRadius: 10,
-                            background: "rgba(107, 114, 128, 0.08)",
-                            fontSize: 13,
-                          }}
-                        >
-                          <span>{rival.profile.username}</span>
-                          <span style={{ color: "var(--muted)" }}>
-                            {rival.points} P
-                          </span>
-                          <PredictionBadge
-                            match={recommendation.match}
-                            prediction={rival.prediction}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                </div>
-              ))}
+                  </LongPressReveal>
+                );
+              })}
             </div>
           )}
         </section>
