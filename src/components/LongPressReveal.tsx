@@ -46,7 +46,22 @@ export function LongPressReveal({
       onContextMenu={(event) => event.preventDefault()}
     >
       {children}
-      {open && <div className={revealClassName}>{reveal}</div>}
+      {open && (
+        <div className={revealClassName}>
+          <button
+            type="button"
+            className="longPressRevealClose"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              setOpen(false);
+            }}
+          >
+            Einklappen
+          </button>
+          {reveal}
+        </div>
+      )}
     </div>
   );
 }

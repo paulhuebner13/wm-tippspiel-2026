@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { Flag } from "@/components/Flag";
 import { Nav } from "@/components/Nav";
@@ -726,10 +726,16 @@ function tipOutcomeSide(row: OptimizerTipRow) {
 }
 
 function teamLabel(team: Team | null | undefined, placeholder?: string | null) {
-  return team?.short_name ?? team?.name ?? placeholder ?? "Offen";
+  return team?.name ?? placeholder ?? "Offen";
 }
 
-function TeamMini({ team, placeholder }: { team?: Team | null; placeholder?: string | null }) {
+function TeamMini({
+  team,
+  placeholder,
+}: {
+  team?: Team | null;
+  placeholder?: string | null;
+}) {
   return (
     <span className="chanceTeamMini">
       <span className="chanceTeamMiniFlag">
@@ -753,6 +759,27 @@ function DrawAdvanceFlag({ team }: { team?: Team | null }) {
   );
 }
 
+function ResultFlag({
+  match,
+  outcomeSide,
+  advanceTeam,
+}: {
+  match: MatchWithTeams;
+  outcomeSide: "home" | "away" | "draw" | null;
+  advanceTeam?: Team | null;
+}) {
+  if (outcomeSide === "home") {
+    return match.home_team ? <Flag team={match.home_team} /> : <span className="chanceEmptyFlag">?</span>;
+  }
+  if (outcomeSide === "away") {
+    return match.away_team ? <Flag team={match.away_team} /> : <span className="chanceEmptyFlag">?</span>;
+  }
+  if (outcomeSide === "draw") {
+    return <DrawAdvanceFlag team={advanceTeam} />;
+  }
+  return <span className="chanceEmptyFlag">?</span>;
+}
+
 function TipBadge({
   match,
   row,
@@ -772,18 +799,16 @@ function TipBadge({
 
   return (
     <span className={`chanceTipBadge ${compact ? "chanceTipBadgeCompact" : ""}`}>
-      <span className="chanceTipTeams">
-        <span className={outcomeSide === "home" ? "chanceTipTeam chanceTipTeamPicked" : "chanceTipTeam"}>
-          <TeamMini team={match.home_team} placeholder={match.home_placeholder} />
-        </span>
-        <strong className="chanceTipScore">
-          {row.home}:{row.away}
-        </strong>
-        <span className={outcomeSide === "away" ? "chanceTipTeam chanceTipTeamPicked" : "chanceTipTeam"}>
-          <TeamMini team={match.away_team} placeholder={match.away_placeholder} />
-        </span>
+      <strong className="chanceTipScoreOnly">
+        {row.home}:{row.away}
+      </strong>
+      <span className="chanceTipResultFlag">
+        <ResultFlag
+          match={match}
+          outcomeSide={outcomeSide}
+          advanceTeam={advanceTeam}
+        />
       </span>
-      {outcomeSide === "draw" && <DrawAdvanceFlag team={advanceTeam} />}
     </span>
   );
 }
@@ -824,19 +849,34 @@ function PredictionBadge({
 
   return (
     <span className={`chanceTipBadge ${compact ? "chanceTipBadgeCompact" : ""}`}>
-      <span className="chanceTipTeams">
-        <span className={outcomeSide === "home" ? "chanceTipTeam chanceTipTeamPicked" : "chanceTipTeam"}>
-          <TeamMini team={match.home_team} placeholder={match.home_placeholder} />
-        </span>
-        <strong className="chanceTipScore">
-          {prediction.predicted_home_score}:{prediction.predicted_away_score}
-        </strong>
-        <span className={outcomeSide === "away" ? "chanceTipTeam chanceTipTeamPicked" : "chanceTipTeam"}>
-          <TeamMini team={match.away_team} placeholder={match.away_placeholder} />
-        </span>
+      <strong className="chanceTipScoreOnly">
+        {prediction.predicted_home_score}:{prediction.predicted_away_score}
+      </strong>
+      <span className="chanceTipResultFlag">
+        <ResultFlag
+          match={match}
+          outcomeSide={outcomeSide}
+          advanceTeam={advanceTeam}
+        />
       </span>
-      {outcomeSide === "draw" && <DrawAdvanceFlag team={advanceTeam} />}
     </span>
+  );
+}
+
+function TipRow({
+  label,
+  children,
+  strong = false,
+}: {
+  label: string;
+  children: ReactNode;
+  strong?: boolean;
+}) {
+  return (
+    <div className={strong ? "chanceTipRow chanceTipRowStrong" : "chanceTipRow"}>
+      <span className="chanceTipRowLabel">{label}</span>
+      <span className="chanceTipRowValue">{children}</span>
+    </div>
   );
 }
 
@@ -1033,9 +1073,11 @@ export default async function ChancenPage() {
 
           .chanceRecommendationCard {
             display: grid;
-            gap: 8px;
-            padding: 10px 0;
-            border-top: 1px solid var(--line);
+            gap: 10px;
+            padding: 12px;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.54);
             user-select: none;
             -webkit-user-select: none;
             touch-action: manipulation;
@@ -1043,14 +1085,14 @@ export default async function ChancenPage() {
 
           .chanceRecommendationMain {
             display: grid;
-            grid-template-columns: minmax(210px, 1fr) minmax(210px, auto) auto;
+            grid-template-columns: minmax(210px, 1fr) minmax(230px, 0.9fr) auto;
             gap: 12px;
             align-items: center;
           }
 
           .chanceRecommendationMatch {
             display: grid;
-            gap: 5px;
+            gap: 6px;
             min-width: 0;
           }
 
@@ -1063,19 +1105,40 @@ export default async function ChancenPage() {
             flex-wrap: wrap;
           }
 
-          .chanceRecommendationBest {
+          .chanceTipTabs {
             display: grid;
-            justify-items: end;
-            gap: 4px;
+            gap: 7px;
             min-width: 0;
           }
 
-          .chanceRecommendationLabel {
+          .chanceTipRow {
+            display: grid;
+            grid-template-columns: 72px 1fr;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 8px;
+            border: 1px solid var(--line);
+            border-radius: 13px;
+            background: var(--card);
+          }
+
+          .chanceTipRowStrong {
+            border-color: rgba(22, 101, 52, 0.24);
+            background: rgba(22, 163, 74, 0.06);
+          }
+
+          .chanceTipRowLabel {
             color: var(--muted);
             font-size: 11px;
-            font-weight: 700;
+            font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.04em;
+          }
+
+          .chanceTipRowValue {
+            display: flex;
+            justify-content: flex-end;
+            min-width: 0;
           }
 
           .chanceRecommendationChance {
@@ -1094,24 +1157,25 @@ export default async function ChancenPage() {
 
           .chanceMatchMini {
             display: grid;
-            grid-template-columns: 1fr auto 1fr;
-            align-items: center;
-            gap: 8px;
-            max-width: 360px;
+            grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+            align-items: start;
+            gap: 10px;
+            max-width: 440px;
           }
 
           .chanceMatchVs {
             color: var(--muted);
             font-size: 11px;
-            font-weight: 800;
+            font-weight: 900;
             text-transform: uppercase;
+            padding-top: 4px;
           }
 
           .chanceTeamMini {
             display: grid;
             justify-items: center;
-            align-items: center;
-            gap: 3px;
+            align-items: start;
+            gap: 5px;
             min-width: 0;
           }
 
@@ -1119,17 +1183,17 @@ export default async function ChancenPage() {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-height: 22px;
+            min-height: 24px;
           }
 
           .chanceTeamMiniName {
-            max-width: 88px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            font-size: 11px;
-            color: var(--muted);
+            width: 100%;
+            overflow-wrap: anywhere;
+            font-size: 12px;
+            line-height: 1.12;
+            color: var(--text);
             text-align: center;
+            font-weight: 700;
           }
 
           .chanceEmptyFlag {
@@ -1146,51 +1210,39 @@ export default async function ChancenPage() {
           }
 
           .chanceTipBadge {
-            display: inline-flex;
+            display: inline-grid;
+            grid-template-columns: auto auto;
             align-items: center;
-            justify-content: flex-end;
-            gap: 7px;
-            min-width: 0;
+            justify-content: end;
+            gap: 9px;
+            min-width: 86px;
           }
 
-          .chanceTipTeams {
-            display: grid;
-            grid-template-columns: minmax(48px, 1fr) auto minmax(48px, 1fr);
-            align-items: center;
-            gap: 7px;
-            min-width: 178px;
-          }
-
-          .chanceTipTeam {
-            opacity: 0.55;
-          }
-
-          .chanceTipTeamPicked {
-            opacity: 1;
-          }
-
-          .chanceTipScore {
-            font-size: 17px;
+          .chanceTipScoreOnly {
+            font-size: 18px;
             line-height: 1;
             white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+          }
+
+          .chanceTipResultFlag {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 34px;
           }
 
           .chanceTipBadgeCompact {
-            gap: 5px;
+            gap: 7px;
+            min-width: 74px;
           }
 
-          .chanceTipBadgeCompact .chanceTipTeams {
-            min-width: 138px;
-            gap: 5px;
+          .chanceTipBadgeCompact .chanceTipScoreOnly {
+            font-size: 15px;
           }
 
-          .chanceTipBadgeCompact .chanceTipScore {
-            font-size: 14px;
-          }
-
-          .chanceTipBadgeCompact .chanceTeamMiniName {
-            max-width: 58px;
-            font-size: 10px;
+          .chanceTipBadgeCompact .chanceTipResultFlag {
+            min-width: 30px;
           }
 
           .chanceDrawStack {
@@ -1199,12 +1251,12 @@ export default async function ChancenPage() {
             align-items: center;
             justify-content: center;
             min-width: 42px;
-            min-height: 24px;
+            min-height: 25px;
           }
 
           .chanceDrawFlagLarge {
             font-size: 10px;
-            padding: 5px 8px;
+            padding: 6px 9px;
             border-radius: 8px;
             line-height: 1;
           }
@@ -1223,28 +1275,39 @@ export default async function ChancenPage() {
           .chanceNoTip {
             color: var(--muted);
             font-size: 12px;
+            justify-self: end;
           }
 
           .chanceRivalReveal {
             margin-top: 2px;
+            display: grid;
+            gap: 8px;
+          }
+
+          .longPressRevealClose {
+            justify-self: end;
+            padding: 7px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            background: #f3f4f6;
+            color: var(--text);
           }
 
           .chanceRivalList {
             display: grid;
-            gap: 6px;
-            max-width: 620px;
+            gap: 7px;
             padding: 8px;
-            border-radius: 14px;
+            border-radius: 15px;
             background: rgba(107, 114, 128, 0.07);
           }
 
           .chanceRivalRow {
             display: grid;
-            grid-template-columns: minmax(92px, 1fr) auto minmax(140px, auto);
+            grid-template-columns: minmax(90px, 1fr) auto minmax(94px, auto);
             gap: 8px;
             align-items: center;
-            padding: 6px 8px;
-            border-radius: 11px;
+            padding: 7px 8px;
+            border-radius: 12px;
             background: var(--card);
             font-size: 12px;
           }
@@ -1254,7 +1317,7 @@ export default async function ChancenPage() {
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            font-weight: 700;
+            font-weight: 800;
           }
 
           .chanceRivalPoints {
@@ -1263,26 +1326,23 @@ export default async function ChancenPage() {
             white-space: nowrap;
           }
 
-          @media (max-width: 720px) {
-            .chanceRecommendationMain {
-              grid-template-columns: 1fr;
-              gap: 8px;
+          @media (max-width: 760px) {
+            .chanceRecommendationCard {
+              padding: 11px;
+              border-radius: 16px;
             }
 
-            .chanceRecommendationBest {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
+            .chanceRecommendationMain {
+              grid-template-columns: 1fr;
               gap: 10px;
-              justify-items: stretch;
             }
 
             .chanceRecommendationChance {
               display: flex;
               justify-content: space-between;
               align-items: baseline;
-              font-size: 11px;
               min-width: 0;
+              padding-top: 2px;
             }
 
             .chanceRecommendationChance strong {
@@ -1291,32 +1351,25 @@ export default async function ChancenPage() {
 
             .chanceMatchMini {
               max-width: none;
-              gap: 6px;
-            }
-
-            .chanceTipBadge {
-              width: 100%;
-              justify-content: space-between;
-            }
-
-            .chanceTipTeams {
-              min-width: 0;
-              width: 100%;
-              grid-template-columns: minmax(46px, 1fr) auto minmax(46px, 1fr);
+              gap: 7px;
             }
 
             .chanceTeamMiniName {
-              max-width: 78px;
+              font-size: 11px;
+            }
+
+            .chanceTipRow {
+              grid-template-columns: 64px 1fr;
+              padding: 7px;
+            }
+
+            .chanceTipBadge {
+              min-width: 78px;
             }
 
             .chanceRivalRow {
-              grid-template-columns: 1fr auto;
-            }
-
-            .chanceRivalRow .chanceTipBadge,
-            .chanceRivalRow .chanceNoTip {
-              grid-column: 1 / -1;
-              justify-self: stretch;
+              grid-template-columns: minmax(0, 1fr) auto minmax(82px, auto);
+              padding: 7px;
             }
           }
         `}</style>
@@ -1453,23 +1506,24 @@ export default async function ChancenPage() {
                         <span className="chanceRecommendationMeta">
                           <span>#{recommendation.match.match_number}</span>
                           <span>{getStageLabel(recommendation.match.stage)}</span>
-                          <span>
-                            aktuell:{" "}
-                            <PredictionBadge
-                              match={recommendation.match}
-                              prediction={recommendation.currentPrediction}
-                              compact
-                            />
-                          </span>
                         </span>
                       </div>
 
-                      <div className="chanceRecommendationBest">
-                        <span className="chanceRecommendationLabel">Optimal</span>
-                        <TipBadge
-                          match={recommendation.match}
-                          row={recommendation.best.row}
-                        />
+                      <div className="chanceTipTabs">
+                        <TipRow label="Aktuell">
+                          <PredictionBadge
+                            match={recommendation.match}
+                            prediction={recommendation.currentPrediction}
+                            compact
+                          />
+                        </TipRow>
+                        <TipRow label="Optimal" strong>
+                          <TipBadge
+                            match={recommendation.match}
+                            row={recommendation.best.row}
+                            compact
+                          />
+                        </TipRow>
                       </div>
 
                       <span className="chanceRecommendationChance">
